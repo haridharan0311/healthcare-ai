@@ -14,10 +14,11 @@ class Doctor(models.Model):
         ('M', 'Male'),
         ('F', 'Female'),
         ('O', 'Other'),
+        ('U', 'Unknown'),
     )
 
     first_name = models.CharField(max_length=100)
-    initial = models.CharField(max_length=10, blank=True, null=True)
+    last_name = models.CharField(max_length=100, blank=True, null=True)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     qualification = models.CharField(max_length=255)
 
@@ -28,7 +29,7 @@ class Doctor(models.Model):
     )
 
     def __str__(self):
-        return f"{self.first_name} {self.initial or ''}".strip()
+        return f"{self.first_name} {self.last_name or ''}".strip()
 
 
 class Patient(models.Model):
@@ -36,6 +37,7 @@ class Patient(models.Model):
         ('M', 'Male'),
         ('F', 'Female'),
         ('O', 'Other'),
+        ('U', 'Unknown'),
     )
 
     TITLE_CHOICES = (
@@ -51,8 +53,6 @@ class Patient(models.Model):
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     title = models.CharField(max_length=10, choices=TITLE_CHOICES)
 
-    patient_account_number = models.CharField(max_length=50, unique=True)
-
     dob = models.DateField()
     mobile_number = models.CharField(max_length=15)
 
@@ -61,6 +61,14 @@ class Patient(models.Model):
     clinic = models.ForeignKey(
         Clinic,
         on_delete=models.CASCADE,
+        related_name='patients'
+    )
+
+    doctor = models.ForeignKey(
+        Doctor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='patients'
     )
 

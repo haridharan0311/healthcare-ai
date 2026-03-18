@@ -16,14 +16,14 @@ class Disease(models.Model):
     # active flag for future control
     is_active = models.BooleanField(default=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField()
 
     def __str__(self):
         return self.name
 
 
 class Appointment(models.Model):
-    appointment_date = models.DateTimeField()
+    appointment_datetime = models.DateTimeField()
 
     appointment_status = models.CharField(max_length=50)
 
@@ -54,5 +54,5 @@ class Appointment(models.Model):
     op_number = models.CharField(max_length=50, db_index=True)
 
     def __str__(self):
-        return f"{self.op_number} - {self.appointment_date}"
+        return f"{self.op_number} - {self.appointment_datetime}"
 

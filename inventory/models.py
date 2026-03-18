@@ -59,6 +59,13 @@ class PrescriptionLine(models.Model):
         db_index=True
     )
 
+    disease = models.ForeignKey(
+        'analytics.Disease',
+        on_delete=models.SET_NULL,
+        null=True,
+        db_index=True
+    )
+
     quantity = models.IntegerField()
 
     drug = models.ForeignKey(
