@@ -1,0 +1,511 @@
+"id","first_name","initial","gender","qualifications","clinic_id"
+20,RajeshPD,K,m,MBBS,10
+21,Rajesh GP,Kumble,m,"MBBS , FAAP",10
+22,RajeshDB,K,m,MBBS,10
+23,RajeshOBGYN,K,m,MBBS,10
+24,RajeshPSY,K,m,MBBS,10
+49,Pradeepa,DS,f,"M.Sc DFSM.,CDE CMC Vellore.,MIDA",34
+90,RamsathyaGP,R,m,MBBS,10
+113,Test,Test,m,MBBS,10
+171,Sanjai,V.S,m,"MBBS, MS (Gen), DNB (Plastic)",52
+172,Sabari Prabhu,K,m,MBBS,52
+173,Pranesh Kumar,M,m,"MBBS, MS (ORTHO)",52
+174,GunaSekaran,M,m,MPT (ORTHO),52
+176,Prabhakaran,D,m,"MBBS, MDRD, (YSMU)",52
+177,Savithri,M,f,"MBBS, DGO, DNB (OG)",52
+178,Sathish,M,m,MD,52
+179,Raja,D,m,"MBBS, MS, MCH (URO)",52
+180,Prakash,S,m,"MBBS, MS",52
+184,Sasikumar,B.R,m,"MBBS, MD, DCH",52
+185,Bhargavi,V.R.J,f,"MBBS, DCH",52
+186,Gopinath,C,m,"MBBS, MD",52
+113,Test,Test,m,MBBS,10
+191,Thiruveni,R,f,"D.G.O, D.N.B, D.R.M (Germany)",53
+211,Nalini,S,f,"MBBS, DMRD",58
+212,Arasu,V.T,m,M.S,58
+213,Subash,S,m,M.D.DCH,58
+215,Sudha,S,f,M.D,58
+216,Dhilipkumar,E,m,M.S,58
+219,Sheetal,S,f,"M.S,ENT",58
+226,Hemaprasad,T,,,59
+236,Sabarish,MS,m,MS,58
+237,Chandru,MD,m,MD,58
+238,Mugunthan,DB,m,MBBS,58
+239,Sangameshwaran,MS,m,MS,58
+244,Azarudeen,K,m,"MBBS.,DNHE.,M.D(PEAD)",59
+249,VimalRaj,V,,"MBBS,DNB,(PAED)IDPCCM",58
+277,Aravind Vijayan,,m,M.D.(Gen.Med),68
+278,Ananthi Aravind,S,f,M.S.(OG),68
+279,Ajith K Nair,,m,"M.D., DM(Gastro)",68
+280,Ajin Daniel,,m,"M.B.B.S., M.S",68
+281,Sheban J,,f,"MBBS., DCH",68
+283,Calwin Davidsingh,S,m,"MD., DNB(Cardio)",68
+286,Bradlin Rose,,f,"MBBS.,DCH",68
+291,Ravi Shankar,P,m,MBBS,68
+64,Nithin K Srinivasan,,m,MS,69
+309,Prem Chanth,,m,"MBBS, MD DVL",68
+189,Naveen K Srinivasan,,m,MS,69
+311,A Srinivasan,,m,MS DO FRF(USA),69
+318,Yobu,L,m,MBBS,73
+319,Hanushraj,R,m,"MBBS, MD (Gen Med), DM (Cardio)",68
+323,Rajesh OBGYN,A,m,MBBS DNB(OG),75
+324,Rajesh GP,A,m,"MBBS, MD (Gen Med), DM (Cardio)",75
+325,Rajesh DB,A,m,"",75
+326,Rajesh PD,A,m,"",75
+331,Rajaraman,R,m,"MD, F.Diab (UK)",76
+333,Alva,K S,"","",79
+328,Rajesh OPT,A,m,MBBS,10
+336,Srinivasan GP,A,m,"MBBS, MD (Gen Med), DM (Cardio)",82
+337,Srinivasan Db,A,m,MBBS,82
+338,Srinivasan OPT,A,m,"MS, MCH(ORTHO), FAGE, MBA",82
+339,Srinivasan PD,A,m,"MBBS, MD",82
+340,Srinivasan OBGYN,A,m,MBBS,82
+341,Srinivasan PSY,A,m,"MS, MCH, FAGE, MBA",82
+322,Narmatha,P,f,MBBS DNB(OG),70
+321,Gayathri,V,f,"DGO, DNB",70
+353,Kalpana,S,f,"M.B.B.S.,D.O.,",86
+356,Rajesh Opthalmology,S,,MBBS,88
+357,Karthick,A,m,"M.B.B.S.,DEM(UK), M.MED.,AFIH.,F.DIAB",89
+190,Rajesh Ophthalmology,O,m,MBBS,94
+369,Selvam,M,m,"MBBS, MD, DO",97
+372,Brinda,Selvam,f,"MBBS,DGO",97
+374,Praveen Kumar,S,m,"MBBS, MS , DO",99
+377,Parthiba Vijayan,R,"",MBBS,102
+380,Babu,S,,"MBBS,MS,MCH",52
+381,Mohan Kumar,,,"MBBS,MS,MCH",52
+382,Selvakumar,"","","MBBS,MD,DM",52
+383,Sukumar,,,"MBBS,DCH",52
+384,Suresh,,,"MBBS,MDDM",52
+387,Emmanuel,Stephen,"","MBBS,MS",52
+388,Radhika,,,"MBBS,DCH",52
+403,Sumala,S S,f,"MS., DNB, OG",111
+404,Thiruchitrambalavanan,M R,m,BDS,111
+405,Sonia Jerolin,"","","MBBS, DLO",112
+406,Navamohana Krishnan,M B,m,"M.B.B.S.,D.O.,D.N.B.,",116
+407,Rajasekaran,R,m,Medical Radiology - Diagnosis,113
+409,Ramanathan,K,"","MBBS, MD.,(PAED)",118
+414,Padmavathy,Y,f,"MBBS., DGO",121
+416,Shanmugasundaram,A,"",M.B.B.S,121
+424,Venkataramana Rao,S,m,MBBS,121
+427,Rajkumar,P,m,MBBS,121
+428,Deepa Balachandran,B,m,"MBBS,M.Ed,DCH",121
+430,Shri Janani,R,"","MBBS, MS OG",97
+431,Alala Sundharam,K V,"",MBBS,121
+433,Kala,S,"",MBBS,121
+435,Pushpalatha,K,"",MBBS,121
+437, Rajkumar,K,"",MBBS,121
+438, Aravindh,"","",MBBS,121
+440, Shanmugam,T,"",MBBS,121
+442, Sivabalan,J,"",MBBS,121
+443, Kabilan,S,"",MBBS,121
+444, Bala Meena,S,"",MBBS,121
+446, Sudhan Raj,R,"",MBBS,121
+451, Alagu Sundharam,"","",MBBS,121
+457,Susanth M J,,,"MD (General Medicine), DM (Neurology)",68
+507,Sridevi,A,f,"M.B.B.S.,M.S.,EMR",153
+512,Vishnu,Pounraju,"","MBBS., MS., FAEH (Glaucoma)",159
+513,Arun Magendran,"","","MBBS, MS (ENT)",118
+516,Selvaraj,,,"M.S., D.O.,",99
+518,Sushma,"","","MBBS., MS., FAEH,FRCS, MRCS, FICO",159
+521,Hari,A,"",MBBS,173
+522,RAJAMANI KARUNAKARAN,"",m,"",148
+523,HABEEB RAHMAN,"",m,D ORTHO,148
+524,MOHAMMED IBRAHIM,P,m,"D ORTHO,MS ORTHO,DNB ORTHO MCH ORTHO(USAIM)",148
+525,PRAVEEN KUMAR,K S,m,"MS ORTHO,MCH ORTHO",148
+529,ASHOK PARAPOYIL,"",m,D ORTHO DNB ORTHO,148
+530,ASIF KASSIM,"",m,MS ORTHO,148
+532,Krishnaswami,R,"",MBBS.DCH,173
+533,Senthil Kumar,P,"",M.D.,173
+534,Maheswari,"","",MBBS.M.MED,173
+535,Ramya,M,"",M.D.,173
+536,Karthikeyan P.S,P.S,,"DCH.DNB.,",173
+537,Thiyagarajan,S,"",M.D.,173
+538,Vinodha Latha,S,,MBBS.DCH,173
+540,Anukurian,"","",M.D.,173
+541,Dulasi Durga,K,"",M.D.,173
+542,Venkatapathy Raja,D,"",M.D.,173
+544,Raaghul,C,"",M.D.,173
+547,Eswaramoorthy,K,"",MBBS,173
+548,Mohana Prasad,"","",MBBS,173
+549,Anjitha Chandran,"","",MBBS.DCH,173
+550,Anushuya,M,"",MBBS,173
+551,Sakthipriya,R,"",MBBS.DCH,173
+552,Aamila,M,"",MBBS,173
+553,Rajamani,G,"",M.S. M.Ch,173
+554,Srinivasan,K,"",M.S. M.Ch,173
+556,Kalyanasundaram,M,"",MD. DNB,173
+558,Shivangi Panda,"","",MBBS. DNB DVL,173
+559,Ahila Ayyavoo,"","",DCH. DNB.Phd,173
+560,Balakrishnan,K,"",MS(ENT) DNB(ENT)FRCS(Glasgow) FRCS(ORL-HNS),173
+561,Laya SriRaam,,,"DLO, DNB",173
+562,John Matthai,"","",MD.DCH.FAB(Paed.Gastro) FIAP,173
+563,Shashi Ranjani,"","","DCH.DNB.,",173
+564,Manivasakan,R,"",MD .DCH. DM,173
+565,(Major) Kamalanathan,K,,"Msc (IT) , BE -ECE , BE-CSE",173
+567,Vijayakumar,R,"",M.S. M.Ch,173
+570,Hemalatha,D,"","MBBS.DPM.,",173
+574,Rajani Sundar,"","",MD .DA,173
+575,Jeyabaskar,A,"",MD .DA,173
+576,Kulandai Raguramaiah,"","",MBBS. DA,173
+577,Dinesh Kumar Gunasekaran,"","",M.D. (Anaes) PDCC (Ped) MBA,173
+578,Kannadhasan,R,"",M.D.DMRD,173
+579,Ashok Kumar,S,"",MD. FPCCM,173
+580,Aravind Subramaniam,"","",M.D.,173
+581,Nagalakshmi,D,"",MD. DCH. DNB,173
+582,Usha Elango,"","",MD,173
+583,Rathan,"","",MD,173
+586,Ramasubramaniam,R,"","MBBS., MS.,",166
+595,Nandhu Doctor,,,MBBS,10
+596,Mani,,,MBBS,10
+597,Rajesh Gp Qa,,,mbbs,10
+600,Ganeshan,,,MD,10
+601,Hitesh Solanki,K,,"MBBS,FRCS, MS",10
+602,Kathiresan,,,"MBBS,FRCS",10
+603,Vijay Sethuram,,,MD,10
+606,Varathan,,,MBBS,10
+612,V Vivek Ram Thilak,,,MBBS,79
+615,S S Sumala,,,"MBBS,DGO",79
+616,Rajesh GP2,K,m,MBBS,10
+619,Christopher Jebaraj,,m,Orthopaedic,68
+621,Madhumathi,,,MBBS,111
+625,Madhavan,R,,MD(DVL),173
+626,Vaishnavi M,,,MD,173
+627,Heera,,,"M.BBS, DrNB(Pediatric surgery)",173
+632,ZUBAIR AHMED,V USMAN,m,"MBBS,DCH",173
+633,SASIKALA,S P,f,"MBBS.,DDVL",118
+643,Praveen S.V(Cardiologist),,m,,68
+653,Ajay Rathoon,,,MBBS:MD:DM,183
+659,Abirami,,,MBBS:MD,183
+668,Ninoo George,,m,"M.D., D.M.(Nephro),",180
+670,Deepan V,,,"MD,DNB",118
+671,Ks Alva,,,MBBS,111
+672,Panjavan,,,MBBBS,10
+674,Rahul Jeyaraj,,,MBBS,180
+675,Manju,,,MBBS,180
+676,P Sabitha,,,MBBS,180
+677,N Kannan,,,MBBS,180
+678,Ayarin Glorida,,,MBBS,180
+679,Ingudhas,,,MBBS,180
+680,A Yazhini,,,MBBS,180
+681,Krishnu Prasin P,,,MBBS,180
+682,De Sruthi Sundar Raj,,,MBBS,180
+683,Anita Robinson,,,"M.R.C.P.,",180
+684,Rubakaran Robinson,,,"F.R.C.S.,",180
+685,Samuel Ben Solomon,,,"M.D.,",180
+686,R J Praveen,,,MDDM,180
+687,R C Nagarani,,,DGO,180
+688,Cordelia Praveen,,,"M.D.,(Ob&Gy)",180
+689,Mohammed Yasar,,,"M.D. (Pead),",180
+690,Sheena Joseph S J,,,"M.B.B.S.,M.D.,M.R.C.P (UK)",180
+691,Nadiya Hameed Farooq,,,MBBS,180
+692,Rajamurugan,,,MD,180
+693,A Franklin Joseph,,,"MBBS., B.E., B.A., QA., 12345678",180
+694,Sivaraja Gopalan,,,MSMCH,180
+695,Venita Moses,,,DGOMAAFP,180
+696,K Krishnankutty,,,MDDM,180
+697,Radhakrishnan,,,MSMch,180
+699,Kingsly,,,"M.D.,D.M.(Neuro)",180
+700,Evelyn Angel,,,MD,180
+701,Evangelin George,,,MBBS,180
+702,Arul Prakash,,,MDDPM,180
+703,C Gauthaman,,,"M.S., F.R.C.S., DiP (Urology)",180
+704,Jegan Jascott,,,"D.Ortho.,",180
+705,Joseph Pratheeban,,,"M.D.,(Pulmo),",180
+706,Rajesh,,,MSMch,180
+707,N Jeyaseelan,,,MDDM,180
+708,John Grifson,,,MSMch,180
+709,Dhinesh David,,,MDDM,180
+710,Rakesh Chandru,,,"M.S.,M.Ch.,(Endocrinology)",180
+711,M Prathap,,,MBBSDO,180
+712,Nivetha,,,"M.D., D.V.L.,",180
+713,Subramonia Biju,,,"D.N.P.,(ENT) D.L.O.,",180
+714,R Abinesh,,,MBBSDCHDNB,180
+715,Jerin J Ovett,,,MDDM,180
+716,Rethinesh Kumar,,,"M.D.R.T.,D.M.R.T.,",180
+717,Rajesh,,,"Mbbs, Dermatology & frcs",10
+718,Santhosh,,,anasethesist,10
+719,Muji,,,B.E AEROPLANE DOC,10
+720,Bhuvanesh Da,,,B.Tech IT DOCTOR,10
+724,Senthil,,,ANAESTHETIST,52
+726,Selvaraju,,,ANAESTHETIST,52
+729,Dharmendra R P,,,"MBBS.,MS.,M.ch",52
+731,Sethuraman,,,MD,188
+732,D Vinoth,,,MBBS,173
+733,Praveenkumar,,,MDRD,113
+744,Gopalakrishnan K,,,"MD DERMATOLOGY ,VENEREOLOGY & LEPROLOGY",118
+747,Nirupan chakkaravarthy,A,m,"MBBS.,FID(RLAUK).,FDFM.,CCEBDM",189
+748,Niranjana,V,f,"MD(Pediatrics).,MRCPCH",189
+749,Bharathiraja,K,m,Mch Surgical Oncology,189
+750,Blood Transfusion,,,MBBS,173
+751,Praveen Kumar,M,m,"MBBS.,MD.,(R.D)",191
+752,Lavanya Praveen kumar,,f,"MBBS.,MS(OG)",191
+753,R Karthik Kumar,,,M.D,173
+754,Ra Poo Ezhil Mangai,,,MBBS DCH PGD DNN,173
+755,Karthikeyan R,,,BDS MDS,173
+756,Ramachandran Psy,,,MA..Mphil...PhD..,173
+757,Vidhya Haridas,,,MBBS,173
+758,G Sonali,,,MBBS,191
+759,Poppy Punithan,,,"M.D.,D.M.,(Gastro),",180
+761,Ashwin Jaya Krishnan,,,"MBBS.,MS.,DNB.,MNAMS",180
+762,Joel Franklin,,,"MD, DM. ",180
+763,Kani Mozhi,,,"MBBS.,DGO.,",191
+764,Suruthi,,,M.B.B.S,180
+765,Muthu Pandi,,,MBBS,10
+766,Jhansi Rani,,,MBBS,10
+767,Monica,,,MBBS,10
+769,Maria Alex Babu,,,"MD, DM (SGPGI)",180
+777,Shamil mt,,m,"BDS,MDS",192
+779,Hareesh kg,,m,"MBBS,MD,DM",192
+778,Murad,,m,MBBS,192
+782,Ramshad Ibrahim Moosa,,m,"MBBS,MD,FRCP",192
+783,Mohan,,,Pulmonology,58
+785,Nithin K Srinivasan,,m,MS,193
+786,Naveen K Srinivasan,,m,MS,193
+787,A Srinivasan,,m,MS,193
+790,Dinesh Jothimani,,,"MPCP (UK),FRCP (GLABGOW), CCT(HEPATOLOGY,UK)",180
+791,Shreyas,,,MBBS,82
+792,Buvanesh,,,mbbs,82
+793,Seethu Mol,,,M.B.B.S.,180
+794,Anand,,,DCH,173
+797,Girivasan,,,DCH,173
+799,Karthik Annamalai,,,DCH,173
+803,Jithin,,,MBBS,10
+804,P Senthil Kumar Md Dm Neo,,,MBBS,173
+805,Palanikumar,,,bca,10
+811,Vikram P,,,MD,173
+813,Arul R,,,DCH MD,173
+815,Gopal,,,MBBS,10
+816,Dhoni,,,MBBS,10
+818,Feenix,,,FRCS,10
+822,E Kaushik Kumar,,,MBBS,111
+824,S Kavya,,,"BDS.,MDS.,",196
+826,Rathiga,,f,MBBS.DCH,196
+832,Raaghul,,,MBBS,197
+834,Anukurian,,,MBBS,197
+838,Gopinath,,,"MBBS,MD",196
+839,Abhilash,,m,BAMS,202
+841,Shyamala,,f,"MBBS,DGO,DNG(OBG)",196
+843,Parthiban Purushothaman,,m,"M.B.B.S.,M.S.,D.O",198
+844,Sponniah,,,MD,188
+846,B S Jayabanu,,,MD,173
+849,B Jeyaprakash,,m,"M.B.B.S.,M.S.,(Ophthalmology)",199
+850,Vijayasarathy S,,,"M.S., M.CH.(SURG.ONC.), F.MAS.,DIP.MAS",118
+851,Nithya,,,MD(Paed) PGDDN,70
+858,Vijayapriyanka,,,MBBS,201
+859,K Chandra Vadhana,,,DCH MS(OG),99
+860,Murali,M,m,MBBS,88
+862,DPOPT,D,f,MBBS,88
+868,Aadithreya Aadithreya Aadithreya,Varman,m,MBBS; OPT,204
+870,Dinesh,,m,MBBS; OPT,204
+871,Mathan Kumar,,,"12th",10
+872,Sathish,,,MBBS MS GENERAL SURGEON,89
+873,Roshni Robert,,,MBBS MS (Ophthalmology),206
+875,Arulmozhi Varman,,m,M.S.D.O,204
+881,Betsy Sherba,,,"MD,DCH,DNB",173
+884,Murali,,,M.S M.Ch,173
+886,M Pratap,,,"M.B.B.S., D.O",82
+887,Satyajit,,,"MBBS.,MEM (GWU-USA).,FICM.,Ph.d.,",191
+889,Vaishnavi M,,,MS,69
+891,Ravi,,,mbbs,10
+902,Ganapathy Sriraam S,,,"MDS,MOMS RCS(Edinburgh),MFDS RCPS(Glasgow)",173
+906,Steps Groups,,,OT,173
+907,Gopishankar,,m,,208
+908,Murali Kkk,,,MMBBS,10
+910,Rolex,,,MBBS,10
+911,Manisha,,f,MDS,173
+912,Umamageswari,,,MDS,208
+913,Balamurugan,,,"B.SC.,YOGA.,MD",196
+917,Poorani Vg,,,MBBS MS(OG),89
+918,Jonath,,,MBBS D.ORTHO,89
+919,Dhinesh,,,MBBS MS DNB(ORTHO),89
+920,Karthik Pv,,,MBBS MD DM,89
+921,Priyadharshini,,,MBBS DVL DNB,89
+922,Antony Terance,,,"MD., MRCPCH., DAA",173
+923,Hima Bindu,,,M.D,173
+926,Dinesh Gandhi M,,,MBBS,196
+927,Relve Verghese,,,M.D,173
+928,Subburaj,,,"MD,DM (Cardiology)",196
+930,Teena,,,MBBS,10
+931,Kaveri Subbiah,,,M.D (Developmental Pediatrics),173
+933,Sivakumar P,,,", MD, IDPCCM",173
+934,Muthukumaran V,,,"MBBS,MS,DNB,FASM",173
+936,Anup Menon,,m,MBBS MS (Phaco Surgeon),206
+937,R Subha,,f,MBBS MS (Cataract Surgeon),206
+938,Arul Venkadesh,,,M.D.,180
+944,Jerome D Souza,,,MBBS MS GENERAL SURGERY DRNB SURGICAL GASTROENTEROLOGY AND HEPATOPANCREATICOBILIARY SURGERY FIAGES,118
+945,Kowsik,,,MBBS ,166
+948,Surya Prabha,,f,"MBBS,M.D.,DVL.,",209
+951,Joe Lourdu Pradeep,,,"MBBS,MS(ORTHO)",118
+953,Swapna Attokaran,,,MBBS DO,206
+954,Bipul Kumar Das,,,MBBS MS (OPHTHAL),201
+955,Suganya Anandaraman,,f,"MBBS.,DGO.,DNB",210
+956,Giri,,,MD,188
+957,Pgiri,,,MD,188
+958,Ajith,,m,,211
+959,Surya,,,MBBS,10
+960,Athira Unnikrishnan,,f,"MS., Ophthalmology",212
+961,Dictin,,m,"BAMS,CCKS",213
+962,Samutirika Devi,,,MD,121
+965,Prinith,,,"M.S., MRCS., MCH.",180
+967,Murali,,,BBA,216
+968,Krishanan,,,MSM,216
+969,Ravi,,,MMS,216
+970,Ram,,,PT,216
+972,M Sathya,,,MBBS,173
+973,Ria Hashim,,,MBBS,206
+974,Duraisamy,,,MBBS,52
+975,Vijayalakshmi,,,MBBS,111
+976,Sockalingam,,,MS,188
+978,Geetha Rani,,,"M.B.B.S.,M.D.(O&G).,",219
+979,S Balakumar,,,"MBBS.,MS (Gen.surg).,FMAS.,FIAGES.,FAIS.,DLS.,",219
+981,Praveen Kumar Patil,,,"MBBS.,MS",212
+982,M Sinddhu,,,MDRD,219
+983,N Shyam Kumar,,,MDRD,219
+984,M Shiva Balan,,,"MD.,DNB.,FICC.,FESC.,FSCAI.,",219
+985,Jayapaul,,m,"B.Sc,MBBS,CO,ZO[VIENNA]",218
+986,Aravind,W,,"MBBS, MD, MS",10
+987,Murali M,,,"MBBS,MS,DFID",221
+1000,Sivakumar S,,,"M.B.B.S.,D.L.O.,MS(Gen).,M.Ch-(Plastic)D.N.B(Plastic)",222
+1001,Asik K Das,,,MBBS DO,206
+1003,Sandhya,,,MS Opthal,221
+1004,NEHA CHAUHAN,,f,"MBBS, MS,FVRS",212
+1005,Varisu,,,"MBBS, MD, MS",88
+1006,Uvaraj Muruganandam,,,MBBS,52
+1007,A Amirthagani,,,"MS., ENT SURGEON",189
+1008,Kumar,,,MBBS,10
+1009,Rey,,,"mbbs, md, ms",10
+1010,Svn,,,MSMSMS,216
+1011,N Venkatesh,,,MBBS DNB MCH,173
+1012,Nirmal Kumar,,,DO DNB,193
+1014,Surya Kumar Rohit Nishanth Sures,,,Mbbs,10
+1015,Neha Chauhan,,,"MBBS,MS,FVRS",218
+1016,Keerthana,,,MD,173
+1017,Akshay Krishnan,,,BASLP MASLP,121
+1018,Sangeetha,,,mbbs,10
+1019,Adhya,,,MBBS,10
+1020,Neha Chauhan,,,MS FVRS,193
+1022,Arut Selvan U S,,,MD,52
+1023,Surya,,,MBBS,211
+1024,Sufreeta,,,MBBS,196
+1025,R Venkatesh,,,MBBS MS MCH,173
+1026,Mohan,,,msc,10
+1028,Prakash Johnson,,,"M.S., M.Ch.(Uro) F.R.C.S.",180
+1029,Charlesh,,,msc ,10
+1030,Kedra,,,MBBS,192
+1031,Kaviyarasan,,,msc,88
+1032,Namasivayam,,,"M.S., M.ch",180
+1033,Murali Nirupan  ajith db,K,m,"MMBBBS  FID(RLAUK).., FDFM., CCEMD., MDFG - SVN DOCTOR ., EMED.",10
+1034,Spacer DB,,m,"M.B.B.S.,M.D.",10
+1035,Ajith OPT,,,MBBS,88
+1036,Spacer OPT,,,"M.B.B.S.,M.D.",88
+1037,Surya,,,MBBS,10
+1039,K S Alva,,,MBBS,79
+1040,Muraad,,,MBBS,192
+1041,Mustafe,,,MBBS,192
+1042,Mustafe,,,MBBS,192
+1043,Balasubramani,,,"MBBS, MS (General surgery)",52
+1044,Dietician,,,B.Sc,206
+1045,Tia,,,MBBS,10
+1046,B Vishnuraj,,,MBBS (Opthal),218
+1047,Syamnath,S,,"MBBS, MS",221
+1049,Ravi,,,MBBS,82
+1050,Raju,,,MBBS,82
+1051,Janu,,,mbbs,82
+1052,Shafna P Abdu,,f,"MBBS,DND",206
+1053,E T Kumaresh,,,"MBBS, D. ORTHO",196
+1054,Rizwana,,,"BDS,MDS",192
+1055,Saravanan,,,M.S. M.ch.,180
+1056,Ranjith,,,MBBS,88
+1057,Sabari Karthik,,,"MBBS, MD(Anaesthesia)",52
+1058,Shereen,,,"MBBS,MD",10
+1059,Arya,,,MBBS,10
+1059,Arya,,,MBBS,10
+1060,Thangaraj Chellakutti,,,MBBS DNB,173
+1061,Srini Voilet Srini Voilet Srini ,,,Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black Deepak Black,10
+1062,Gowri,,,MBBS,10
+1063,N,,,A,10
+1064,Mks,,,MDMD,223
+1065,Athimoolam,,,MBBS ,10
+1067,Suryasurya Suryasuryasuryasuryas,,,MDNMDNMND,10
+1070,Parthiban U,,,"MBBS.,MD.,DNB,DDVL,MNAMS",196
+1071,Rahna,P,,"MBBS,MS,DNB",206
+1073,Rajesh Ent,,m,med,10
+1075,Murali Nirupan Chakkaravarthy  M,,,MBA,10
+1076,Kannan,,,M.B.B.S,10
+1077,Dr Franchis,,,M.D.S,10
+1078,RajeshDB2,,m,MBBS,10
+1079,Rajesh Optho 2,,m,Mbbs,225
+1080,Surya Surya Surya Surya Surya Su,,,Bcom Bcom Bcom Bcom Bcom Bcom Bcom Bcom ,173
+1081,Hari,,,MSMMS,223
+1082,Yoga,,,MS543,223
+1083,Sam,,,MSMMS,223
+1084,Siva,,,MMS,223
+1085,Siva Dass,,,MKS7389,221
+1086,Guru Moorthi,,,MSKLL,221
+1087,Murali,,,MMBSS,218
+1088,Ram Ent,,,MMS67389,218
+1089,Ravi Dass,,,MMSTTU,218
+1090,Ram,,,MMS,212
+1091,Murali Ent,,,MMBS,212
+1092,Sandy,,,MMBBS,212
+1093,Yogaraj,,,MMBS,212
+1094,Siva Dass,,,HBBBS,212
+1095,Guru Dass,,,MMSSS,212
+1096,John,,,MMSD,212
+1097,Maheswaran Pitchaimuthu Madhav V,,,MBBS frcs DR MBBS  DDBBSS BBCCCDDDSSS,10
+1098,Yogaraj Sp Doctor Name Dr Config,,,"B.E.., MBA..., M.B.B.S..,",10
+1099,Ranjith Kumar Mbbs Frcs Mba Be D,,,MBBS BE MBA BA Qualification QA Tester Automation ,10
+1100,Ramesh,,,MBBA,10
+1101,Rajesh,,,MBBS,236
+1102,Sarmila,,,MBBS,10
+1103,Ajitha K,,,"M B B S,DNB",237
+1105,Asjan Basheer,,,"M B B S,M S",237
+1114,Wasim Khan Syed Ibrahim,,,"M B B S,M S",237
+1115,Qaone,,,"MBBS,DCS",236
+1116,Qa Two,,,MBBS,236
+1117,Bharath Kanna Ramasamy Kuppusamy,,,MBBS,69
+1118,Daniel,,m,MBBS,239
+1119,Prasad,,,FRCS,239
+1120,Haridas,,,MMB,239
+1121,Rajammal,,,mbbs,10
+1122,Kumaresh,,,mbbs,10
+1123,Ramakumaran,,,MBBS,10
+1124,Tharun Kumar,,,"MBBS., MS., MD., GP.,",10
+1125,Aadhilakshmi Rajeswari Charulath,,,"12",173
+1126,Charulatha Sivaranjani Charulath,,,"12",173
+1127,Charulatha Sivaranjani  Charulat,,,"12",173
+1128,Mercy,,,MBBS,10
+1129,Teena,,,Mbbs,82
+1130,Bhuvanesh,,,"B.E., M.B.A.,",148
+1131,Kkssd,,,MSMSbDH,10
+1132,Deepak,,,MBBS,10
+1133,Ent Dr,,,MDMD,216
+1134,Db Dr,,,DBDDB,216
+1135,Gp Dr,,,GPDNMD,216
+1136,Obgyn Dr,,,ODDFDFFG,216
+1139,Mmkdb,,,MMDB 1,216
+1141,Mmkgp,,,MMGH,216
+1142,Mmkent,,,MMDENT,216
+1143,Mtp Db,,,SSS,216
+1145,Surya Doctor,,,mbbs,180
+1146,Kirthick,,,MBBS,180
+1147,Dr Murali Krishnan,,,ENT,216
+1148,Ram Kannan Ram,,,ENET34,216
+1149,Siva Dass Kannan Re,,,ENT,216
+1150,Surya,,,,193
+1151,Kamaraj,,m,,69
+1152,Deepak,,,MBA,10
+1153,Rajeshpd K,,,MBBS,10
+1159,Aran,,,"MBBS,MD,BDS,EYE",212
+1161,Tharun,,,ASXSAX,212
+1162,Srini Obgyn O,,,M.B.B.S,82
+1165,Ramesh,kumar,m,,173
+1166,Surya,,,bcom,69
+1168,Yogaraj,,,MBBS,69
+1169,Jeya,,,MMM,212
+1170,Sks Db,,,MBBS,212
+1171,Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww,,,BE MEC,212
+1172,Umk,,,be,212
+1174,Namitha,,,MBBS,82
+1175,Sri,,,MBD,82
+1177,Sandy,,,HDF,82
