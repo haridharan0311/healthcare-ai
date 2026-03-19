@@ -47,12 +47,23 @@ export default function RestockTable() {
                     {item.suggested_restock.toLocaleString()}
                   </td>
                   <td style={{ padding: '10px 12px' }}>
-                    <span style={{
-                      ...STATUS_STYLE[item.status],
-                      borderRadius: 6, padding: '2px 10px', fontSize: 12, fontWeight: 500
-                    }}>
-                      {item.status}
-                    </span>
+                    {item.status ? (
+                      <span style={{
+                        ...(STATUS_STYLE[item.status] || STATUS_STYLE['sufficient']),
+                        borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 500,
+                        display: 'inline-block'
+                      }}>
+                        {item.status}
+                      </span>
+                    ) : (
+                      <span style={{
+                        ...STATUS_STYLE['sufficient'],
+                        borderRadius: 6, padding: '3px 12px', fontSize: 12, fontWeight: 500,
+                        display: 'inline-block'
+                      }}>
+                        sufficient
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '10px 12px', color: '#666', fontSize: 12 }}>
                     {item.contributing_diseases.join(', ')}
