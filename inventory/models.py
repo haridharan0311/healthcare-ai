@@ -7,6 +7,8 @@ class DrugMaster(models.Model):
     drug_strength = models.CharField(max_length=100)
     dosage_type = models.CharField(max_length=100)
 
+    current_stock = models.IntegerField(default=0)
+
     clinic = models.ForeignKey(
         'core.Clinic',
         on_delete=models.CASCADE,
