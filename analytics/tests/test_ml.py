@@ -48,6 +48,22 @@ class TestSpikeDetector(TestCase):
         weight = get_seasonal_weight("Monsoon", current_month=1)  # January
         self.assertEqual(weight, 1.0)
 
+    # Add a new test for wider baseline
+    def test_spike_wider_baseline(self):
+        # 30-day baseline: stable ~5/day, spike at 50
+        counts = [5] * 30 + [50]
+        result = detect_spike(counts, baseline_days=30)
+        self.assertTrue(result["is_spike"])
+        # Mean should be close to 5, not just last 7 days
+        self.assertAlmostEqual(result["mean_last_7_days"], 5.0, places=0)
+
+    def test_no_spike_wider_baseline(self):
+        # If recent days were also high, wider baseline raises threshold
+        counts = [2, 2, 2, 20, 20, 20, 20, 20, 20, 21]
+        result = detect_spike(counts, baseline_days=9)
+        # mean of 9 baseline days includes the high values → threshold higher
+        self.assertFalse(result["is_spike"])
+
 
 class TestRestockCalculator(TestCase):
 

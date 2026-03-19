@@ -81,4 +81,5 @@ class RestockSuggestionSerializer(serializers.Serializer):
     current_stock = serializers.IntegerField()
     predicted_demand = serializers.FloatField()
     suggested_restock = serializers.IntegerField()
+    status = serializers.CharField()  # e.g., "OK", "Low Stock", "Critical"
     contributing_diseases = serializers.ListField(child=serializers.CharField())

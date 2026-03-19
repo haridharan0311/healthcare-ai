@@ -7,7 +7,7 @@ from django.db.models import Value
 import re
 
 from django.http import HttpResponse
-from django.db.models import Count, Avg, Max
+from django.db.models import Count, Avg, Max, Sum
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
@@ -181,59 +181,54 @@ class TimeSeriesView(APIView):
 
 class SpikeAlertView(APIView):
     """
-    GET /api/spike-alerts/
-    Checks every active disease for a spike today.
-    Only returns diseases where is_spike=True (or all if ?all=true).
+    GET /api/spike-alerts/?all=true&days=7
+    days param controls the baseline window.
+    Minimum enforced at 8 (7-day baseline + today).
     """
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
 
-        # Use DB's latest date as "today"
-        from django.db.models import Max
+        try:
+            days = int(request.query_params.get('days', 8))
+        except ValueError:
+            days = 8
+
+        # Enforce minimum of 8 so spike detection always has a baseline
+        days = max(days, 8)
+
         latest = Appointment.objects.aggregate(
             latest=Max('appointment_datetime')
         )['latest']
-        end = latest.date() if latest else date.today()
-        start = end - timedelta(days=8)
-
-        diseases = Disease.objects.filter(is_active=True)
-        results = []
-
-        # Group by disease TYPE here too
-        from collections import defaultdict
-        type_counts = defaultdict(lambda: defaultdict(int))
-        type_season = {}
+        end   = latest.date() if latest else date.today()
+        start = end - timedelta(days=days)
 
         appts = (
             Appointment.objects
             .filter(appointment_datetime__date__range=(start, end))
             .select_related('disease')
         )
+
+        daily_by_dtype = defaultdict(lambda: defaultdict(int))
+        type_season    = {}
+
         for appt in appts:
             if not appt.disease:
                 continue
             dtype = get_disease_type(appt.disease.name)
             type_season[dtype] = appt.disease.season
-            day = appt.appointment_datetime.date()
-            type_counts[dtype][day] += 1
+            daily_by_dtype[dtype][appt.appointment_datetime.date()] += 1
 
-        # Build daily list per disease type and run spike detection
-        processed = set()
-        for appt in appts:
-            if not appt.disease:
-                continue
-            dtype = get_disease_type(appt.disease.name)
-            if dtype in processed:
-                continue
-            processed.add(dtype)
+        results = []
+        baseline_days = days - 1  # all days except today
 
+        for dtype in type_season:
             daily_counts = []
             cursor = start
             while cursor <= end:
-                daily_counts.append(type_counts[dtype].get(cursor, 0))
+                daily_counts.append(daily_by_dtype[dtype].get(cursor, 0))
                 cursor += timedelta(days=1)
 
-            spike_info = detect_spike(daily_counts)
+            spike_info = detect_spike(daily_counts, baseline_days=baseline_days)
             if spike_info['is_spike'] or show_all:
                 results.append({
                     'disease_name': dtype,
@@ -290,6 +285,14 @@ class RestockSuggestionView(APIView):
             .annotate(avg_qty=Avg('quantity'))
         }
 
+        # Sum total stock across all DrugMaster rows with same drug_name
+        stock_map = {
+            r['drug_name']: r['total_stock']
+            for r in DrugMaster.objects
+            .values('drug_name')
+            .annotate(total_stock=Sum('current_stock'))
+        }
+
         # Single loop — build drug_name → disease demands
         drug_results = defaultdict(lambda: {
             'generic_name': '',
@@ -316,7 +319,7 @@ class RestockSuggestionView(APIView):
             # Set drug meta once
             if not entry['generic_name']:
                 entry['generic_name'] = line.drug.generic_name or ''
-                entry['current_stock'] = getattr(line.drug, 'current_stock', 0) or 0
+                entry['current_stock'] = stock_map.get(line.drug.drug_name, 0)
 
             # Add disease contribution only once per disease type
             if dtype not in entry['seen_diseases']:
@@ -464,6 +467,13 @@ class ExportReportView(APIView):
         )
         avg_qty_map = {r['drug__drug_name']: r['avg_qty'] for r in avg_qty_qs}
 
+        stock_map = {
+            r['drug_name']: r['total_stock']
+            for r in DrugMaster.objects
+            .values('drug_name')
+            .annotate(total_stock=Sum('current_stock'))
+        }
+
         drug_results = defaultdict(lambda: {
             'generic_name': '', 'current_stock': 0, 'disease_demands': []
         })
@@ -487,7 +497,7 @@ class ExportReportView(APIView):
             sw = get_seasonal_weight(line.disease.season, current_month)
 
             drug_results[drug_name]['generic_name'] = line.drug.generic_name or ''
-            drug_results[drug_name]['current_stock'] = getattr(line.drug, 'current_stock', 0) or 0
+            drug_results[drug_name]['current_stock'] = stock_map.get(line.drug.drug_name, 0)
             drug_results[drug_name]['disease_demands'].append({
                 'disease_name': dtype,
                 'predicted_demand': demand,
