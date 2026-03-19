@@ -229,9 +229,13 @@ class SpikeAlertView(APIView):
                 cursor += timedelta(days=1)
 
             spike_info = detect_spike(daily_counts, baseline_days=baseline_days)
+
+            period_count = sum(daily_counts)
+
             if spike_info['is_spike'] or show_all:
                 results.append({
                     'disease_name': dtype,
+                    'period_count': period_count,
                     **spike_info
                 })
 

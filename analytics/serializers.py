@@ -68,6 +68,7 @@ class TimeSeriesPointSerializer(serializers.Serializer):
 
 class SpikeAlertSerializer(serializers.Serializer):
     disease_name = serializers.CharField()
+    period_count = serializers.IntegerField()
     today_count = serializers.IntegerField()
     mean_last_7_days = serializers.FloatField()
     std_dev = serializers.FloatField()
