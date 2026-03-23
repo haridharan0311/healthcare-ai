@@ -1,0 +1,9 @@
+Disease,Season,Category,Severity,Total Cases,Recent Cases (7d),Older Cases,Trend Score,Seasonal Weight,Status,Period Start,Period End
+COVID-19,Summer,Chronic,1,294,163,131,230.1,1.5,High,2026-02-21,2026-03-23
+Flu,Summer,Chronic,4,295,150,145,222.75,1.5,High,2026-02-21,2026-03-23
+Diabetes,Summer,Acute,5,262,143,119,203.7,1.5,High,2026-02-21,2026-03-23
+Hypertension,All,Acute,4,217,97,120,103.9,1.0,High,2026-02-21,2026-03-23
+Asthma,All,Chronic,2,189,106,83,99.1,1.0,High,2026-02-21,2026-03-23
+Allergy,Winter,Acute,3,179,85,94,87.7,1.0,High,2026-02-21,2026-03-23
+Migraine,Monsoon,Chronic,4,187,73,114,85.3,1.0,High,2026-02-21,2026-03-23
+Arthritis,Monsoon,Viral,2,165,74,91,79.1,1.0,High,2026-02-21,2026-03-23
