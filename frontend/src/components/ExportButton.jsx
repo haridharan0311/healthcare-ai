@@ -1,19 +1,39 @@
 import { getExportUrl } from '../api';
 
 export default function ExportButton() {
-  const handleExport = () => {
-    window.open(getExportUrl(), '_blank');
-  };
+  const buttons = [
+    {
+      label: 'Disease trends CSV',
+      url:   'http://localhost:8000/api/export/disease-trends/',
+      color: '#1D9E75',
+    },
+    {
+      label: 'Spike alerts CSV',
+      url:   'http://localhost:8000/api/export/spike-alerts/',
+      color: '#E24B4A',
+    },
+    {
+      label: 'Restock report CSV',
+      url:   'http://localhost:8000/api/export/restock/',
+      color: '#BA7517',
+    },
+  ];
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
-      <button onClick={handleExport} style={{
-        padding: '10px 24px', borderRadius: 8, border: 'none',
-        background: '#1D9E75', color: '#fff', fontSize: 14,
-        fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8
-      }}>
-        Download CSV report
-      </button>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginBottom: 24 }}>
+      {buttons.map(btn => (
+        <button
+          key={btn.label}
+          onClick={() => window.open(btn.url, '_blank')}
+          style={{
+            padding: '10px 20px', borderRadius: 8, border: 'none',
+            background: btn.color, color: '#fff', fontSize: 13,
+            fontWeight: 500, cursor: 'pointer',
+          }}
+        >
+          {btn.label}
+        </button>
+      ))}
     </div>
   );
 }

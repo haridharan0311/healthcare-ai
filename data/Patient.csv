@@ -1,5 +1,5 @@
-id,first_name,last_name,gender,title,dob,mobile_number,address_line_1,clinic,doctor
-1,Alan,Dennis,M,Mr,1949-12-01,0186885641,"373 Ruiz Square, Port Samanthafurt, RI 14710",12452,12064
+id,first_name,last_name,gender,title,dob,mobile_number,address_line_1,clinic_id,doctor_id
+1,Alan,Dennis,M,Mr,1949-12-01,0186885641,"373 Ruiz Square, Port Samanthafurt, RI 14710",12452,5562
 2,Kimberly,Davis,F,Mr,1945-10-20,7033825963,"627 Brianna Knolls, Fosterburgh, TX 81673",16992,15900
 3,Ricardo,Mitchell,F,Ms,1994-09-25,7523482705,"68407 Evelyn Center Apt. 543, New Pamelaview, HI 87144",16616,4237
 4,Gabrielle,Gutierrez,F,Mr,1964-02-16,8994391836,"95420 Eric Circle Apt. 438, Justinfort, OR 70829",2338,14199

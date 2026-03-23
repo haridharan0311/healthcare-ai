@@ -4,8 +4,8 @@ import ModelList    from './admin/ModelList';
 import ModelForm    from './admin/ModelForm';
 import TrendChart   from './components/TrendChart';
 import SpikeAlerts  from './components/SpikeAlerts';
-import RestockTable from './components/RestockTable';
 import ExportButton from './components/ExportButton';
+import DistrictRestock from './components/DistrictRestock';
 
 function Dashboard() {
   return (
@@ -32,7 +32,7 @@ function Dashboard() {
         <ExportButton />
         <SpikeAlerts />
         <TrendChart />
-        <RestockTable />
+        <DistrictRestock />
       </div>
     </div>
   );

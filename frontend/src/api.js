@@ -8,6 +8,9 @@ export const fetchSpikes      = ()          => axios.get(`${BASE}/spike-alerts/?
 export const fetchRestock     = ()          => axios.get(`${BASE}/restock-suggestions/`);
 export const getExportUrl     = ()          => `${BASE}/export-report/`;
 export const fetchDropdowns   = ()          => axios.get(`${BASE}/crud/dropdowns/`);
+export const fetchDistricts    = ()          => axios.get(`${BASE}/district-restock/`);
+export const fetchDistrictRestock = (district, days = 30) =>
+  axios.get(`${BASE}/district-restock/?district=${encodeURIComponent(district)}&days=${days}`);
 
 const CRUD = 'http://localhost:8000/api/crud';
 
