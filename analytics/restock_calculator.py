@@ -8,7 +8,7 @@ def calculate_restock(
     drug_name: str,
     generic_name: str,
     predicted_demand: float,
-    avg_quantity_per_prescription: float,
+    avg_usage: float,
     current_stock: int,
     contributing_diseases: List[str]
 ) -> Dict:
@@ -16,20 +16,20 @@ def calculate_restock(
     Calculate how much of a drug to restock.
 
     Formula:
-        expected_demand = (predicted_demand × avg_quantity) × SAFETY_BUFFER
+        expected_demand = (predicted_demand × avg_usage) × SAFETY_BUFFER
         suggested_restock = max(0, expected_demand - current_stock)
 
     Args:
-        drug_name:                    name of the drug
-        generic_name:                 generic/chemical name
-        predicted_demand:             output of ml_engine.predict_demand()
-        avg_quantity_per_prescription: average units prescribed per script
-        current_stock:                units currently in inventory
-        contributing_diseases:        list of disease names driving demand
+        drug_name:       name of the drug
+        generic_name:    generic/chemical name
+        predicted_demand: output of ml_engine.predict_demand()
+        avg_usage:       average units prescribed per script
+        current_stock:   units currently in inventory
+        contributing_diseases: list of disease names driving demand
     Returns:
         dict with full restock recommendation
     """
-    expected_demand = round(predicted_demand * avg_quantity_per_prescription * SAFETY_BUFFER, 2)
+    expected_demand = round(predicted_demand * avg_usage * SAFETY_BUFFER, 2)
     suggested_restock = max(0, int(expected_demand - current_stock))
 
     status = "sufficient"
