@@ -91,3 +91,4 @@ class PrescriptionLineSerializer(serializers.ModelSerializer):
     class Meta:
         model  = PrescriptionLine
         fields = '__all__'
+

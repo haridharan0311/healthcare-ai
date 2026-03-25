@@ -65,3 +65,4 @@ def predict_demand(trend_score: float, forecast: float) -> float:
         predicted total demand
     """
     return round(trend_score + forecast, 2)
+
