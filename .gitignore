@@ -6,3 +6,5 @@ node_modules/
 frontend/build/
 *.egg-info/
 .env
+__pycache__/
+*.pyc
