@@ -1,8 +1,50 @@
+*
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+# Django stuff
+*.log
+media/
+
+# Static files (collected)
+staticfiles/
+
+# Migrations (optional: keep if working in team)
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Packaging
+*.egg-info/
+dist/
+build/
+
+# Node (if you also use React frontend)
+node_modules/
+build/
+
 __pycache__/
 *.pyc
-*.pyo
-.venv/
-node_modules/
-frontend/build/
-*.egg-info/
-.env
