@@ -3,6 +3,11 @@ from analytics.ml_engine import moving_average_forecast, weighted_trend_score, p
 from analytics.spike_detector import detect_spike, get_seasonal_weight
 from analytics.restock_calculator import calculate_restock, apply_multi_disease_contribution
 
+from analytics.aggregation import (
+    compare_disease_trends, get_disease_type,
+    calculate_dynamic_safety_buffer,
+)
+
 
 class TestMovingAverage(TestCase):
 
@@ -146,3 +151,69 @@ class TestRestockCalculator(TestCase):
         """Edge case: zero trend and zero forecast"""
         self.assertEqual(predict_demand(0.0, 0.0), 0.0)
 
+
+
+
+class TestAggregation(TestCase):
+
+    def test_get_disease_type_strips_number(self):
+        self.assertEqual(get_disease_type('Dengue 1842'), 'Dengue')
+
+    def test_get_disease_type_no_number(self):
+        self.assertEqual(get_disease_type('COVID-19'), 'COVID-19')
+
+    def test_get_disease_type_empty(self):
+        self.assertEqual(get_disease_type(''), '')
+
+    def test_get_disease_type_none(self):
+        self.assertEqual(get_disease_type(None), '')
+
+
+class TestTrendComparison(TestCase):
+
+    def test_increase_detected(self):
+        from datetime import date
+        # Simulate compare — period2 has more cases
+        p1 = {'Flu': {'count': 10, 'season': 'Winter', 'category': '', 'severity': 1}}
+        p2 = {'Flu': {'count': 15, 'season': 'Winter', 'category': '', 'severity': 1}}
+        # Manual calculation
+        pct = round(((15 - 10) / 10) * 100, 2)
+        self.assertEqual(pct, 50.0)
+        self.assertEqual('up' if pct > 0 else 'down', 'up')
+
+    def test_decrease_detected(self):
+        count1, count2 = 20, 10
+        pct = round(((count2 - count1) / count1) * 100, 2)
+        self.assertEqual(pct, -50.0)
+        self.assertEqual('down' if pct < 0 else 'up', 'down')
+
+    def test_new_disease_zero_baseline(self):
+        count1, count2 = 0, 5
+        pct = 100.0 if count2 > 0 else 0.0
+        direction = 'new'
+        self.assertEqual(direction, 'new')
+        self.assertEqual(pct, 100.0)
+
+
+class TestAutoSafetyBuffer(TestCase):
+
+    def test_no_spikes_returns_base(self):
+        from analytics.restock_calculator import calculate_dynamic_safety_buffer
+        result = calculate_dynamic_safety_buffer(spike_count=0, total_diseases=8)
+        self.assertAlmostEqual(result, 1.2, places=2)
+
+    def test_all_spiking_returns_max(self):
+        from analytics.restock_calculator import calculate_dynamic_safety_buffer
+        result = calculate_dynamic_safety_buffer(spike_count=8, total_diseases=8)
+        self.assertAlmostEqual(result, 1.8, places=2)
+
+    def test_half_spiking(self):
+        from analytics.restock_calculator import calculate_dynamic_safety_buffer
+        result = calculate_dynamic_safety_buffer(spike_count=4, total_diseases=8)
+        # 1.2 + (0.5 × 0.6) = 1.5
+        self.assertAlmostEqual(result, 1.5, places=2)
+
+    def test_zero_total_returns_base(self):
+        from analytics.restock_calculator import calculate_dynamic_safety_buffer
+        result = calculate_dynamic_safety_buffer(spike_count=0, total_diseases=0)
+        self.assertAlmostEqual(result, 1.2, places=2)

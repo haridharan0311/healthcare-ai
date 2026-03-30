@@ -26,6 +26,15 @@ urlpatterns = [
     path('export-report/',             views.ExportReportView.as_view(),         name='export-report'),
     # ── CRUD dropdown ─────────────────────────────────────────────────
     path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),
+
+    # New Feature endpoints — add to urlpatterns list
+    path('trend-comparison/',   views.TrendComparisonView.as_view(),  name='trend-comparison'),
+    path('top-medicines/',      views.TopMedicinesView.as_view(),     name='top-medicines'),
+    path('low-stock-alerts/',   views.LowStockAlertView.as_view(),    name='low-stock-alerts'),
+    path('seasonality/',        views.SeasonalityView.as_view(),      name='seasonality'),
+    path('doctor-trends/',      views.DoctorWiseTrendsView.as_view(), name='doctor-trends'),
+    path('reports/weekly/',     views.WeeklyReportView.as_view(),     name='report-weekly'),
+    path('reports/monthly/',    views.MonthlyReportView.as_view(),    name='report-monthly'),
 ]
 
 router = DefaultRouter()

@@ -1,4 +1,3 @@
-*
 # Python
 __pycache__/
 *.py[cod]
@@ -20,9 +19,10 @@ media/
 # Static files (collected)
 staticfiles/
 
-# Migrations (optional: keep if working in team)
-# */migrations/*.py
-# !*/migrations/__init__.py
+# Migrations (ignore all except __init__.py)
+*/migrations/*.pyc
+# keep __init__.py in migrations tracked
+#*/migrations/__init__.py
 
 # IDE/editor
 .vscode/
@@ -42,9 +42,9 @@ htmlcov/
 dist/
 build/
 
-# Node (if you also use React frontend)
+# Node / frontend
 node_modules/
-build/
+frontend/build/
 
-__pycache__/
+# Extra safety for cache files
 *.pyc

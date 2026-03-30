@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as drf_status
 
-from .models import Disease, Appointment
+from analytics.models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
@@ -23,6 +23,16 @@ from .serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
+
+# Add this import at the top of views.py:
+from django.core.cache import cache
+from .aggregation import (
+    aggregate_disease_counts, aggregate_daily_counts, build_daily_list,
+    aggregate_medicine_usage, compare_disease_trends, aggregate_top_medicines,
+    aggregate_seasonality, aggregate_doctor_wise,
+    aggregate_weekly, aggregate_monthly, get_disease_type,
+)
+from .restock_calculator import calculate_dynamic_safety_buffer
 
 # ─── Generic name lookup (no hardcoded disease mapping) ──────────────────────
 GENERIC_MAP = {
@@ -1090,3 +1100,261 @@ class ExportReportView(APIView):
             writer.writerow([drug_name, _get_generic(drug_name), stock, '—', '—', status])
 
         return response
+    
+
+
+# ── New Feature 1: Disease Trend Comparison ───────────────────────────────────
+
+class TrendComparisonView(APIView):
+    """
+    GET /api/trend-comparison/?days=7
+
+    Compares this period vs previous period of same length.
+    Returns increase/decrease % per disease.
+    Example: days=7 → this week vs last week.
+    """
+    def get(self, request):
+        try:
+            days = int(request.query_params.get('days', 7))
+        except ValueError:
+            days = 7
+
+        _, end      = _get_db_date_range(days)
+        p2_end      = end
+        p2_start    = end - timedelta(days=days)
+        p1_end      = p2_start - timedelta(days=1)
+        p1_start    = p1_end - timedelta(days=days)
+
+        results = compare_disease_trends(p1_start, p1_end, p2_start, p2_end)
+
+        if not results:
+            return Response([])
+
+        return Response({
+            'period1':  f'{p1_start} to {p1_end}',
+            'period2':  f'{p2_start} to {p2_end}',
+            'results':  results,
+            'summary': {
+                'increasing': sum(1 for r in results if r['direction'] == 'up'),
+                'decreasing': sum(1 for r in results if r['direction'] == 'down'),
+                'stable':     sum(1 for r in results if r['direction'] == 'stable'),
+                'new':        sum(1 for r in results if r['direction'] == 'new'),
+            }
+        })
+
+
+# ── New Feature 2: Top Medicines Dashboard ────────────────────────────────────
+
+class TopMedicinesView(APIView):
+    """
+    GET /api/top-medicines/?days=30&limit=10
+
+    Top medicines by total usage from prescription data.
+    Groups by medicine, calculates total quantity.
+    Optional cache: ?cache=true for 30s TTL.
+    """
+    def get(self, request):
+        start, end = _get_date_range(request)
+        try:
+            limit = int(request.query_params.get('limit', 10))
+        except ValueError:
+            limit = 10
+        limit = min(max(limit, 1), 50)
+
+        use_cache  = request.query_params.get('cache', 'false').lower() == 'true'
+        cache_key  = f'top_medicines_{start}_{end}_{limit}'
+
+        if use_cache:
+            cached = cache.get(cache_key)
+            if cached:
+                return Response({'data': cached, 'cached': True})
+
+        results = aggregate_top_medicines(start, end, limit)
+
+        if not results:
+            return Response([])
+
+        if use_cache:
+            cache.set(cache_key, results, 30)   # 30 second TTL
+
+        return Response(results)
+
+
+# ── New Feature 3: Low Stock Alert System ────────────────────────────────────
+
+class LowStockAlertView(APIView):
+    """
+    GET /api/low-stock-alerts/?threshold=50
+
+    Detects medicines below threshold automatically.
+    Groups by drug_name. No hardcoded thresholds per drug.
+    Returns alert list sorted by urgency.
+    """
+    def get(self, request):
+        try:
+            threshold = int(request.query_params.get('threshold', 50))
+        except ValueError:
+            threshold = 50
+
+        # ORM aggregation — Sum stock per drug name
+        stock_qs = (
+            DrugMaster.objects
+            .values('drug_name', 'drug__generic_name'
+                    if hasattr(DrugMaster, 'drug__generic_name') else 'generic_name')
+            .annotate(total_stock=Sum('current_stock'))
+            .filter(total_stock__lte=threshold)
+            .order_by('total_stock')
+        )
+
+        # Fallback if nested lookup fails
+        stock_qs = (
+            DrugMaster.objects
+            .values('drug_name', 'generic_name')
+            .annotate(total_stock=Sum('current_stock'))
+            .filter(total_stock__lte=threshold)
+            .order_by('total_stock')
+        )
+
+        results = []
+        for row in stock_qs:
+            total = row['total_stock'] or 0
+            if total == 0:
+                alert_level = 'out_of_stock'
+            elif total <= threshold // 4:
+                alert_level = 'critical'
+            elif total <= threshold // 2:
+                alert_level = 'low'
+            else:
+                alert_level = 'warning'
+
+            results.append({
+                'drug_name':    row['drug_name'],
+                'generic_name': row['generic_name'] or '',
+                'total_stock':  total,
+                'threshold':    threshold,
+                'alert_level':  alert_level,
+                'restock_now':  total == 0 or alert_level == 'critical',
+            })
+
+        return Response({
+            'threshold':     threshold,
+            'total_alerts':  len(results),
+            'out_of_stock':  sum(1 for r in results if r['alert_level'] == 'out_of_stock'),
+            'critical':      sum(1 for r in results if r['alert_level'] == 'critical'),
+            'low':           sum(1 for r in results if r['alert_level'] == 'low'),
+            'alerts':        results,
+        })
+
+
+# ── New Feature 4: Disease Seasonality Insights ───────────────────────────────
+
+class SeasonalityView(APIView):
+    """
+    GET /api/seasonality/?days=365
+
+    Analyses disease occurrence by season using Disease.season field.
+    No hardcoded disease-season mapping — all from DB.
+    Shows most common disease per season + full breakdown.
+    """
+    def get(self, request):
+        start, end = _get_date_range(request)
+        result     = aggregate_seasonality(start, end)
+
+        if not result:
+            return Response({})
+
+        return Response({
+            'period':   f'{start} to {end}',
+            'seasons':  result,
+            'insight':  [
+                {
+                    'season':           season,
+                    'top_disease':      data['top_disease'],
+                    'total_cases':      data['total_cases'],
+                    'disease_count':    len(data['diseases']),
+                }
+                for season, data in result.items()
+            ]
+        })
+
+
+# ── New Feature 5: Doctor-wise Disease Trends ─────────────────────────────────
+
+class DoctorWiseTrendsView(APIView):
+    """
+    GET /api/doctor-trends/?days=30&limit=20
+
+    Groups disease data by doctor.
+    Shows which doctor handles most cases of specific diseases.
+    Pure ORM aggregation.
+    """
+    def get(self, request):
+        start, end = _get_date_range(request)
+        try:
+            limit = int(request.query_params.get('limit', 20))
+        except ValueError:
+            limit = 20
+
+        results = aggregate_doctor_wise(start, end)
+
+        if not results:
+            return Response([])
+
+        return Response(results[:limit])
+
+
+# ── New Feature 6: Weekly & Monthly Reports ───────────────────────────────────
+
+class WeeklyReportView(APIView):
+    """
+    GET /api/reports/weekly/?days=90
+
+    Aggregated weekly disease counts using TruncWeek.
+    Includes trend scores and restock summary per week.
+    """
+    def get(self, request):
+        start, end = _get_date_range(request)
+        weekly     = aggregate_weekly(start, end)
+
+        if not weekly:
+            return Response([])
+
+        return Response({
+            'period':  f'{start} to {end}',
+            'granularity': 'weekly',
+            'data':    weekly,
+        })
+
+
+class MonthlyReportView(APIView):
+    """
+    GET /api/reports/monthly/?days=365
+
+    Aggregated monthly disease counts using TruncMonth.
+    """
+    def get(self, request):
+        start, end = _get_date_range(request)
+        monthly    = aggregate_monthly(start, end)
+
+        if not monthly:
+            return Response([])
+
+        return Response({
+            'period':      f'{start} to {end}',
+            'granularity': 'monthly',
+            'data':        monthly,
+        })
+
+
+# ── New Feature 7: Auto Safety Buffer in Restock ─────────────────────────────
+# Integrated inside RestockSuggestionView — spike_count drives the buffer.
+# Add this block inside RestockSuggestionView.get() before the results loop:
+#
+#   spike_results = [
+#       detect_spike(_build_daily_list(daily_by_dtype, d, start, end))
+#       for d in dtype_season
+#   ]
+#   spike_count   = sum(1 for s in spike_results if s['is_spike'])
+#   safety_buffer = calculate_dynamic_safety_buffer(spike_count, len(dtype_season))
+#
+# Then pass safety_buffer= to calculate_restock().

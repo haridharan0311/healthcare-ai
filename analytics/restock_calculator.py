@@ -1,7 +1,21 @@
 from typing import List, Dict
 
+BASE_SAFETY_BUFFER = 1.2
+MAX_SAFETY_BUFFER  = 1.8
 
-SAFETY_BUFFER = 1.2   # 20% extra stock above predicted demand
+
+def calculate_dynamic_safety_buffer(spike_count: int, total_diseases: int) -> float:
+    """
+    New Feature 7: Auto Safety Buffer Adjustment.
+    Higher spike count → higher buffer.
+    Formula: buffer = BASE + (spike_ratio × (MAX - BASE))
+    spike_ratio = spikes / total_diseases (0.0 to 1.0)
+    """
+    if total_diseases == 0:
+        return BASE_SAFETY_BUFFER
+    spike_ratio = min(spike_count / total_diseases, 1.0)
+    buffer = BASE_SAFETY_BUFFER + (spike_ratio * (MAX_SAFETY_BUFFER - BASE_SAFETY_BUFFER))
+    return round(buffer, 3)
 
 
 def calculate_restock(
@@ -10,57 +24,50 @@ def calculate_restock(
     predicted_demand: float,
     avg_usage: float,
     current_stock: int,
-    contributing_diseases: List[str]
+    contributing_diseases: List[str],
+    safety_buffer: float = BASE_SAFETY_BUFFER,
 ) -> Dict:
     """
-    Calculate how much of a drug to restock.
-
     Formula:
-        expected_demand = (predicted_demand × avg_usage) × SAFETY_BUFFER
+        expected_demand   = predicted_demand × avg_usage × safety_buffer
         suggested_restock = max(0, expected_demand - current_stock)
 
-    Args:
-        drug_name:       name of the drug
-        generic_name:    generic/chemical name
-        predicted_demand: output of ml_engine.predict_demand()
-        avg_usage:       average units prescribed per script
-        current_stock:   units currently in inventory
-        contributing_diseases: list of disease names driving demand
-    Returns:
-        dict with full restock recommendation
+    avg_usage      = total_quantity / total_cases (must come from DB)
+    safety_buffer  = 1.2 base, auto-adjusted up to 1.8 based on spike count
     """
-    expected_demand = round(predicted_demand * avg_usage * SAFETY_BUFFER, 2)
+    expected_demand   = round(predicted_demand * avg_usage * safety_buffer, 2)
     suggested_restock = max(0, int(expected_demand - current_stock))
 
-    status = "sufficient"
-    if suggested_restock > 0:
-        shortage_pct = ((expected_demand - current_stock) / expected_demand) * 100
+    if current_stock == 0:
+        status = "critical"
+    elif suggested_restock == 0:
+        status = "sufficient"
+    else:
+        shortage_pct = (
+            (expected_demand - current_stock) / expected_demand * 100
+            if expected_demand > 0 else 100
+        )
         status = "critical" if shortage_pct > 50 else "low"
 
     return {
-        "drug_name": drug_name,
-        "generic_name": generic_name,
-        "current_stock": current_stock,
-        "predicted_demand": expected_demand,
-        "suggested_restock": suggested_restock,
+        "drug_name":             drug_name,
+        "generic_name":          generic_name,
+        "current_stock":         current_stock,
+        "predicted_demand":      expected_demand,
+        "suggested_restock":     suggested_restock,
         "contributing_diseases": contributing_diseases,
-        "status": status           # "sufficient" | "low" | "critical"
+        "status":                status,
+        "safety_buffer":         safety_buffer,
     }
 
 
 def apply_multi_disease_contribution(disease_demands: List[Dict]) -> float:
     """
-    When multiple diseases contribute to demand for one drug,
-    sum their weighted demands.
-
-    Args:
-        disease_demands: list of dicts, each with:
-                         { "predicted_demand": float, "seasonal_weight": float }
-    Returns:
-        combined demand float
+    Combined demand = Σ (disease_demand × seasonal_weight)
+    No hardcoded disease mapping — fully data-driven.
     """
-    total = sum(
-        d["predicted_demand"] * d.get("seasonal_weight", 1.0)
-        for d in disease_demands
+    return round(
+        sum(d["predicted_demand"] * d.get("seasonal_weight", 1.0)
+            for d in disease_demands),
+        2
     )
-    return round(total, 2)

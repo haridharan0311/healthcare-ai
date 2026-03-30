@@ -103,8 +103,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# CORS — allow React dev server
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv())
+
+CORS_ALLOWED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:3000']
 
 # DRF global config
 REST_FRAMEWORK = {
