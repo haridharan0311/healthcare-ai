@@ -1,9 +1,0 @@
-Disease,Season,Today Count,Period Count,Mean (baseline),Std Dev,Threshold,Is Spike,Severity,Baseline Days,As Of Date
-Flu,Summer,49,196,15.71,9.43,34.57,YES,4,7,2026-03-23
-Diabetes,Summer,43,168,16.86,11.33,39.53,YES,5,7,2026-03-23
-COVID-19,Summer,26,218,25.71,16.06,57.83,no,1,7,2026-03-23
-Asthma,All,24,119,12.57,14.47,41.5,no,2,7,2026-03-23
-Allergy,Winter,21,105,10.43,9.02,28.46,no,3,7,2026-03-23
-Arthritis,Monsoon,17,93,9.86,5.52,20.9,no,2,7,2026-03-23
-Hypertension,All,16,109,12.43,9.47,31.36,no,4,7,2026-03-23
-Migraine,Monsoon,15,99,10,7.46,24.92,no,4,7,2026-03-23
