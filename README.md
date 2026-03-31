@@ -306,7 +306,7 @@ Combines weighted historical trend with forward-looking forecast.
 
 Statistical threshold using mean and standard deviation:
 
-$$\text{is\spike} = \text{today\count} > (\mu + 2\sigma)$$
+$$\text{is\_spike} = \text{today\_count} > (\mu + 2\sigma)$$
 
 Where:
 - $\mu$ = mean of last 7 days (excluding today)
