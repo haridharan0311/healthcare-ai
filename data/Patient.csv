@@ -7639,7 +7639,6 @@ id,first_name,last_name,gender,title,dob,mobile_number,address_line_1,clinic_id,
 7638,Holly,Sharp,F,Ms,1997-07-28,0131544494,"91598 Campbell Cape Suite 609, Roseburgh, LA 16649",15340,14717
 7639,Christine,Baker,M,Mr,1982-09-20,9154328375,"USNV Gray, FPO AE 64062",16820,3441
 7640,Amber,Jones,M,Ms,1962-11-11,4447016525,"463 Brandy Shores, Joelville, MA 99083",864,18407
-7641,Kevin,Johnson,F,Ms,1991-11-11,0361734959,"USS Green, FPO AA 68439",4,2526
 7642,Dean,Bennett,F,Mrs,1946-06-26,5826737802,"43594 Bates Glen, Fletcherview, FL 85911",19826,18971
 7643,Jackie,Jones,F,Mr,1965-02-19,8682069898,"6530 Obrien Plains, North Chadberg, TN 96595",13424,4826
 7644,Annette,Moore,M,Ms,2000-04-28,9876500242,"USCGC Clark, FPO AE 29909",15810,17476
@@ -10336,7 +10335,7 @@ id,first_name,last_name,gender,title,dob,mobile_number,address_line_1,clinic_id,
 10335,Anthony,Scott,M,Ms,2003-08-10,2394185580,"91070 Snyder Keys, South Josephside, RI 98335",5677,18667
 10336,Ian,Robinson,M,Mr,1971-06-12,8459913873,"17102 Robertson Rest, Heathermouth, MI 54330",10353,11443
 10337,David,Gonzalez,F,Mrs,2013-01-21,3644610575,"686 Gonzalez Causeway Apt. 448, Jimtown, MO 39983",10098,9939
-10338,Travis,Johns,F,Ms,1997-09-01,9868304806,"2166 Ashley Road Suite 529, Lake Carlos, NY 99688",17192,6927
+10338,Travis,Johns,F,Ms,1997-09-01,9868304806,"2166 Ashley Road Suite 529, Lake Carlos, NY 99688",17192,NULL
 10339,Michelle,Williams,M,Mr,1962-12-03,6585005643,"60986 Bradford Branch Apt. 934, Mooreberg, HI 43318",3203,6556
 10340,Cynthia,Sanchez,M,Mrs,1946-06-09,1929598576,"99176 William Fork Apt. 262, Josephport, GU 53061",17274,7619
 10341,Jack,Graham,F,Ms,2021-05-23,8942797723,"8025 Michael Groves Suite 665, Laneborough, VI 53441",18588,11303
@@ -10380,7 +10379,6 @@ id,first_name,last_name,gender,title,dob,mobile_number,address_line_1,clinic_id,
 10379,Jason,Johnson,M,Ms,1975-10-26,4836509558,"9593 Hernandez Stravenue, Codyville, IA 80209",13759,11573
 10380,Amy,West,F,Mr,2024-05-12,2214679288,"663 Diaz Ranch, Deanville, AL 10405",6761,3938
 10381,Howard,Weber,F,Mr,2024-11-20,3535846396,"64676 Martinez Crossing, North Karen, VI 32723",13727,8196
-10382,Ryan,Chen,M,Ms,1944-08-12,3337418075,"70467 Jason Islands, East Markchester, MP 60721",4,8166
 10383,Angel,Chan,M,Mr,1986-11-11,2197877573,"5529 George Lakes, Henryhaven, FL 31321",17588,11108
 10384,Rodney,Gibson,M,Mrs,2022-06-12,9605685709,"9961 Cynthia Branch Suite 395, New Lauratown, VI 68342",1928,4358
 10385,Linda,Harmon,F,Mrs,1951-08-15,6038812980,"18450 Smith Squares, Lake Jasonchester, MT 26059",19591,14382

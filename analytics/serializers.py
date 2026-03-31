@@ -84,3 +84,64 @@ class RestockSuggestionSerializer(serializers.Serializer):
     suggested_restock = serializers.IntegerField()
     status = serializers.CharField()  # e.g., "OK", "Low Stock", "Critical"
     contributing_diseases = serializers.ListField(child=serializers.CharField())
+
+
+class TrendComparisonSerializer(serializers.Serializer):
+    disease_name  = serializers.CharField()
+    season        = serializers.CharField()
+    period1_count = serializers.IntegerField()
+    period2_count = serializers.IntegerField()
+    change        = serializers.IntegerField()
+    pct_change    = serializers.FloatField()
+    direction     = serializers.CharField()
+    period1       = serializers.CharField()
+    period2       = serializers.CharField()
+
+
+class TopMedicineSerializer(serializers.Serializer):
+    drug_name             = serializers.CharField()
+    generic_name          = serializers.CharField()
+    dosage_type           = serializers.CharField()
+    total_quantity        = serializers.IntegerField()
+    total_prescriptions   = serializers.IntegerField()
+    avg_qty_per_rx        = serializers.FloatField()
+
+
+class LowStockAlertSerializer(serializers.Serializer):
+    drug_name    = serializers.CharField()
+    generic_name = serializers.CharField()
+    total_stock  = serializers.IntegerField()
+    threshold    = serializers.IntegerField()
+    alert_level  = serializers.CharField()
+    restock_now  = serializers.BooleanField()
+
+
+class DoctorTrendSerializer(serializers.Serializer):
+    doctor_id    = serializers.IntegerField()
+    doctor_name  = serializers.CharField()
+    disease_name = serializers.CharField()
+    season       = serializers.CharField()
+    case_count   = serializers.IntegerField()
+
+
+class WeeklyDataSerializer(serializers.Serializer):
+    week         = serializers.CharField()
+    disease_name = serializers.CharField()
+    case_count   = serializers.IntegerField()
+
+
+class MonthlyDataSerializer(serializers.Serializer):
+    month        = serializers.CharField()
+    disease_name = serializers.CharField()
+    case_count   = serializers.IntegerField()
+
+
+class MedicineUsageSerializer(serializers.Serializer):
+    drug_name          = serializers.CharField()
+    generic_name       = serializers.CharField()
+    disease_name       = serializers.CharField()
+    season             = serializers.CharField()
+    total_quantity     = serializers.IntegerField()
+    total_cases        = serializers.IntegerField()
+    avg_usage          = serializers.FloatField()
+    prescription_count = serializers.IntegerField()

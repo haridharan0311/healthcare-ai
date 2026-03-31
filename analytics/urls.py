@@ -5,36 +5,36 @@ from . import crud_views
 from .crud_views import dropdown_options
 
 urlpatterns = [
-    # ── Analytics APIs ─────────────────────────────────────────────────
-    # 1.1 Disease Aggregation
+    # ── Core Analytics (Layer 1 + 2 + 3) ──────────────────────────────
     path('disease-trends/',            views.DiseaseTrendView.as_view(),      name='disease-trends'),
-    # 1.2 Time-Series Aggregation
     path('disease-trends/timeseries/', views.TimeSeriesView.as_view(),        name='disease-timeseries'),
-    # 1.3 Medicine Usage Aggregation
     path('medicine-usage/',            views.MedicineUsageView.as_view(),     name='medicine-usage'),
-    # 2.3 Spike Detection (both route names as per document)
+
+    # ── Spike Detection (both URL names per requirements doc) ──────────
     path('spike-alerts/',              views.SpikeAlertView.as_view(),        name='spike-alerts'),
     path('spike-detection/',           views.SpikeAlertView.as_view(),        name='spike-detection'),
-    # 2.4 + 2.5 Demand + Restock
-    path('restock-suggestions/',       views.RestockSuggestionView.as_view(), name='restock-suggestions'),
-    # District-level restock
-    path('district-restock/',          views.DistrictRestockView.as_view(),   name='district-restock'),
-    # ── Export APIs ────────────────────────────────────────────────────
-    path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(), name='export-trends'),
-    path('export/spike-alerts/',       views.ExportSpikeAlertsView.as_view(),   name='export-spikes'),
-    path('export/restock/',            views.ExportRestockView.as_view(),        name='export-restock'),
-    path('export-report/',             views.ExportReportView.as_view(),         name='export-report'),
-    # ── CRUD dropdown ─────────────────────────────────────────────────
-    path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),
 
-    # New Feature endpoints — add to urlpatterns list
-    path('trend-comparison/',   views.TrendComparisonView.as_view(),  name='trend-comparison'),
-    path('top-medicines/',      views.TopMedicinesView.as_view(),     name='top-medicines'),
-    path('low-stock-alerts/',   views.LowStockAlertView.as_view(),    name='low-stock-alerts'),
-    path('seasonality/',        views.SeasonalityView.as_view(),      name='seasonality'),
-    path('doctor-trends/',      views.DoctorWiseTrendsView.as_view(), name='doctor-trends'),
-    path('reports/weekly/',     views.WeeklyReportView.as_view(),     name='report-weekly'),
-    path('reports/monthly/',    views.MonthlyReportView.as_view(),    name='report-monthly'),
+    # ── Restock (system-wide + district) ──────────────────────────────
+    path('restock-suggestions/',       views.RestockSuggestionView.as_view(), name='restock-suggestions'),
+    path('district-restock/',          views.DistrictRestockView.as_view(),   name='district-restock'),
+
+    # ── New Features ───────────────────────────────────────────────────
+    path('trend-comparison/',          views.TrendComparisonView.as_view(),   name='trend-comparison'),
+    path('top-medicines/',             views.TopMedicinesView.as_view(),      name='top-medicines'),
+    path('low-stock-alerts/',          views.LowStockAlertView.as_view(),     name='low-stock-alerts'),
+    path('seasonality/',               views.SeasonalityView.as_view(),       name='seasonality'),
+    path('doctor-trends/',             views.DoctorWiseTrendsView.as_view(),  name='doctor-trends'),
+    path('reports/weekly/',            views.WeeklyReportView.as_view(),      name='report-weekly'),
+    path('reports/monthly/',           views.MonthlyReportView.as_view(),     name='report-monthly'),
+
+    # ── CSV Exports (all respect ?days= and ?district=) ────────────────
+    path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(),  name='export-trends'),
+    path('export/spike-alerts/',       views.ExportSpikeAlertsView.as_view(),    name='export-spikes'),
+    path('export/restock/',            views.ExportRestockView.as_view(),         name='export-restock'),
+    path('export-report/',             views.ExportReportView.as_view(),          name='export-report'),
+
+    # ── CRUD ───────────────────────────────────────────────────────────
+    path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),
 ]
 
 router = DefaultRouter()

@@ -1,35 +1,51 @@
 import axios from 'axios';
 
 const BASE = 'http://localhost:8000/api';
+const CRUD = `${BASE}/crud`;
 
-export const fetchTrends      = (days = 30) => axios.get(`${BASE}/disease-trends/?days=${days}`);
-export const fetchTimeSeries  = (days = 7)  => axios.get(`${BASE}/disease-trends/timeseries/?days=${days}`);
-export const fetchSpikes      = ()          => axios.get(`${BASE}/spike-alerts/?all=true`);
-export const fetchRestock     = ()          => axios.get(`${BASE}/restock-suggestions/`);
-export const getExportUrl     = ()          => `${BASE}/export-report/`;
-export const fetchDropdowns   = ()          => axios.get(`${BASE}/crud/dropdowns/`);
-export const fetchDistricts    = ()          => axios.get(`${BASE}/district-restock/`);
-export const fetchDistrictRestock = (district, days = 30) =>
-  axios.get(`${BASE}/district-restock/?district=${encodeURIComponent(district)}&days=${days}`);
+const api = (url, params = {}) =>
+  axios.get(`${BASE}${url}`, { params });
 
-const CRUD = 'http://localhost:8000/api/crud';
+// ── Core analytics ────────────────────────────────────────────────────
+export const fetchTrends       = (days = 30)  => api('/disease-trends/', { days });
+export const fetchTimeSeries   = (days = 7)   => api('/disease-trends/timeseries/', { days });
+export const fetchMedicineUsage= (days = 30)  => api('/medicine-usage/', { days });
+export const fetchSpikes       = (days = 8, all = true) =>
+  api('/spike-alerts/', { days, all });
+export const fetchRestock      = (days = 30)  => api('/restock-suggestions/', { days });
 
+// ── District restock ──────────────────────────────────────────────────
+export const fetchDistricts         = ()                    => api('/district-restock/');
+export const fetchDistrictRestock   = (district, days = 30) =>
+  api('/district-restock/', { district, days });
+
+// ── New features ──────────────────────────────────────────────────────
+export const fetchTrendComparison  = (days = 7)    => api('/trend-comparison/', { days });
+export const fetchTopMedicines     = (days = 30, limit = 10) =>
+  api('/top-medicines/', { days, limit });
+export const fetchLowStockAlerts   = (threshold = 50) =>
+  api('/low-stock-alerts/', { threshold });
+export const fetchSeasonality      = (days = 365)  => api('/seasonality/', { days });
+export const fetchDoctorTrends     = (days = 30, limit = 20) =>
+  api('/doctor-trends/', { days, limit });
+export const fetchWeeklyReport     = (days = 90)   => api('/reports/weekly/', { days });
+export const fetchMonthlyReport    = (days = 365)  => api('/reports/monthly/', { days });
+
+// ── CSV exports ───────────────────────────────────────────────────────
+export const getExportUrl = (type, params = {}) => {
+  const qstr = new URLSearchParams(params).toString();
+  return `${BASE}/export/${type}/${qstr ? '?' + qstr : ''}`;
+};
+
+// ── CRUD ──────────────────────────────────────────────────────────────
 export const crudApi = {
   list:   (model, page = 1, search = '', pageSize = 20) =>
     axios.get(`${CRUD}/${model}/`, { params: { page, search, page_size: pageSize } }),
-
-  get:    (model, id) =>
-    axios.get(`${CRUD}/${model}/${id}/`),
-
-  create: (model, data) =>
-    axios.post(`${CRUD}/${model}/`, data),
-
-  update: (model, id, data) =>
-    axios.put(`${CRUD}/${model}/${id}/`, data),
-
-  patch:  (model, id, data) =>
-    axios.patch(`${CRUD}/${model}/${id}/`, data),
-
-  remove: (model, id) =>
-    axios.delete(`${CRUD}/${model}/${id}/`),
+  get:    (model, id) => axios.get(`${CRUD}/${model}/${id}/`),
+  create: (model, data) => axios.post(`${CRUD}/${model}/`, data),
+  update: (model, id, data) => axios.put(`${CRUD}/${model}/${id}/`, data),
+  patch:  (model, id, data) => axios.patch(`${CRUD}/${model}/${id}/`, data),
+  remove: (model, id) => axios.delete(`${CRUD}/${model}/${id}/`),
 };
+export const fetchDropdowns = () => axios.get(`${CRUD}/dropdowns/`);
+

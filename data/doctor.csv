@@ -6925,7 +6925,6 @@ id,first_name,gender,qualification,clinic_id,last_name
 6924,Philip,F,MS,11038,Rich
 6925,Sarah,M,BDS,17318,Shaw
 6926,Melissa,M,BDS,7441,Brown
-6927,Melinda,M,BDS,2,Padilla
 6928,Christine,F,MBBS,5085,Gray
 6929,Shelley,F,BDS,1148,Woodard
 6930,Dave,F,DM,18193,Bailey
@@ -17026,7 +17025,6 @@ id,first_name,gender,qualification,clinic_id,last_name
 17025,Benjamin,F,MS,8948,Young
 17026,Robert,M,MD,1856,Wong
 17027,Brendan,M,BDS,4402,Morton
-17028,Mary,F,BDS,4,Roth
 17029,Cynthia,F,DM,6854,Mejia
 17030,David,M,MS,17999,Baldwin
 17031,Martin,F,MBBS,9891,Wise
