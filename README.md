@@ -306,7 +306,7 @@ Combines weighted historical trend with forward-looking forecast.
 
 Statistical threshold using mean and standard deviation:
 
-$$\text{is\_spike} = \text{today\_count} > (\mu + 2\sigma)$$
+$$\text{is\spike} = \text{today\count} > (\mu + 2\sigma)$$
 
 Where:
 - $\mu$ = mean of last 7 days (excluding today)
@@ -690,16 +690,3 @@ Proprietary software for Tamil Nadu healthcare network analytics. All rights res
 For issues, questions, or feature requests, please reach out to the development team.
 
 ---
-
-## Changelog
-
-### v1.0.0 (March 2026)
-- ✅ Disease trend analysis with seasonal weighting
-- ✅ Statistical spike detection (Mean + 2σ)
-- ✅ ML-based demand forecasting
-- ✅ Multi-factor intelligent restocking
-- ✅ Interactive dashboard with district filtering
-- ✅ Full CRUD admin panel
-- ✅ CSV export capabilities
-- ✅ 20+ REST API endpoints
-- ✅ Complete data pipeline with management commands
