@@ -16,7 +16,7 @@ export const fetchRestock      = (days = 30)  => api('/restock-suggestions/', { 
 
 // ── District restock ──────────────────────────────────────────────────
 export const fetchDistricts         = ()                    => api('/district-restock/');
-export const fetchDistrictRestock   = (district, days = 30) =>
+export const fetchDistrictRestock = (district, days = 30) =>
   api('/district-restock/', { district, days });
 
 // ── New features ──────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ export const fetchDoctorTrends     = (days = 30, limit = 20) =>
   api('/doctor-trends/', { days, limit });
 export const fetchWeeklyReport     = (days = 90)   => api('/reports/weekly/', { days });
 export const fetchMonthlyReport    = (days = 365)  => api('/reports/monthly/', { days });
+export const fetchTodaySummary = () => api('/today-summary/');
 
 // ── CSV exports ───────────────────────────────────────────────────────
 export const getExportUrl = (type, params = {}) => {

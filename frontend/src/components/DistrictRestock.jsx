@@ -8,40 +8,41 @@ const STATUS_STYLE = {
 };
 
 const DATE_OPTIONS = [
-  { label: '1W', days: 7  },
-  { label: '1M', days: 30 },
-  { label: '3M', days: 90 },
-  { label: '6M', days: 180},
+  { label: '1W', days: 7   },
+  { label: '1M', days: 30  },
+  { label: '3M', days: 90  },
+  { label: '6M', days: 180 },
 ];
 
-export default function DistrictRestock() {
-  const [districts, setDistricts]         = useState([]);
-  const [selectedDistrict, setDistrict]   = useState('');
-  const [selectedDays, setDays]           = useState(30);
-  const [data, setData]                   = useState(null);
-  const [loading, setLoading]             = useState(false);
-  const [districtLoading, setDLoading]    = useState(true);
-  const [search, setSearch]               = useState('');
-  const [statusFilter, setStatusFilter]   = useState('all');
-  const [sortField, setSortField]         = useState('status');
-  const [sortDir, setSortDir]             = useState('asc');
+export default function DistrictRestock({ onExport }) {
+  const [districts,        setDistricts]        = useState([]);
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedDays,     setSelectedDays]     = useState(30);
+  const [data,             setData]             = useState(null);
+  const [loading,          setLoading]          = useState(false);
+  const [districtLoading,  setDistrictLoading]  = useState(true);
+  const [search,           setSearch]           = useState('');
+  const [statusFilter,     setStatusFilter]     = useState('all');
+  const [sortField,        setSortField]        = useState('status');
+  const [sortDir,          setSortDir]          = useState('asc');
 
-  // Load district list on mount
+  // Load district list once
   useEffect(() => {
     fetchDistricts().then(res => {
       setDistricts(res.data.districts || []);
-      setDLoading(false);
+      setDistrictLoading(false);
     });
   }, []);
 
-  // Load restock data when district or days changes
+  // Re-fetch when EITHER district OR days changes
   useEffect(() => {
     if (!selectedDistrict) return;
     setLoading(true);
+    setData(null);
     fetchDistrictRestock(selectedDistrict, selectedDays).then(res => {
       setData(res.data);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [selectedDistrict, selectedDays]);
 
   const handleSort = (field) => {
@@ -107,15 +108,21 @@ export default function DistrictRestock() {
           )}
         </div>
 
-        {/* Period selector */}
+        {/* Period selector — calls API with new days */}
         <div style={{ display: 'flex', gap: 4 }}>
           {DATE_OPTIONS.map(opt => (
-            <button key={opt.label} onClick={() => setDays(opt.days)} style={{
-              padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: selectedDays === opt.days ? 500 : 400,
-              background: selectedDays === opt.days ? '#378ADD' : '#f0f0f0',
-              color: selectedDays === opt.days ? '#fff' : '#555',
-            }}>{opt.label}</button>
+            <button
+              key={opt.label}
+              onClick={() => setSelectedDays(opt.days)}  // ← was missing this
+              style={{
+                padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: selectedDays === opt.days ? 500 : 400,
+                background: selectedDays === opt.days ? '#378ADD' : '#f0f0f0',
+                color: selectedDays === opt.days ? '#fff' : '#555',
+              }}
+            >
+              {opt.label}
+            </button>
           ))}
         </div>
       </div>
@@ -124,7 +131,7 @@ export default function DistrictRestock() {
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <select
           value={selectedDistrict}
-          onChange={e => setDistrict(e.target.value)}
+          onChange={e => setDistricts(e.target.value)}
           style={{
             padding: '8px 14px', borderRadius: 8, border: '1px solid #ddd',
             fontSize: 14, minWidth: 220, outline: 'none', cursor: 'pointer',

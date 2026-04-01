@@ -232,19 +232,18 @@ class TimeSeriesView(APIView):
             .annotate(appt_date=TruncDate('appointment_datetime'))
             .values('appt_date', 'disease__name')
             .annotate(case_count=Count('id'))
-            .order_by('appt_date')
+            .order_by('appt_date', 'disease__name')
         )
 
         if disease_filter:
             qs = qs.filter(disease__name__icontains=disease_filter)
 
-        # Group by disease type — aggregate across numbered variants
+        # Group by disease TYPE (strip numbers) per date
+        # Use dict to merge "Flu 1", "Flu 2" etc into single "Flu" per date
         counts = defaultdict(int)
         for row in qs:
             dtype = get_disease_type(row['disease__name'])
-            if disease_filter and dtype.lower() != disease_filter.lower():
-                continue
-            key = (row['appt_date'], dtype)
+            key   = (row['appt_date'], dtype)
             counts[key] += row['case_count']
 
         if not counts:
@@ -692,8 +691,10 @@ class DistrictRestockView(APIView):
         for row in drug_qs:
             district = _extract_district(row['clinic__clinic_address_1'])
             all_districts.add(district)
+
             if district_filter and district.lower() != district_filter.lower():
                 continue
+
             key = (
                 row['drug_name'], row['generic_name'] or '',
                 row['drug_strength'] or '', row['dosage_type'] or ''
@@ -714,7 +715,20 @@ class DistrictRestockView(APIView):
         results       = []
         max_clinics   = 0
 
-        for (drug_name, generic, strength, dosage), data in district_drug[district_filter].items():
+        matched_key = next(
+            (k for k in district_drug if k.lower() == district_filter.lower()),
+            None
+        )
+
+        if not matched_key:
+            return Response({
+                'district': district_filter, 'clinic_count': 0,
+                'period': f'{start} to {end}', 'results': [],
+                'summary': {'total_drugs': 0, 'critical': 0, 'low': 0, 'sufficient': 0}
+            })
+
+
+        for (drug_name, generic, strength, dosage), data in district_drug[matched_key].items():
             max_clinics   = max(max_clinics, data['clinic_count'])
             system_demand, contributing = get_drug_demand(drug_name)
             district_ratio  = data['clinic_count'] / total_clinics
@@ -1149,9 +1163,8 @@ class TopMedicinesView(APIView):
     """
     GET /api/top-medicines/?days=30&limit=10
 
-    Top medicines by total usage from prescription data.
-    Groups by medicine, calculates total quantity.
-    Optional cache: ?cache=true for 30s TTL.
+    Shows current stock per drug from DrugMaster (not prescription-based).
+    Prescription count = total prescriptions written in period (for context).
     """
     def get(self, request):
         start, end = _get_date_range(request)
@@ -1161,24 +1174,44 @@ class TopMedicinesView(APIView):
             limit = 10
         limit = min(max(limit, 1), 50)
 
-        use_cache  = request.query_params.get('cache', 'false').lower() == 'true'
-        cache_key  = f'top_medicines_{start}_{end}_{limit}'
+        # Current stock from DrugMaster — Sum per drug name
+        stock_qs = (
+            DrugMaster.objects
+            .values('drug_name', 'generic_name', 'dosage_type')
+            .annotate(
+                current_stock=Sum('current_stock'),
+                variant_count=Count('id'),
+            )
+            .order_by('-current_stock')
+        )
 
-        if use_cache:
-            cached = cache.get(cache_key)
-            if cached:
-                return Response({'data': cached, 'cached': True})
+        # Prescription count in period (how many times prescribed)
+        rx_qs = (
+            PrescriptionLine.objects
+            .filter(prescription__prescription_date__range=(start, end))
+            .select_related('drug')
+            .values('drug__drug_name')
+            .annotate(rx_count=Count('id'))
+        )
+        rx_map = {r['drug__drug_name']: r['rx_count'] for r in rx_qs}
 
-        results = aggregate_top_medicines(start, end, limit)
+        results = []
+        seen = set()
+        for row in stock_qs:
+            name = row['drug_name']
+            if name in seen:
+                continue
+            seen.add(name)
+            results.append({
+                'drug_name':          name,
+                'generic_name':       row['generic_name'] or '',
+                'dosage_type':        row['dosage_type'] or '',
+                'current_stock':      row['current_stock'] or 0,
+                'prescription_count': rx_map.get(name, 0),
+                'variant_count':      row['variant_count'],
+            })
 
-        if not results:
-            return Response([])
-
-        if use_cache:
-            cache.set(cache_key, results, 30)   # 30 second TTL
-
-        return Response(results)
-
+        return Response(results[:limit])
 
 # ── New Feature 3: Low Stock Alert System ────────────────────────────────────
 
@@ -1186,9 +1219,8 @@ class LowStockAlertView(APIView):
     """
     GET /api/low-stock-alerts/?threshold=50
 
-    Detects medicines below threshold automatically.
-    Groups by drug_name. No hardcoded thresholds per drug.
-    Returns alert list sorted by urgency.
+    Uses average stock per clinic per drug, not system total.
+    This makes the threshold meaningful at clinic level.
     """
     def get(self, request):
         try:
@@ -1196,55 +1228,65 @@ class LowStockAlertView(APIView):
         except ValueError:
             threshold = 50
 
-        # ORM aggregation — Sum stock per drug name
-        stock_qs = (
-            DrugMaster.objects
-            .values('drug_name', 'drug__generic_name'
-                    if hasattr(DrugMaster, 'drug__generic_name') else 'generic_name')
-            .annotate(total_stock=Sum('current_stock'))
-            .filter(total_stock__lte=threshold)
-            .order_by('total_stock')
-        )
+        from django.db.models import Avg as DAvg, Count as DCount
 
-        # Fallback if nested lookup fails
+        # Average stock per clinic per drug — meaningful comparison
         stock_qs = (
             DrugMaster.objects
             .values('drug_name', 'generic_name')
-            .annotate(total_stock=Sum('current_stock'))
-            .filter(total_stock__lte=threshold)
-            .order_by('total_stock')
+            .annotate(
+                avg_stock=DAvg('current_stock'),
+                total_stock=Sum('current_stock'),
+                clinic_count=DCount('clinic', distinct=True),
+            )
+            .order_by('avg_stock')
         )
 
         results = []
+        out_of_stock = critical = low = warning = 0
+
         for row in stock_qs:
+            avg = round(row['avg_stock'] or 0, 1)
             total = row['total_stock'] or 0
-            if total == 0:
+
+            # Alert based on AVERAGE per clinic vs threshold
+            if avg > threshold:
+                continue    # not an alert
+
+            if avg == 0:
                 alert_level = 'out_of_stock'
-            elif total <= threshold // 4:
+                out_of_stock += 1
+            elif avg <= threshold * 0.25:
                 alert_level = 'critical'
-            elif total <= threshold // 2:
+                critical += 1
+            elif avg <= threshold * 0.5:
                 alert_level = 'low'
+                low += 1
             else:
                 alert_level = 'warning'
+                warning += 1
 
             results.append({
                 'drug_name':    row['drug_name'],
                 'generic_name': row['generic_name'] or '',
+                'avg_stock_per_clinic': avg,
                 'total_stock':  total,
+                'clinic_count': row['clinic_count'],
                 'threshold':    threshold,
                 'alert_level':  alert_level,
-                'restock_now':  total == 0 or alert_level == 'critical',
+                'restock_now':  avg == 0 or alert_level == 'critical',
             })
 
         return Response({
             'threshold':     threshold,
+            'note':          'Based on average stock per clinic',
             'total_alerts':  len(results),
-            'out_of_stock':  sum(1 for r in results if r['alert_level'] == 'out_of_stock'),
-            'critical':      sum(1 for r in results if r['alert_level'] == 'critical'),
-            'low':           sum(1 for r in results if r['alert_level'] == 'low'),
+            'out_of_stock':  out_of_stock,
+            'critical':      critical,
+            'low':           low,
+            'warning':       warning,
             'alerts':        results,
         })
-
 
 # ── New Feature 4: Disease Seasonality Insights ───────────────────────────────
 
@@ -1358,3 +1400,49 @@ class MonthlyReportView(APIView):
 #   safety_buffer = calculate_dynamic_safety_buffer(spike_count, len(dtype_season))
 #
 # Then pass safety_buffer= to calculate_restock().
+
+class TodaySummaryView(APIView):
+    """
+    GET /api/today-summary/
+    Returns counts for today based on latest DB date.
+    No date param — always uses latest appointment date in DB.
+    """
+    def get(self, request):
+        # Latest date in DB
+        latest = Appointment.objects.aggregate(
+            latest=Max('appointment_datetime')
+        )['latest']
+        today = latest.date() if latest else date.today()
+
+        # Total appointments today
+        today_count = Appointment.objects.filter(
+            appointment_datetime__date=today
+        ).count()
+
+        # Per disease today — ORM Count, no loops
+        disease_today = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date=today,
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .values('disease__name')
+            .annotate(cnt=Count('id'))
+        )
+
+        # Group by disease type
+        by_type = defaultdict(int)
+        for row in disease_today:
+            dtype = get_disease_type(row['disease__name'])
+            by_type[dtype] += row['cnt']
+
+        return Response({
+            'date':           str(today),
+            'total_today':    today_count,
+            'by_disease':     [
+                {'disease': k, 'count': v}
+                for k, v in sorted(by_type.items(), key=lambda x: -x[1])
+            ],
+        })
+    

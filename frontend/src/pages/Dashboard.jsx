@@ -49,8 +49,8 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [loadAll]);
 
-  const handleCsvPreview = async (type) => {
-    const url = getExportUrl(type, { days });
+  const handleCsvPreview = async (type, params = {}) => {
+    const url = getExportUrl(type, { ...params });
     const res = await fetch(url);
     const text = await res.text();
     const rows = text.trim().split('\n').map(r =>
@@ -71,27 +71,8 @@ export default function Dashboard() {
         alignItems: 'center', justifyContent: 'space-between',
         height: 60, position: 'sticky', top: 0, zIndex: 10
       }}>
-        <div>
-          <span style={{ fontWeight: 600, fontSize: 18 }}>Healthcare AI</span>
-          <span style={{ color: '#aaa', marginLeft: 12, fontSize: 13 }}>
-            Tamil Nadu Analytics
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {/* Global date range selector */}
-          <div style={{ display: 'flex', gap: 4 }}>
-            {DATE_OPTIONS.map(opt => (
-              <button key={opt.label} onClick={() => setDays(opt.days)} style={{
-                padding: '5px 12px', borderRadius: 6, border: 'none',
-                cursor: 'pointer', fontSize: 12,
-                fontWeight: days === opt.days ? 600 : 400,
-                background: days === opt.days ? '#2563eb' : '#f0f0f0',
-                color: days === opt.days ? '#fff' : '#555',
-              }}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        <span style={{ fontWeight: 600, fontSize: 18 }}>Healthcare AI</span>
+        <div style={{ display: 'flex', gap: 8 }}>
           <a href="/reports" style={{
             padding: '6px 16px', borderRadius: 6, border: '1px solid #ddd',
             background: '#fff', fontSize: 13, color: '#444',
@@ -113,22 +94,13 @@ export default function Dashboard() {
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '28px 24px' }}>
 
         {/* Summary cards */}
-        <SummaryCards trends={trends} spikes={spikes} days={days} />
+        <SummaryCards days={days} />
 
         {/* Spike alerts */}
-        <SpikeAlerts
-          data={spikes}
-          days={days}
-          loading={loading}
-          onExport={() => handleCsvPreview('spike-alerts')}
-        />
+        <SpikeAlerts onExport={(range) => handleCsvPreview('spike-alerts', { days: range })} />
 
         {/* Trend chart + comparison */}
-        <TrendChart
-          days={days}
-          comparison={comparison}
-          onExport={() => handleCsvPreview('disease-trends')}
-        />
+        <TrendChart globalDays={days} onExport={(d) => handleCsvPreview('disease-trends', { days: d })} />
 
         {/* District restock */}
         <DistrictRestock

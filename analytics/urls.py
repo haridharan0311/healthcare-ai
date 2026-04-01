@@ -26,6 +26,7 @@ urlpatterns = [
     path('doctor-trends/',             views.DoctorWiseTrendsView.as_view(),  name='doctor-trends'),
     path('reports/weekly/',            views.WeeklyReportView.as_view(),      name='report-weekly'),
     path('reports/monthly/',           views.MonthlyReportView.as_view(),     name='report-monthly'),
+    path('today-summary/', views.TodaySummaryView.as_view(), name='today-summary'),
 
     # ── CSV Exports (all respect ?days= and ?district=) ────────────────
     path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(),  name='export-trends'),
