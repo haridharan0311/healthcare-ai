@@ -129,3 +129,15 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# ── Live Data Generator (Development Only) ────────────────────────────────
+# For live dashboard testing, automatically generates appointments, prescriptions,
+# and prescription lines in the background every N seconds while runserver is active.
+#
+# Settings:
+#   ENABLE_LIVE_DATA_GENERATOR: Enable/disable (default: True if DEBUG=True)
+#   LIVE_DATA_INTERVAL: Generation interval in seconds (default: 30)
+#
+# To disable: Set ENABLE_LIVE_DATA_GENERATOR = False in .env or override here
+ENABLE_LIVE_DATA_GENERATOR = DEBUG  # Only in development mode
+LIVE_DATA_INTERVAL = 30  # Generate new data every 30 seconds

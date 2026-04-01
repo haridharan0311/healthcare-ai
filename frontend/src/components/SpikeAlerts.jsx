@@ -38,6 +38,11 @@ export default function SpikeAlerts({ onExport }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Spike alerts</h2>
+          {spikes.length > 0 && (
+            <span style={{ background: '#dc2626', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>
+              {spikes.length} spike{spikes.length > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Local range pills — independent of global days */}

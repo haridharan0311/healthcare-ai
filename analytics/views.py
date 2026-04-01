@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from django.http import HttpResponse
 from django.db.models import Count, Avg, Max, Sum, Min
-from django.db.models.functions import TruncDate
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as drf_status
@@ -33,6 +33,34 @@ from .aggregation import (
     aggregate_weekly, aggregate_monthly, get_disease_type,
 )
 from .restock_calculator import calculate_dynamic_safety_buffer
+
+# ─── Response Caching Utility ──────────────────────────────────────────────────
+
+def cache_api_response(timeout=300):
+    """
+    Decorator to cache API responses.
+    timeout: cache duration in seconds (default: 5 minutes)
+    """
+    def decorator(view_func):
+        def wrapper(self, request, *args, **kwargs):
+            # Generate cache key from view name + query params
+            cache_key = f"{self.__class__.__name__}:{request.GET.urlencode()}"
+            
+            # Try to get from cache
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+            
+            # Call the original view
+            response = view_func(self, request, *args, **kwargs)
+            
+            # Cache the response data
+            if response.status_code == 200:
+                cache.set(cache_key, response.data, timeout)
+            
+            return response
+        return wrapper
+    return decorator
 
 # ─── Generic name lookup (no hardcoded disease mapping) ──────────────────────
 GENERIC_MAP = {
@@ -372,6 +400,7 @@ class SpikeAlertView(APIView):
     Configurable baseline window via ?days= param (minimum 8).
     Returns period_count = total cases across the selected window.
     """
+    @cache_api_response(timeout=180)  # Cache for 3 minutes
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
 
@@ -705,6 +734,11 @@ class DistrictRestockView(APIView):
             entry['clinic_count'] += 1
 
         if not district_filter:
+            # If all districts are "Unknown", fallback to clinic names
+            if all_districts == {'Unknown'} or len(all_districts) == 0:
+                clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
+                all_districts = set(clinics)
+            
             return Response({
                 'districts': sorted(all_districts),
                 'total':     len(all_districts),
@@ -1166,6 +1200,7 @@ class TopMedicinesView(APIView):
     Shows current stock per drug from DrugMaster (not prescription-based).
     Prescription count = total prescriptions written in period (for context).
     """
+    @cache_api_response(timeout=300)  # Cache for 5 minutes
     def get(self, request):
         start, end = _get_date_range(request)
         try:
@@ -1222,6 +1257,7 @@ class LowStockAlertView(APIView):
     Uses average stock per clinic per drug, not system total.
     This makes the threshold meaningful at clinic level.
     """
+    @cache_api_response(timeout=300)  # Cache for 5 minutes
     def get(self, request):
         try:
             threshold = int(request.query_params.get('threshold', 50))
@@ -1288,105 +1324,272 @@ class LowStockAlertView(APIView):
             'alerts':        results,
         })
 
-# ── New Feature 4: Disease Seasonality Insights ───────────────────────────────
+# ─── Seasonality ───────────────────────────
 
 class SeasonalityView(APIView):
     """
     GET /api/seasonality/?days=365
 
-    Analyses disease occurrence by season using Disease.season field.
-    No hardcoded disease-season mapping — all from DB.
-    Shows most common disease per season + full breakdown.
+    Groups disease cases by season (Summer/Monsoon/Winter/All).
+    The "All" section = only diseases whose season field = "All".
+    Monsoon + Summer + Winter cases are separate — they do NOT add up to "All".
+    "All" means diseases active in all seasons (e.g. Hypertension).
+    Total across all seasons will exceed total appointments because one
+    appointment may be counted in its specific season bucket only.
     """
     def get(self, request):
         start, end = _get_date_range(request)
-        result     = aggregate_seasonality(start, end)
 
-        if not result:
-            return Response({})
+        # Pure ORM — count per disease per season
+        qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(start, end),
+                disease__isnull=False,
+                disease__is_active=True,
+            )
+            .select_related('disease')
+            .values('disease__name', 'disease__season')
+            .annotate(case_count=Count('id'))
+            .order_by('disease__season', '-case_count')
+        )
+
+        # Group by season, aggregate by disease type
+        season_map = defaultdict(lambda: defaultdict(int))
+
+        for row in qs:
+            dtype  = get_disease_type(row['disease__name'])
+            season = row['disease__season'] or 'Unknown'
+            season_map[season][dtype] += row['case_count']
+
+        # Build response per season
+        seasons_out = {}
+        for season, type_counts in season_map.items():
+            total = sum(type_counts.values())
+            sorted_diseases = sorted(type_counts.items(), key=lambda x: -x[1])
+            seasons_out[season] = {
+                'top_disease':       sorted_diseases[0][0] if sorted_diseases else None,
+                'top_disease_count': sorted_diseases[0][1] if sorted_diseases else 0,
+                'total_cases':       total,
+                'diseases': [
+                    {
+                        'disease_name': d,
+                        'case_count':   c,
+                        'percentage':   round(c / total * 100, 1) if total > 0 else 0,
+                    }
+                    for d, c in sorted_diseases
+                ],
+            }
+
+        # Overall total = sum of all appointments in range (not sum of seasons)
+        overall_total = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
+        ).count()
 
         return Response({
-            'period':   f'{start} to {end}',
-            'seasons':  result,
-            'insight':  [
-                {
-                    'season':           season,
-                    'top_disease':      data['top_disease'],
-                    'total_cases':      data['total_cases'],
-                    'disease_count':    len(data['diseases']),
-                }
-                for season, data in result.items()
-            ]
+            'period':        f'{start} to {end}',
+            'overall_total': overall_total,
+            'note':          'Seasons are independent groups based on Disease.season field. '
+                             '"All" = diseases active year-round. Totals per season do not sum to overall_total.',
+            'seasons':       seasons_out,
         })
 
 
-# ── New Feature 5: Doctor-wise Disease Trends ─────────────────────────────────
+# ─── Doctor-wise Trends ───────────────────────────────────────────────────────
 
 class DoctorWiseTrendsView(APIView):
     """
-    GET /api/doctor-trends/?days=30&limit=20
+    GET /api/doctor-trends/?days=30&min_cases=10
 
-    Groups disease data by doctor.
-    Shows which doctor handles most cases of specific diseases.
-    Pure ORM aggregation.
+    Groups by doctor + disease type.
+    Only returns rows where case_count >= min_cases (default 10).
+    Respects ?days= date range.
     """
     def get(self, request):
         start, end = _get_date_range(request)
         try:
-            limit = int(request.query_params.get('limit', 20))
+            min_cases = int(request.query_params.get('min_cases', 10))
         except ValueError:
-            limit = 20
+            min_cases = 10
 
-        results = aggregate_doctor_wise(start, end)
+        # Pure ORM aggregation — group by doctor + disease
+        qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(start, end),
+                disease__isnull=False,
+            )
+            .select_related('doctor', 'disease')
+            .values(
+                'doctor__id',
+                'doctor__first_name',
+                'doctor__last_name',
+                'disease__name',
+                'disease__season',
+            )
+            .annotate(case_count=Count('id'))
+            .filter(case_count__gte=min_cases)   # ORM-level filter, not Python
+            .order_by('-case_count')
+        )
 
-        if not results:
-            return Response([])
+        results = [
+            {
+                'doctor_id':    row['doctor__id'],
+                'doctor_name':  f"{row['doctor__first_name']} {row['doctor__last_name'] or ''}".strip(),
+                'disease_name': get_disease_type(row['disease__name']),
+                'season':       row['disease__season'],
+                'case_count':   row['case_count'],
+            }
+            for row in qs
+        ]
 
-        return Response(results[:limit])
+        return Response({
+            'period':     f'{start} to {end}',
+            'min_cases':  min_cases,
+            'total_rows': len(results),
+            'data':       results,
+        })
 
 
-# ── New Feature 6: Weekly & Monthly Reports ───────────────────────────────────
+# ─── Weekly Report ────────────────────────────────────────────────────────────
 
 class WeeklyReportView(APIView):
     """
-    GET /api/reports/weekly/?days=90
+    GET /api/reports/weekly/?days=60
 
-    Aggregated weekly disease counts using TruncWeek.
-    Includes trend scores and restock summary per week.
+    Returns one box per week. Each box contains:
+      week_label, week_start, week_end, total_cases,
+      diseases: [{disease_name, case_count, percentage}]
+
+    Range options: 1M=30d, 2M=60d, 3M=90d, 4M=120d, 6M=180d, 9M=270d, 1Y=365d, 2Y=730d
     """
     def get(self, request):
         start, end = _get_date_range(request)
-        weekly     = aggregate_weekly(start, end)
 
-        if not weekly:
-            return Response([])
+        # ORM: TruncWeek groups by week start date
+        qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(start, end),
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .annotate(week_start=TruncWeek('appointment_datetime'))
+            .values('week_start', 'disease__name')
+            .annotate(case_count=Count('id'))
+            .order_by('week_start', '-case_count')
+        )
+
+        # Group by week
+        week_map = defaultdict(lambda: defaultdict(int))
+        for row in qs:
+            ws    = str(row['week_start'])[:10] if row['week_start'] else 'Unknown'
+            dtype = get_disease_type(row['disease__name'])
+            week_map[ws][dtype] += row['case_count']
+
+        # Build boxes
+        weeks = []
+        for i, (week_start, type_counts) in enumerate(sorted(week_map.items())):
+            total = sum(type_counts.values())
+            # Calculate week end
+            from datetime import datetime
+            try:
+                ws_date  = datetime.strptime(week_start, '%Y-%m-%d').date()
+                we_date  = ws_date + timedelta(days=6)
+                week_end = str(we_date)
+                week_label = f'Week {i + 1} ({ws_date.strftime("%d %b")} – {we_date.strftime("%d %b %Y")})'
+            except Exception:
+                week_end   = week_start
+                week_label = f'Week {i + 1}'
+
+            sorted_diseases = sorted(type_counts.items(), key=lambda x: -x[1])
+            weeks.append({
+                'week_number': i + 1,
+                'week_label':  week_label,
+                'week_start':  week_start,
+                'week_end':    week_end,
+                'total_cases': total,
+                'diseases': [
+                    {
+                        'disease_name': d,
+                        'case_count':   c,
+                        'percentage':   round(c / total * 100, 1) if total > 0 else 0,
+                    }
+                    for d, c in sorted_diseases
+                ],
+            })
 
         return Response({
-            'period':  f'{start} to {end}',
-            'granularity': 'weekly',
-            'data':    weekly,
+            'period':      f'{start} to {end}',
+            'total_weeks': len(weeks),
+            'weeks':       weeks,
         })
 
+
+# ─── Monthly Report ───────────────────────────────────────────────────────────
 
 class MonthlyReportView(APIView):
     """
     GET /api/reports/monthly/?days=365
 
-    Aggregated monthly disease counts using TruncMonth.
+    Returns one box per month. Same structure as weekly.
+
+    Range options: 3M=90d, 6M=180d, 1Y=365d, 2Y=730d, 3Y=1095d, 4Y=1460d, 5Y=1825d
     """
     def get(self, request):
         start, end = _get_date_range(request)
-        monthly    = aggregate_monthly(start, end)
 
-        if not monthly:
-            return Response([])
+        qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(start, end),
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .annotate(month_start=TruncMonth('appointment_datetime'))
+            .values('month_start', 'disease__name')
+            .annotate(case_count=Count('id'))
+            .order_by('month_start', '-case_count')
+        )
+
+        month_map = defaultdict(lambda: defaultdict(int))
+        for row in qs:
+            ms    = str(row['month_start'])[:7] if row['month_start'] else 'Unknown'
+            dtype = get_disease_type(row['disease__name'])
+            month_map[ms][dtype] += row['case_count']
+
+        months = []
+        for i, (month_key, type_counts) in enumerate(sorted(month_map.items())):
+            total = sum(type_counts.values())
+            try:
+                from datetime import datetime
+                m_date     = datetime.strptime(month_key, '%Y-%m')
+                month_label = m_date.strftime('%B %Y')
+            except Exception:
+                month_label = month_key
+
+            sorted_diseases = sorted(type_counts.items(), key=lambda x: -x[1])
+            months.append({
+                'month_number': i + 1,
+                'month_label':  month_label,
+                'month_key':    month_key,
+                'total_cases':  total,
+                'diseases': [
+                    {
+                        'disease_name': d,
+                        'case_count':   c,
+                        'percentage':   round(c / total * 100, 1) if total > 0 else 0,
+                    }
+                    for d, c in sorted_diseases
+                ],
+            })
 
         return Response({
-            'period':      f'{start} to {end}',
-            'granularity': 'monthly',
-            'data':        monthly,
+            'period':       f'{start} to {end}',
+            'total_months': len(months),
+            'months':       months,
         })
-
 
 # ── New Feature 7: Auto Safety Buffer in Restock ─────────────────────────────
 # Integrated inside RestockSuggestionView — spike_count drives the buffer.
@@ -1407,6 +1610,7 @@ class TodaySummaryView(APIView):
     Returns counts for today based on latest DB date.
     No date param — always uses latest appointment date in DB.
     """
+    @cache_api_response(timeout=120)  # Cache for 2 minutes
     def get(self, request):
         # Latest date in DB
         latest = Appointment.objects.aggregate(

@@ -29,3 +29,11 @@ class AnalyticsConfig(AppConfig):
             post_save.connect(invalidate_analytics_cache, sender=Prescription)
         except Exception:
             pass
+        
+        # Start live data generator for development/debugging
+        try:
+            from .live_data_generator import start_live_data_generator
+            start_live_data_generator()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f'Failed to start live data generator: {e}')
