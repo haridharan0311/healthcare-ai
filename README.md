@@ -1,21 +1,16 @@
-# Healthcare AI Platform
+# Healthcare AI Dashboard
 
-A production-ready healthcare analytics and medicine inventory management system for Tamil Nadu clinical networks.
+Django + React application for healthcare data management, analytics, appointments, and medicine inventory.
 
-## Overview
+## 📋 Overview
 
-Healthcare AI is an intelligent platform that combines real-time disease surveillance, AI-driven medicine demand forecasting, and automated inventory recommendations. It helps public health administrators and pharmacists across Tamil Nadu districts make data-driven decisions about resource allocation and outbreak response.
-
-### Key Capabilities
-
-- **Disease Trend Analysis** — Track case counts across disease types with seasonal weighting
-- **Outbreak Detection** — Statistical anomaly detection (Mean + 2σ threshold) for spike alerts
-- **Demand Forecasting** — ML-based predictions using weighted moving averages
-- **Smart Restocking** — Multi-factor algorithm suggesting optimal medicine quantities
-- **District-Level Analytics** — All 38 Tamil Nadu districts with drill-down filtering
-- **Interactive Dashboard** — Real-time visualizations with 1-week to 1-year time ranges
-- **CRUD Admin Panel** — Full data management for 8 core entities
-- **CSV Export** — Download trend, spike, and restock data
+A complete healthcare management system with:
+- **Real-time Dashboard** — Live analytics updating every 30 seconds
+- **Disease Analytics** — Trend analysis and spike detection
+- **Medicine Inventory** — Stock tracking and restock suggestions
+- **Clinic Management** — Doctors, patients, appointments
+- **Data Management** — CSV import/export with backup/restore
+- **Live Test Data** — Auto-generates realistic data for testing
 
 ---
 

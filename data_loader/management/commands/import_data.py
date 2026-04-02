@@ -1,3 +1,73 @@
+"""
+IMPORT DATA COMMAND
+===================
+Imports all database records from CSV files in the data/ folder.
+
+This command restores a database from exported CSV files. It handles foreign key
+relationships, validates data, and provides comprehensive error reporting.
+
+USAGE:
+    python manage.py import_data
+
+REQUIRED FILES (in data/ folder):
+    - Clinic.csv (required first)
+    - Disease.csv
+    - Doctor.csv (requires Clinic data)
+    - Patient.csv (requires Clinic and Doctor data)
+    - DrugMaster.csv (requires Clinic data)
+    - Appointment.csv (requires Disease/Clinic/Doctor/Patient)
+    - Prescription.csv (requires Appointment/Clinic/Doctor/Patient)
+    - PrescriptionLine.csv (requires Prescription/Drug/Disease)
+
+IMPORT ORDER:
+    The command automatically imports in correct order to resolve foreign keys:
+    1. Clinic (base)
+    2. Disease (base)
+    3. Doctor (references Clinic)
+    4. Patient (references Clinic, Doctor)
+    5. DrugMaster (references Clinic)
+    6. Appointment (references all above)
+    7. Prescription (references Appointment)
+    8. PrescriptionLine (references Prescription)
+
+FEATURES:
+    - Validates directory and file existence
+    - Handles missing/optional fields (nullable FK)
+    - Transaction support (all-or-nothing atomic operation)
+    - Comprehensive error messages
+    - Batch processing for performance (batch_size=1000)
+    - DateTime parsing with timezone awareness
+
+ERROR HANDLING:
+    - FileNotFoundError: CSV file doesn't exist
+    - KeyError: Missing required column in CSV
+    - ValueError: Invalid data format
+    - Generic exceptions: Other database/FK errors
+
+EXAMPLE:
+    $ python manage.py import_data
+    Importing Clinics...
+    Importing Diseases...
+    ...
+    ✅ ALL DATA IMPORTED SUCCESSFULLY
+
+TROUBLESHOOTING:
+    Q: "Duplicate entry for key" error
+    A: Data already exists. Delete existing data first:
+       python manage.py flush  (caution: deletes all data)
+    
+    Q: "Missing column" error
+    A: Check data/* CSV files have correct headers
+
+INTEGRATION:
+    Part of the backup/migration workflow with export_data command.
+    After import, run: python manage.py optimize_db
+
+See Also:
+    - export_data: Opposite operation (export database to CSV)
+    - optimize_db: Add database indexes for performance
+"""
+
 import csv
 import os
 from django.core.management.base import BaseCommand

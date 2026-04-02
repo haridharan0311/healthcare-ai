@@ -1,3 +1,47 @@
+"""
+EXPORT DATA COMMAND
+===================
+Exports all database records to CSV files in the data/ folder.
+
+This command creates a complete backup of the database in CSV format,
+suitable for backup, migration, or re-import into another environment.
+
+USAGE:
+    python manage.py export_data
+
+OUTPUT FILES (in data/ folder):
+    - Clinic.csv: All clinic information
+    - Doctor.csv: All doctor records with clinic associations
+    - Patient.csv: All patient records with doctor/clinic associations
+    - Disease.csv: All disease definitions with seasons and severity
+    - DrugMaster.csv: All medicine inventory with stock levels
+    - Appointment.csv: All appointment records with foreign keys
+    - Prescription.csv: All prescription records
+    - PrescriptionLine.csv: All prescription line items
+
+FEATURES:
+    - Handles NULL/empty foreign keys gracefully
+    - UTF-8 encoding for international characters
+    - CSV format compatible with import_data command
+    - Progress messages for each export stage
+    - Error handling with informative messages
+
+EXAMPLE:
+    $ python manage.py export_data
+    Exporting Clinics...
+    Exporting Diseases...
+    ...
+    ✅ ALL DATA EXPORTED SUCCESSFULLY TO CSV FILES
+
+INTEGRATION:
+    Part of the backup/migration workflow with import_data command.
+    Always run optimize_db after import for best performance.
+
+See Also:
+    - import_data: Opposite operation (import CSV to database)
+    - optimize_db: Add indexes for query performance
+"""
+
 import csv
 import os
 from django.core.management.base import BaseCommand

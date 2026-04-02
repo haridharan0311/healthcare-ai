@@ -1,103 +1,93 @@
 # Live Data Generator
 
-## Overview
+Automatically generates realistic test data for development and testing.
 
-The **Live Data Generator** automatically creates realistic medical data (appointments, patients, prescriptions, etc.) every 30 seconds while running the Django development server. This is perfect for:
+## Quick Summary
 
-- Testing a live dashboard with fresh data
-- Demonstrating real-time features
-- Load testing
-- Demo purposes
+- **Starts automatically** when Django boots (in DEBUG mode)
+- **Generates data every 30 seconds** (configurable)
+- **Creates**: Appointments, prescriptions, and drug usage
+- **Disables in production** automatically
 
-## How It Works
+## Features
 
-When you run `python manage.py runserver`, the generator:
-
-1. Starts automatically (if `DEBUG=True` and enabled)
-2. Runs in a background daemon thread (non-blocking)
-3. Every 30 seconds, generates:
-   - 1-3 new appointments with random clinics, doctors, patients, diseases
-   - Prescriptions for completed appointments (80% chance)
-   - Prescription lines with realistic medicine usage
-   - Updates drug stock counts automatically
-4. Uses season-aware disease weighting (monsoon diseases more common in monsoon, etc.)
+✅ Season-aware disease weighting (monsoon diseases more common in monsoon)  
+✅ Realistic drug stock depletion  
+✅ Valid FK relationships (all data is consistent)  
+✅ Unique OP numbers for each appointment  
+✅ 80% of completed appointments get prescriptions  
+✅ 1-3 prescription lines per prescription  
 
 ## Configuration
 
-In `config/settings.py`:
+Edit `config/settings.py`:
 
 ```python
-# Enable/disable the generator
-ENABLE_LIVE_DATA_GENERATOR = DEBUG  # Only in dev (default: True if DEBUG=True)
+# Enable/disable (default: True in DEBUG, False in PRODUCTION)
+ENABLE_LIVE_DATA_GENERATOR = DEBUG
 
-# Interval between data generations (seconds)
-LIVE_DATA_INTERVAL = 30  # Default: 30 seconds
+# How often to generate data (seconds)
+LIVE_DATA_INTERVAL = 30
 ```
 
-### Disable for a specific run:
+## Data Generated Per Cycle
 
-```python
-# Add to settings.py or .env
-ENABLE_LIVE_DATA_GENERATOR = False
-```
+Each 30-second cycle creates:
+- **1-3 appointments** (random)
+- **0-2 prescriptions** (80% of completed appointments)
+- **0-6 prescription line items**
+- **Drug stock updates** (decreases)
 
-Or modify `config/settings.py`:
+## Testing
 
-```python
-ENABLE_LIVE_DATA_GENERATOR = False  # Disable generator
-LIVE_DATA_INTERVAL = 60  # Or change interval to 60 seconds
-```
-
-## Usage
-
-### Start with live data generation (Default)
+Run live data generator tests:
 
 ```bash
-python manage.py runserver
+python manage.py test analytics.tests.test_live_data_generator
 ```
 
-![Example output in server logs]:
-```
-✓ Live data generator started (interval: 30s)
-Live data generated: 2 appts, 1 rx, 2 lines
-Live data generated: 3 appts, 2 rx, 5 lines
-```
+Test coverage:
+- ✓ Generator initialization
+- ✓ Appointment creation
+- ✓ Prescription creation
+- ✓ Prescription line creation
+- ✓ Valid FK relationships
+- ✓ Drug stock depletion
+- ✓ Unique OP numbers
+- ✓ Status value validation
 
-### Disable for a run
+## Disabling
 
-Set in `config/settings.py`:
+To disable in development:
 
 ```python
+# In config/settings.py
 ENABLE_LIVE_DATA_GENERATOR = False
+
+# Or set in environment
+DEBUG = False
 ```
 
-Or create `.env` file:
+## View Generated Data
 
 ```bash
-ENABLE_LIVE_DATA_GENERATOR=False
+# Watch appointments flow in (in admin or via API)
+GET http://localhost:8000/api/appointments/
+
+# Check appointments in Django admin
+http://localhost:8000/admin/analytics/appointment/
 ```
 
-And update `config/settings.py` to use it:
+## Troubleshooting
 
-```python
-from decouple import config
+**Q: Not generating data?**  
+A: Check `ENABLE_LIVE_DATA_GENERATOR = True` in settings.py and `DEBUG = True`
 
-ENABLE_LIVE_DATA_GENERATOR = config('ENABLE_LIVE_DATA_GENERATOR', default=DEBUG, cast=bool)
-```
+**Q: Stock going negative?**  
+A: This is a known behavior in test data. Real system would have stock floors.
 
-### Change generation interval
-
-```python
-# Generate every 60 seconds instead of 30
-LIVE_DATA_INTERVAL = 60
-```
-
-## What Gets Generated
-
-Each 30-second cycle generates:
-
-### Appointments
-- 1-3 appointments per cycle
+**Q: Too fast/slow?**  
+A: Adjust `LIVE_DATA_INTERVAL` in settings.py (seconds)
 - Random clinic, doctor, patient from database
 - Random disease (season-aware weighting)
 - Status: 70% Completed, 20% Scheduled, 10% Cancelled

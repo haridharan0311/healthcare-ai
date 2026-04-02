@@ -2,7 +2,7 @@ from django.test import TestCase
 from analytics.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
 from analytics.spike_detector import detect_spike, get_seasonal_weight
 from analytics.restock_calculator import calculate_restock, apply_multi_disease_contribution
-
+from analytics.restock_calculator import calculate_dynamic_safety_buffer
 from analytics.aggregation import get_disease_type
 
 
@@ -169,7 +169,6 @@ class TestAggregation(TestCase):
 class TestTrendComparison(TestCase):
 
     def test_increase_detected(self):
-        from datetime import date
         # Simulate compare — period2 has more cases
         p1 = {'Flu': {'count': 10, 'season': 'Winter', 'category': '', 'severity': 1}}
         p2 = {'Flu': {'count': 15, 'season': 'Winter', 'category': '', 'severity': 1}}
@@ -195,22 +194,18 @@ class TestTrendComparison(TestCase):
 class TestAutoSafetyBuffer(TestCase):
 
     def test_no_spikes_returns_base(self):
-        from analytics.restock_calculator import calculate_dynamic_safety_buffer
         result = calculate_dynamic_safety_buffer(spike_count=0, total_diseases=8)
         self.assertAlmostEqual(result, 1.2, places=2)
 
     def test_all_spiking_returns_max(self):
-        from analytics.restock_calculator import calculate_dynamic_safety_buffer
         result = calculate_dynamic_safety_buffer(spike_count=8, total_diseases=8)
         self.assertAlmostEqual(result, 1.8, places=2)
 
     def test_half_spiking(self):
-        from analytics.restock_calculator import calculate_dynamic_safety_buffer
         result = calculate_dynamic_safety_buffer(spike_count=4, total_diseases=8)
         # 1.2 + (0.5 × 0.6) = 1.5
         self.assertAlmostEqual(result, 1.5, places=2)
 
     def test_zero_total_returns_base(self):
-        from analytics.restock_calculator import calculate_dynamic_safety_buffer
         result = calculate_dynamic_safety_buffer(spike_count=0, total_diseases=0)
         self.assertAlmostEqual(result, 1.2, places=2)

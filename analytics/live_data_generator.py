@@ -1,12 +1,33 @@
 """
-Live Data Generator for Development/Testing
-=====================================
-Generates realistic appointments, patients, prescriptions, and prescription lines
-every 30 seconds to simulate a live dashboard with fresh data.
+LIVE DATA GENERATOR
+===================
+Generates realistic test data for development and testing purposes.
 
-Usage: Starts automatically in Django's ready() method. Can be controlled via:
-  - ENABLE_LIVE_DATA_GENERATOR setting (default: True in DEBUG mode)
-  - LIVE_DATA_INTERVAL setting (default: 30 seconds)
+FEATURES:
+- Automatically creates appointments, prescriptions, and related data
+- Runs as background daemon thread (non-blocking)
+- Season-aware disease weighting (monsoon diseases more common in monsoon)
+- Realistic drug stock depletion
+- Compatible with existing database schema
+
+CONFIGURATION:
+- ENABLE_LIVE_DATA_GENERATOR (default: True in DEBUG mode, False in PRODUCTION)
+- LIVE_DATA_INTERVAL (default: 30 seconds between data generation cycles)
+
+USAGE:
+- Starts automatically when Django boots (see analytics/apps.py)
+- Can be disabled by setting ENABLE_LIVE_DATA_GENERATOR=False in settings.py
+- Run tests: python manage.py test analytics.tests.test_live_data_generator
+
+EXAMPLE OUTPUT PER CYCLE:
+- 1-3 new appointments (varies randomly)
+- 0-2 new prescriptions (80% of completed appointments)
+- 0-6 prescription line items
+- Drug stock updates
+
+THREAD SAFETY:
+- Uses transaction.atomic() for database consistency
+- Daemon thread automatically terminates on app shutdown
 """
 
 import threading
