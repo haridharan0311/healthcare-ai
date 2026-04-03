@@ -87,12 +87,20 @@ class DiseaseAnalyticsAPITestCase(TestCase):
         if data:
             self.assertIn('disease_name', data[0])
     
-    def test_today_summary_endpoint(self):
-        """Test that today summary endpoint returns data."""
-        response = self.client.get('/api/today-summary/')
+    def test_medicine_usage_endpoint(self):
+        """Test medicine usage endpoint returns data."""
+        response = self.client.get('/api/medicine-usage/?days=30')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIn('total_today', data)
+        self.assertIsInstance(data, list)
+
+    def test_trend_comparison_endpoint(self):
+        """Test trend comparison endpoint returns data."""
+        response = self.client.get('/api/trend-comparison/?days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('results', data)
 
 
 class RestockAnalyticsAPITestCase(TestCase):
@@ -130,3 +138,112 @@ class RestockAnalyticsAPITestCase(TestCase):
         response = self.client.get('/api/district-restock/?district=Test&days=30')
         # Should either return 200 or 404 (if district doesn't exist)
         self.assertIn(response.status_code, [200, 404])
+
+
+class AnalyticsCoverageAPITestCase(TestCase):
+    """Extended coverage for new API endpoints."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.clinic = Clinic.objects.create(clinic_name='Test Clinic', clinic_address_1='123 Main St')
+        cls.disease = Disease.objects.create(name='Flu', season='Winter', category='Respiratory', severity=2, is_active=True, created_at=timezone.now())
+        cls.doctor = Doctor.objects.create(first_name='Alice', last_name='Smith', gender='F', qualification='MD', clinic=cls.clinic)
+        cls.patient = Patient.objects.create(first_name='Bob', last_name='Jones', gender='M', title='Mr', dob='1985-09-21', mobile_number='9998887776', address_line_1='789 Pine St', clinic=cls.clinic)
+        cls.appointment = Appointment.objects.create(appointment_datetime=timezone.now(), appointment_status='Completed', disease=cls.disease, clinic=cls.clinic, doctor=cls.doctor, patient=cls.patient, op_number='OP000002')
+
+        cls.drug = DrugMaster.objects.create(drug_name='Paracetamol', generic_name='Acetaminophen', drug_strength='500mg', dosage_type='Tablet', clinic=cls.clinic, current_stock=30)
+        cls.prescription = Prescription.objects.create(prescription_date=timezone.now().date(), appointment=cls.appointment, clinic=cls.clinic, doctor=cls.doctor, patient=cls.patient)
+        PrescriptionLine.objects.create(duration='5 days', instructions='Twice daily', prescription=cls.prescription, disease=cls.disease, quantity=20, drug=cls.drug)
+
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_top_medicines_endpoint(self):
+        response = self.client.get('/api/top-medicines/?days=30&limit=5')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, list)
+        self.assertTrue(len(data) >= 1)
+        self.assertIn('drug_name', data[0])
+
+    def test_seasonality_endpoint(self):
+        response = self.client.get('/api/seasonality/?days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('seasons', data)
+        self.assertIn('Winter', data['seasons'])
+
+    def test_doctor_trends_endpoint(self):
+        response = self.client.get('/api/doctor-trends/?days=30&limit=10')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('data', data)
+        if data['data']:
+            self.assertIn('doctor_name', data['data'][0])
+
+    def test_weekly_report_endpoint(self):
+        response = self.client.get('/api/reports/weekly/?days=90')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('weeks', data)
+
+    def test_monthly_report_endpoint(self):
+        response = self.client.get('/api/reports/monthly/?days=365')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('months', data)
+
+    def test_trend_comparison_with_data(self):
+        response = self.client.get('/api/trend-comparison/?days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('results', data)
+
+    def test_all_analytics_endpoints_coverage(self):
+        """Comprehensive coverage for each analytics API scenario."""
+        checks = [
+            ('/api/disease-trends/?days=30', list, None),
+            ('/api/disease-trends/timeseries/?days=30', list, None),
+            ('/api/medicine-usage/?days=30', list, None),
+            ('/api/spike-alerts/?days=30&all=true', list, None),
+            ('/api/restock-suggestions/?days=30', list, None),
+            ('/api/district-restock/?days=30', dict, ['districts', 'total']),
+            ('/api/trend-comparison/?days=30', dict, ['results', 'summary']),
+            ('/api/top-medicines/?days=30&limit=10', list, None),
+            ('/api/low-stock-alerts/?threshold=50', dict, ['out_of_stock', 'alerts']),
+            ('/api/seasonality/?days=365', dict, ['seasons']),
+            ('/api/doctor-trends/?days=30&min_cases=0', dict, ['data']),
+            ('/api/reports/weekly/?days=90', dict, ['weeks']),
+            ('/api/reports/monthly/?days=365', dict, ['months']),
+            ('/api/today-summary/', dict, ['total_today']),
+        ]
+
+        for path, expected_type, required_keys in checks:
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200, f'Endpoint failed: {path}')
+            data = response.json()
+            self.assertIsInstance(data, expected_type, f'{path} returned {type(data)}')
+            if required_keys:
+                for key in required_keys:
+                    self.assertIn(key, data, f'{path} missing {key}')
+
+        season_data = self.client.get('/api/seasonality/?days=365').json()
+        if season_data.get('seasons'):
+            for season_value in season_data.get('seasons').values():
+                self.assertGreaterEqual(season_value.get('total_cases', 0), 0)
+
+        doctor_data = self.client.get('/api/doctor-trends/?days=30&min_cases=0').json()
+        self.assertIn('data', doctor_data)
+
+    def test_low_stock_alerts_threshold(self):
+        response = self.client.get('/api/low-stock-alerts/?threshold=50')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('out_of_stock', data)
+

@@ -227,17 +227,32 @@ class LiveDataGenerator:
                 ))
                 drug_usage[drug.id] += qty
         
-        # Use batch_size to handle larger datasets safely
-        if prescription_lines:
-            PrescriptionLine.objects.bulk_create(prescription_lines, batch_size=100)
-        
-        # ── Update drug stock ────────────────────────────────────
-        if drug_usage:
-            drug_objs = DrugMaster.objects.filter(id__in=drug_usage.keys())
-            for d in drug_objs:
-                d.current_stock = max(0, d.current_stock - drug_usage[d.id])
-            DrugMaster.objects.bulk_update(drug_objs, ['current_stock'], batch_size=200)
-        
+        # Use batch_size to handle larger datasets safely with deadlock retry
+        max_retries = 3
+        for attempt in range(1, max_retries + 1):
+            try:
+                if prescription_lines:
+                    PrescriptionLine.objects.bulk_create(prescription_lines, batch_size=100)
+
+                # ── Update drug stock ────────────────────────────────────
+                if drug_usage:
+                    drug_objs = DrugMaster.objects.filter(id__in=drug_usage.keys())
+                    for d in drug_objs:
+                        d.current_stock = max(0, d.current_stock - drug_usage[d.id])
+                    DrugMaster.objects.bulk_update(drug_objs, ['current_stock'], batch_size=200)
+
+                break
+            except Exception as exc:
+                # deadlock and transient DB errors should retry before giving up
+                if 'deadlock' in str(exc).lower() and attempt < max_retries:
+                    logger.warning(
+                        f'Deadlock detected during live data bulk write (attempt {attempt}), retrying...'
+                    )
+                    time.sleep(0.5 * attempt)
+                    continue
+                logger.error('Live data bulk write failed', exc_info=exc)
+                break
+
         # ── Log summary ──────────────────────────────────────────
         total_lines = len(prescription_lines)
         logger.info(

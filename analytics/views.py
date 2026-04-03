@@ -400,7 +400,7 @@ class SpikeAlertView(APIView):
     Configurable baseline window via ?days= param (minimum 8).
     Returns period_count = total cases across the selected window.
     """
-    @cache_api_response(timeout=180)  # Cache for 3 minutes
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
 
@@ -1200,7 +1200,7 @@ class TopMedicinesView(APIView):
     Shows current stock per drug from DrugMaster (not prescription-based).
     Prescription count = total prescriptions written in period (for context).
     """
-    @cache_api_response(timeout=300)  # Cache for 5 minutes
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
         try:
@@ -1220,15 +1220,19 @@ class TopMedicinesView(APIView):
             .order_by('-current_stock')
         )
 
-        # Prescription count in period (how many times prescribed)
+        # Prescription counts and quantity in period
         rx_qs = (
             PrescriptionLine.objects
             .filter(prescription__prescription_date__range=(start, end))
             .select_related('drug')
             .values('drug__drug_name')
-            .annotate(rx_count=Count('id'))
+            .annotate(
+                rx_count=Count('id'),
+                total_quantity=Sum('quantity')
+            )
         )
         rx_map = {r['drug__drug_name']: r['rx_count'] for r in rx_qs}
+        qty_map = {r['drug__drug_name']: r['total_quantity'] or 0 for r in rx_qs}
 
         results = []
         seen = set()
@@ -1243,10 +1247,19 @@ class TopMedicinesView(APIView):
                 'dosage_type':        row['dosage_type'] or '',
                 'current_stock':      row['current_stock'] or 0,
                 'prescription_count': rx_map.get(name, 0),
+                'total_quantity':     qty_map.get(name, 0),
                 'variant_count':      row['variant_count'],
+                'note':              'Top medicines are sorted by usage, not stock',
             })
 
-        return Response(results[:limit])
+        # Sort by usage (total quantity) then by prescription count.
+        results.sort(key=lambda r: (-r['total_quantity'], -r['prescription_count']))
+
+        return Response({
+            'period':        f'{start} to {end}',
+            'total_drugs':   len(results),
+            'top_medicines': results[:limit],
+        })
 
 # ── New Feature 3: Low Stock Alert System ────────────────────────────────────
 
@@ -1257,7 +1270,7 @@ class LowStockAlertView(APIView):
     Uses average stock per clinic per drug, not system total.
     This makes the threshold meaningful at clinic level.
     """
-    @cache_api_response(timeout=300)  # Cache for 5 minutes
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         try:
             threshold = int(request.query_params.get('threshold', 50))
@@ -1610,7 +1623,7 @@ class TodaySummaryView(APIView):
     Returns counts for today based on latest DB date.
     No date param — always uses latest appointment date in DB.
     """
-    @cache_api_response(timeout=120)  # Cache for 2 minutes
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         # Latest date in DB
         latest = Appointment.objects.aggregate(

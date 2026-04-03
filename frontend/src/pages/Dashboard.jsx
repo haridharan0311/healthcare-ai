@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   fetchTrends, fetchSpikes,
   fetchTrendComparison,
+  fetchTopMedicines, fetchLowStockAlerts,
+  fetchSeasonality, fetchDoctorTrends,
+  fetchWeeklyReport, fetchMonthlyReport,
   getExportUrl
 } from '../api';
 import TrendChart       from '../components/TrendChart';
@@ -18,13 +21,34 @@ export default function Dashboard() {
   const [refreshKey, setRefreshKey]   = useState(0);  // Force re-render of child components
   const [currentTime, setCurrentTime] = useState(new Date());  // Live timer
 
+  const [topMedicines, setTopMedicines] = useState([]);
+  const [lowStock, setLowStock] = useState({});
+  const [seasonality, setSeasonality] = useState({});
+  const [doctorTrends, setDoctorTrends] = useState([]);
+  const [doctorSummary, setDoctorSummary] = useState({});
+  const [weeklySummary, setWeeklySummary] = useState({});
+  const [monthlySummary, setMonthlySummary] = useState({});
+
   const loadAll = useCallback(() => {
     setRefreshing(true);
     Promise.all([
       fetchTrends(days),
       fetchSpikes(Math.max(days, 8), true),
       fetchTrendComparison(days),
-    ]).then(() => {
+      fetchTopMedicines(days, 5),
+      fetchLowStockAlerts(50),
+      fetchSeasonality(365),
+      fetchDoctorTrends(days, 10),
+      fetchWeeklyReport(60),
+      fetchMonthlyReport(365),
+    ]).then(([trendsRes, spikesRes, trendCompRes, topMedRes, lowStockRes, seasonRes, doctorRes, weeklyRes, monthlyRes]) => {
+      setTopMedicines(topMedRes.data || []);
+      setLowStock(lowStockRes.data || {});
+      setSeasonality(seasonRes.data || {});
+      setDoctorSummary(doctorRes.data || {});
+      setDoctorTrends((doctorRes.data && doctorRes.data.data) || []);
+      setWeeklySummary(weeklyRes.data || {});
+      setMonthlySummary(monthlyRes.data || {});
       setLastRefresh(new Date());
       setRefreshKey(k => k + 1);
       setRefreshing(false);
@@ -59,10 +83,6 @@ export default function Dashboard() {
 
   const handleRefresh = () => {
     loadAll();
-    // Full page reload after 1 second
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
   };
 
   const formatRefreshTime = () => {
@@ -145,6 +165,82 @@ export default function Dashboard() {
 
         {/* Summary cards */}
         <SummaryCards key={refreshKey} days={days} />
+
+        {/* Immediate insights from new analytics endpoints */}
+        <section style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 12, marginBottom: 24
+        }}>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Top Medicines</div>
+            {topMedicines.length === 0 ? (
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>No top medicine data yet.</div>
+            ) : (
+              topMedicines.slice(0, 4).map((m, i) => (
+                <div key={`${m.drug_name}-${i}`} style={{ marginBottom: 6 }}>
+                  <strong>{m.drug_name}</strong> ({m.generic_name || 'Generic'})
+                  <span style={{ float: 'right', color: '#2563eb' }}>{(m.total_quantity || 0).toLocaleString()}</span>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>
+                    {m.total_prescriptions} prescriptions · avg {m.avg_qty_per_rx}/rx
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Low Stock Snapshot</div>
+            <div style={{ fontSize: 20, fontWeight: 650, color: '#dc2626' }}>
+              {lowStock?.out_of_stock ?? 0}
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>Drugs with critical stock levels</div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Doctor Load (Top)</div>
+            {doctorTrends.length === 0 ? (
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>No doctor trend data yet.</div>
+            ) : (
+              doctorTrends.slice(0, 4).map((d, i) => (
+                <div key={`${d.doctor_id}-${i}`} style={{ marginBottom: 6 }}>
+                  <strong>{d.doctor_name}</strong>
+                  <span style={{ float: 'right', color: '#16a34a' }}>{d.case_count || 0}</span>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>{d.disease_name}</div>
+                </div>
+              ))
+            )}
+
+            <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>
+              <strong>{doctorSummary.total_rows ?? 0}</strong> doctors found &bull; min cases: <strong>{doctorSummary.min_cases ?? 0}</strong>
+            </div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Seasonality</div>
+            {(!seasonality || !seasonality.seasons || Object.keys(seasonality.seasons).length === 0) ? (
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>No seasonality data yet.</div>
+            ) : (
+              Object.entries(seasonality.seasons).slice(0, 3).map(([key, value]) => (
+                <div key={key} style={{ marginBottom: 6 }}>
+                  <strong>{key}</strong>
+                  <span style={{ float: 'right', color: '#7c3aed' }}>{value.total_cases}</span>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>Top: {value.top_disease || '—'}</div>
+                </div>
+              ))
+            )}
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Weekly Report</div>
+            <div style={{ fontSize: 20, fontWeight: 650, color: '#2563eb' }}>
+              {weeklySummary?.weeks?.length ?? 0}
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>Weeks with case data</div>
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Monthly Report</div>
+            <div style={{ fontSize: 20, fontWeight: 650, color: '#16a34a' }}>
+              {monthlySummary?.months?.length ?? 0}
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>Months with case data</div>
+          </div>
+        </section>
 
         {/* Spike alerts */}
         <SpikeAlerts onExport={(range) => handleCsvPreview('spike-alerts', { days: range })} />

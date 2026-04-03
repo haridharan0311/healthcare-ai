@@ -265,6 +265,19 @@ export default function ReportsPage() {
 
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '24px' }}>
 
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div>
+            <span style={{ fontSize: 12, color: '#6b7280', marginRight: 8 }}>Active tab:</span>
+            <strong style={{ fontSize: 14 }}>{tab}</strong>
+          </div>
+          <button onClick={fetchData} style={{
+            border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8',
+            borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer'
+          }}>
+            Refresh {tab}
+          </button>
+        </div>
+
         {/* ── Tabs ──────────────────────────────────────────────────────────── */}
         <div style={{
           display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap',
