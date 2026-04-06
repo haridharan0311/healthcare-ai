@@ -19,7 +19,7 @@ export default function SummaryCards({ days }) {
   const [trends,      setTrends]      = useState([]);
   const [spikes,      setSpikes]      = useState([]);
   const [todaySummary,setTodaySummary]= useState(null);
-  const [criticalDrugs,setCritical]  = useState(0);
+  const [stockAlerts, setStockAlerts] = useState({ critical: 0, out_of_stock: 0, total_alerts: 0 });
   const [loading,     setLoading]     = useState(true);
 
   const fetchData = useCallback(() => {
@@ -28,12 +28,16 @@ export default function SummaryCards({ days }) {
       fetchTrends(days).catch(e => { console.error('fetchTrends error:', e); return { data: [] }; }),
       fetchSpikes(Math.max(days, 8), true).catch(e => { console.error('fetchSpikes error:', e); return { data: [] }; }),
       fetchTodaySummary().catch(e => { console.error('fetchTodaySummary error:', e); return { data: {} }; }),
-      fetchLowStockAlerts(50).catch(e => { console.error('fetchLowStockAlerts error:', e); return { data: { out_of_stock: 0 } }; }),
+      fetchLowStockAlerts(50).catch(e => { console.error('fetchLowStockAlerts error:', e); return { data: { out_of_stock: 0, critical: 0, total_alerts: 0 } }; }),
     ]).then(([tRes, sRes, todayRes, stockRes]) => {
       setTrends(tRes.data || []);
       setSpikes(sRes.data || []);
       setTodaySummary(todayRes.data || {});
-      setCritical(stockRes.data?.out_of_stock || 0);
+      setStockAlerts({
+        critical: stockRes.data?.critical || 0,
+        out_of_stock: stockRes.data?.out_of_stock || 0,
+        total_alerts: stockRes.data?.total_alerts || 0,
+      });
       setLoading(false);
     }).catch(err => {
       console.error('Error fetching summary data:', err);
@@ -86,9 +90,9 @@ export default function SummaryCards({ days }) {
       color: '#7c3aed',
     },
     {
-      label: 'Critical drugs',
-      value: loading ? '—' : criticalDrugs,
-      sub:   'Stock = 0',
+      label: 'Stock alerts',
+      value: loading ? '—' : stockAlerts.total_alerts?.toLocaleString(),
+      sub:   loading ? '—' : `${stockAlerts.critical} critical · ${stockAlerts.out_of_stock} out of stock`,
       color: '#d97706',
     },
   ];

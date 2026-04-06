@@ -176,23 +176,43 @@ export default function Dashboard() {
             {topMedicines.length === 0 ? (
               <div style={{ color: '#9ca3af', fontSize: 12 }}>No top medicine data yet.</div>
             ) : (
-              topMedicines.slice(0, 4).map((m, i) => (
-                <div key={`${m.drug_name}-${i}`} style={{ marginBottom: 6 }}>
-                  <strong>{m.drug_name}</strong> ({m.generic_name || 'Generic'})
-                  <span style={{ float: 'right', color: '#2563eb' }}>{(m.total_quantity || 0).toLocaleString()}</span>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>
-                    {m.total_prescriptions} prescriptions · avg {m.avg_qty_per_rx}/rx
+              topMedicines.slice(0, 4).map((m, i) => {
+                const avgPerRx = m.prescription_count ? (m.total_quantity / m.prescription_count).toFixed(1) : '0.0';
+                return (
+                  <div key={`${m.drug_name}-${i}`} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div>
+                        <strong>{m.drug_name}</strong>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{m.generic_name || 'Generic'}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2563eb' }}>{(m.total_quantity || 0).toLocaleString()}</div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>units used</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                      {(m.prescription_count || 0).toLocaleString()} prescriptions · avg {avgPerRx}/rx
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Low Stock Snapshot</div>
-            <div style={{ fontSize: 20, fontWeight: 650, color: '#dc2626' }}>
-              {lowStock?.out_of_stock ?? 0}
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>Low Stock Snapshot</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+              <div style={{ background: '#fef2f2', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12, color: '#991b1b', marginBottom: 4 }}>Critical</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#b91c1c' }}>{(lowStock?.critical ?? 0).toLocaleString()}</div>
+              </div>
+              <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12 }}>
+                <div style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>Out of stock</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#1d4ed8' }}>{(lowStock?.out_of_stock ?? 0).toLocaleString()}</div>
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Drugs with critical stock levels</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              {lowStock?.note || 'Includes urgent stock alerts and complete stock-outs.'}
+            </div>
           </div>
           <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
             <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Doctor Load (Top)</div>
@@ -217,28 +237,21 @@ export default function Dashboard() {
             {(!seasonality || !seasonality.seasons || Object.keys(seasonality.seasons).length === 0) ? (
               <div style={{ color: '#9ca3af', fontSize: 12 }}>No seasonality data yet.</div>
             ) : (
-              Object.entries(seasonality.seasons).slice(0, 3).map(([key, value]) => (
-                <div key={key} style={{ marginBottom: 6 }}>
-                  <strong>{key}</strong>
-                  <span style={{ float: 'right', color: '#7c3aed' }}>{value.total_cases}</span>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>Top: {value.top_disease || '—'}</div>
+              Object.entries(seasonality.seasons).map(([key, value]) => (
+                <div key={key} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <strong>{key}</strong>
+                    <span style={{ color: '#7c3aed', fontWeight: 700 }}>{value.total_cases.toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                    Top disease: <strong>{value.top_disease || '—'}</strong> ({value.top_disease_count || 0} cases)
+                  </div>
                 </div>
               ))
             )}
-          </div>
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Weekly Report</div>
-            <div style={{ fontSize: 20, fontWeight: 650, color: '#2563eb' }}>
-              {weeklySummary?.weeks?.length ?? 0}
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Weeks with case data</div>
-          </div>
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>Monthly Report</div>
-            <div style={{ fontSize: 20, fontWeight: 650, color: '#16a34a' }}>
-              {monthlySummary?.months?.length ?? 0}
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Months with case data</div>
+            {seasonality?.note && (
+              <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>{seasonality.note}</div>
+            )}
           </div>
         </section>
 

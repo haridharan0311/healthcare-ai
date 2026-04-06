@@ -132,7 +132,10 @@ export default function ReportsPage() {
 
     fetchers[tab]()
       .then(res => {
-        setData(res.data);
+        const payload = tab === 'Top Medicines'
+          ? (res.data?.top_medicines || [])
+          : res.data;
+        setData(payload);
         setLoading(false);
       })
       .catch(() => {
@@ -270,12 +273,6 @@ export default function ReportsPage() {
             <span style={{ fontSize: 12, color: '#6b7280', marginRight: 8 }}>Active tab:</span>
             <strong style={{ fontSize: 14 }}>{tab}</strong>
           </div>
-          <button onClick={fetchData} style={{
-            border: '1px solid #dbeafe', background: '#eff6ff', color: '#1d4ed8',
-            borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer'
-          }}>
-            Refresh {tab}
-          </button>
         </div>
 
         {/* ── Tabs ──────────────────────────────────────────────────────────── */}
