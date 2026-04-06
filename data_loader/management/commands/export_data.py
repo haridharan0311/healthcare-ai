@@ -53,8 +53,15 @@ from analytics.models import Disease, Appointment
 class Command(BaseCommand):
     help = "Export all database data to CSV files in the data/ folder"
 
-    def handle(self, *args, **kwargs):
-        base_path = "data/"
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--path',
+            default='data/',
+            help='Directory to export CSV files to (default: data/)',
+        )
+
+    def handle(self, *args, **options):
+        base_path = options['path']
         
         # Create data directory if it doesn't exist
         os.makedirs(base_path, exist_ok=True)
@@ -62,7 +69,7 @@ class Command(BaseCommand):
         try:
             # ================== CLINIC ==================
             self.stdout.write("Exporting Clinics...")
-            with open(base_path + "Clinic.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Clinic.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "clinic_name", "clinic_address_1"])
                 writer.writeheader()
                 for clinic in Clinic.objects.all():
@@ -74,7 +81,7 @@ class Command(BaseCommand):
 
             # ================== DISEASE ==================
             self.stdout.write("Exporting Diseases...")
-            with open(base_path + "Disease.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Disease.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "name", "season", "category", "severity", "is_active", "created_at"])
                 writer.writeheader()
                 for disease in Disease.objects.all():
@@ -90,7 +97,7 @@ class Command(BaseCommand):
 
             # ================== DOCTOR ==================
             self.stdout.write("Exporting Doctors...")
-            with open(base_path + "Doctor.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Doctor.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "first_name", "last_name", "gender", "qualification", "clinic_id"])
                 writer.writeheader()
                 for doctor in Doctor.objects.all():
@@ -105,7 +112,7 @@ class Command(BaseCommand):
 
             # ================== PATIENT ==================
             self.stdout.write("Exporting Patients...")
-            with open(base_path + "Patient.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Patient.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "first_name", "last_name", "gender", "title", "dob", "mobile_number", "address_line_1", "clinic_id", "doctor_id"])
                 writer.writeheader()
                 for patient in Patient.objects.all():
@@ -124,7 +131,7 @@ class Command(BaseCommand):
 
             # ================== DRUG MASTER ==================
             self.stdout.write("Exporting DrugMaster...")
-            with open(base_path + "DrugMaster.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "DrugMaster.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "drug_name", "generic_name", "drug_strength", "dosage_type", "clinic_id"])
                 writer.writeheader()
                 for drug in DrugMaster.objects.all():
@@ -139,7 +146,7 @@ class Command(BaseCommand):
 
             # ================== APPOINTMENT ==================
             self.stdout.write("Exporting Appointments...")
-            with open(base_path + "Appointment.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Appointment.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "appointment_datetime", "appointment_status", "op_number", "clinic_id", "doctor_id", "patient_id", "disease_id"])
                 writer.writeheader()
                 for appointment in Appointment.objects.all():
@@ -156,7 +163,7 @@ class Command(BaseCommand):
 
             # ================== PRESCRIPTION ==================
             self.stdout.write("Exporting Prescriptions...")
-            with open(base_path + "Prescription.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "Prescription.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "prescription_date", "appointment_id", "clinic_id", "doctor_id", "patient_id"])
                 writer.writeheader()
                 for prescription in Prescription.objects.all():
@@ -171,7 +178,7 @@ class Command(BaseCommand):
 
             # ================== PRESCRIPTION LINE ==================
             self.stdout.write("Exporting PrescriptionLines...")
-            with open(base_path + "PrescriptionLine.csv", "w", newline="", encoding="utf-8") as f:
+            with open(os.path.join(base_path, "PrescriptionLine.csv"), "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=["id", "duration", "instructions", "quantity", "drug_id", "prescription_id", "disease_id"])
                 writer.writeheader()
                 for line in PrescriptionLine.objects.all():

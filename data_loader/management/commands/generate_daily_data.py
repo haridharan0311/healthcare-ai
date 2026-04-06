@@ -146,6 +146,8 @@ class Command(BaseCommand):
                 created_spikes = bulk_create_and_refresh(Appointment, spike_appts)
                 created_appts += created_spikes
                 self.stdout.write(f'  ✓ Spike injected: {len(created_spikes)} cases')
+            else:
+                self.stdout.write(self.style.WARNING(f'No disease found matching "{options["spike"]}". Available diseases: {[d.name for d in diseases[:5]]}...'))
 
         # ── Generate prescriptions ────────────────────────────────
         prescriptions = []

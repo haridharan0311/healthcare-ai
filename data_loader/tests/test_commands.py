@@ -58,29 +58,32 @@ class ExportDataCommandTestCase(TestCase):
     
     def test_export_data_command_runs(self):
         """Test that export_data command executes without errors."""
-        out = StringIO()
-        call_command('export_data', stdout=out)
-        
-        self.assertIn("EXPORTED SUCCESSFULLY", out.getvalue())
+        with tempfile.TemporaryDirectory() as temp_dir:
+            out = StringIO()
+            call_command('export_data', '--path', temp_dir, stdout=out)
+            
+            self.assertIn("EXPORTED SUCCESSFULLY", out.getvalue())
     
     def test_export_creates_csv_files(self):
         """Test that CSV files are created in data/ directory."""
-        call_command('export_data')
-        
-        csv_files = ['Clinic.csv', 'Disease.csv', 'Doctor.csv']
-        for csv_file in csv_files:
-            path = os.path.join('data', csv_file)
-            self.assertTrue(os.path.exists(path), f"{csv_file} was not created")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            call_command('export_data', '--path', temp_dir)
+            
+            csv_files = ['Clinic.csv', 'Disease.csv', 'Doctor.csv']
+            for csv_file in csv_files:
+                path = os.path.join(temp_dir, csv_file)
+                self.assertTrue(os.path.exists(path), f"{csv_file} was not created")
     
     def test_exported_csv_has_correct_headers(self):
         """Test that exported CSV files have correct column headers."""
-        call_command('export_data')
-        
-        with open('data/Clinic.csv', 'r') as f:
-            reader = csv.DictReader(f)
-            headers = reader.fieldnames
-            self.assertIn('id', headers)
-            self.assertIn('clinic_name', headers)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            call_command('export_data', '--path', temp_dir)
+            
+            with open(os.path.join(temp_dir, 'Clinic.csv'), 'r') as f:
+                reader = csv.DictReader(f)
+                headers = reader.fieldnames
+                self.assertIn('id', headers)
+                self.assertIn('clinic_name', headers)
 
 
 class ImportDataCommandTestCase(TestCase):

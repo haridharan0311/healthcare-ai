@@ -42,7 +42,7 @@ export default function Dashboard() {
       fetchWeeklyReport(60),
       fetchMonthlyReport(365),
     ]).then(([trendsRes, spikesRes, trendCompRes, topMedRes, lowStockRes, seasonRes, doctorRes, weeklyRes, monthlyRes]) => {
-      setTopMedicines(topMedRes.data || []);
+      setTopMedicines(topMedRes.data?.top_medicines || []);
       setLowStock(lowStockRes.data || {});
       setSeasonality(seasonRes.data || {});
       setDoctorSummary(doctorRes.data || {});

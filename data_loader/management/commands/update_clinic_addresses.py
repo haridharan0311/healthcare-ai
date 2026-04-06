@@ -378,7 +378,7 @@ class Command(BaseCommand):
         # Distribute clinics proportionally across all 38 districts
         # Bigger districts get more clinics
         district_weights = {
-            "Chennai": 15, "Coimbatore": 10, "Madurai": 8,
+            "Chennai": 10, "Coimbatore": 15, "Madurai": 8,
             "Salem": 6,    "Tiruchirappalli": 6, "Vellore": 5,
             "Tiruppur": 5, "Erode": 4,  "Thanjavur": 4,
         }

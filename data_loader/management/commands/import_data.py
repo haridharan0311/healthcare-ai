@@ -117,7 +117,7 @@ class Command(BaseCommand):
                     reader = csv.DictReader(f)
                     for row in reader:
                         dt = parse_datetime(row["created_at"])
-                        if dt:
+                        if dt and dt.tzinfo is None:
                             dt = make_aware(dt)
 
                         diseases.append(Disease(
@@ -201,7 +201,7 @@ class Command(BaseCommand):
                     reader = csv.DictReader(f)
                     for row in reader:
                         dt = parse_datetime(row["appointment_datetime"])
-                        if dt:
+                        if dt and dt.tzinfo is None:
                             dt = make_aware(dt)
 
                         appointments.append(Appointment(

@@ -86,3 +86,4 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f'⚠ Index maybe already exists or error: {description} - {e}'))
             
             self.stdout.write(self.style.SUCCESS('\n✓ Database optimization complete'))
+

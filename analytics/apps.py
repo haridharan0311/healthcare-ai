@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+import sys
 
 
 class AnalyticsConfig(AppConfig):
@@ -30,10 +31,11 @@ class AnalyticsConfig(AppConfig):
         except Exception:
             pass
         
-        # Start live data generator for development/debugging
-        try:
-            from .live_data_generator import start_live_data_generator
-            start_live_data_generator()
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f'Failed to start live data generator: {e}')
+        # Start live data generator for development/debugging (not during tests)
+        if 'test' not in sys.argv:
+            try:
+                from .live_data_generator import start_live_data_generator
+                start_live_data_generator()
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f'Failed to start live data generator: {e}')

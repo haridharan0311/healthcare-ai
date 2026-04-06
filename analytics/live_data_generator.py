@@ -96,7 +96,6 @@ class LiveDataGenerator:
             logger.error(f'Live data generator fatal error: {e}', exc_info=True)
             self.running = False
     
-    @transaction.atomic
     def generate_data(self):
         """Generate a batch of appointments, prescriptions, and related data."""
         
@@ -176,7 +175,8 @@ class LiveDataGenerator:
             ))
             op_counter += 1
         
-        created_appts = Appointment.objects.bulk_create(appt_objs)
+        with transaction.atomic():
+            created_appts = Appointment.objects.bulk_create(appt_objs)
         
         # Refresh appointments from DB to get their IDs (required for related objects)
         if created_appts:
@@ -227,31 +227,44 @@ class LiveDataGenerator:
                 ))
                 drug_usage[drug.id] += qty
         
-        # Use batch_size to handle larger datasets safely with deadlock retry
-        max_retries = 3
-        for attempt in range(1, max_retries + 1):
-            try:
-                if prescription_lines:
-                    PrescriptionLine.objects.bulk_create(prescription_lines, batch_size=100)
+        # ── Create prescription lines ─────────────────────────────
+        if prescription_lines:
+            max_retries = 3
+            for attempt in range(1, max_retries + 1):
+                try:
+                    with transaction.atomic():
+                        PrescriptionLine.objects.bulk_create(prescription_lines, batch_size=100)
+                    break
+                except Exception as exc:
+                    if 'deadlock' in str(exc).lower() and attempt < max_retries:
+                        logger.warning(
+                            f'Deadlock detected during prescription lines bulk create (attempt {attempt}), retrying...'
+                        )
+                        time.sleep(0.5 * attempt)
+                        continue
+                    logger.error('Prescription lines bulk create failed', exc_info=exc)
+                    break
 
-                # ── Update drug stock ────────────────────────────────────
-                if drug_usage:
-                    drug_objs = DrugMaster.objects.filter(id__in=drug_usage.keys())
-                    for d in drug_objs:
-                        d.current_stock = max(0, d.current_stock - drug_usage[d.id])
-                    DrugMaster.objects.bulk_update(drug_objs, ['current_stock'], batch_size=200)
-
-                break
-            except Exception as exc:
-                # deadlock and transient DB errors should retry before giving up
-                if 'deadlock' in str(exc).lower() and attempt < max_retries:
-                    logger.warning(
-                        f'Deadlock detected during live data bulk write (attempt {attempt}), retrying...'
-                    )
-                    time.sleep(0.5 * attempt)
-                    continue
-                logger.error('Live data bulk write failed', exc_info=exc)
-                break
+        # ── Update drug stock ────────────────────────────────────
+        if drug_usage:
+            max_retries = 3
+            for attempt in range(1, max_retries + 1):
+                try:
+                    with transaction.atomic():
+                        drug_objs = DrugMaster.objects.filter(id__in=drug_usage.keys())
+                        for d in drug_objs:
+                            d.current_stock = max(0, d.current_stock - drug_usage[d.id])
+                        DrugMaster.objects.bulk_update(drug_objs, ['current_stock'], batch_size=200)
+                    break
+                except Exception as exc:
+                    if 'deadlock' in str(exc).lower() and attempt < max_retries:
+                        logger.warning(
+                            f'Deadlock detected during drug stock bulk update (attempt {attempt}), retrying...'
+                        )
+                        time.sleep(0.5 * attempt)
+                        continue
+                    logger.error('Drug stock bulk update failed', exc_info=exc)
+                    break
 
         # ── Log summary ──────────────────────────────────────────
         total_lines = len(prescription_lines)
@@ -273,3 +286,4 @@ def start_live_data_generator():
 def stop_live_data_generator():
     """Stop the live data generator."""
     _generator.stop()
+

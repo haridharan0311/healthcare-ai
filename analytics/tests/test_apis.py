@@ -162,9 +162,11 @@ class AnalyticsCoverageAPITestCase(TestCase):
         response = self.client.get('/api/top-medicines/?days=30&limit=5')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIsInstance(data, list)
-        self.assertTrue(len(data) >= 1)
-        self.assertIn('drug_name', data[0])
+        self.assertIsInstance(data, dict)
+        self.assertIn('top_medicines', data)
+        self.assertIsInstance(data['top_medicines'], list)
+        self.assertTrue(len(data['top_medicines']) >= 1)
+        self.assertIn('drug_name', data['top_medicines'][0])
 
     def test_seasonality_endpoint(self):
         response = self.client.get('/api/seasonality/?days=30')
@@ -214,7 +216,7 @@ class AnalyticsCoverageAPITestCase(TestCase):
             ('/api/restock-suggestions/?days=30', list, None),
             ('/api/district-restock/?days=30', dict, ['districts', 'total']),
             ('/api/trend-comparison/?days=30', dict, ['results', 'summary']),
-            ('/api/top-medicines/?days=30&limit=10', list, None),
+            ('/api/top-medicines/?days=30&limit=10', dict, ['top_medicines']),
             ('/api/low-stock-alerts/?threshold=50', dict, ['out_of_stock', 'alerts']),
             ('/api/seasonality/?days=365', dict, ['seasons']),
             ('/api/doctor-trends/?days=30&min_cases=0', dict, ['data']),
