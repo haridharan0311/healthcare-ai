@@ -199,6 +199,36 @@ class AnalyticsCoverageAPITestCase(TestCase):
         self.assertIsInstance(data, dict)
         self.assertIn('months', data)
 
+    def test_what_changed_today_endpoint(self):
+        response = self.client.get('/api/what-changed-today/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('date', data)
+        self.assertIn('stock_risks', data)
+        self.assertIn('spike_alerts', data)
+
+    def test_medicine_dependency_endpoint(self):
+        response = self.client.get('/api/medicine-dependency/?days=30&disease=Flu')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(isinstance(data, dict) or isinstance(data, list))
+
+    def test_stock_depletion_forecast_endpoint(self):
+        response = self.client.get(f'/api/stock-depletion/?drug_id={self.drug.id}&days=30&forecast_days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('drug_name', data)
+        self.assertIn('days_until_depletion', data)
+
+    def test_adaptive_buffer_endpoint(self):
+        response = self.client.get('/api/adaptive-buffer/?days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIsInstance(data, dict)
+        self.assertIn('adaptive_buffer', data)
+
     def test_trend_comparison_with_data(self):
         response = self.client.get('/api/trend-comparison/?days=30')
         self.assertEqual(response.status_code, 200)

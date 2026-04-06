@@ -15,12 +15,15 @@ const SkeletonCard = ({ color }) => (
   </div>
 );
 
-export default function SummaryCards({ days }) {
+export default function SummaryCards({ days, summary = null }) {
   const [trends,      setTrends]      = useState([]);
   const [spikes,      setSpikes]      = useState([]);
   const [todaySummary,setTodaySummary]= useState(null);
   const [stockAlerts, setStockAlerts] = useState({ critical: 0, out_of_stock: 0, total_alerts: 0 });
   const [loading,     setLoading]     = useState(true);
+
+  const summaryPassed = Boolean(summary);
+  const summaryLoaded = summaryPassed && summary.loaded;
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -45,54 +48,62 @@ export default function SummaryCards({ days }) {
     });
   }, [days]);
 
-  // Initial load and when days changes
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const currentTrends = summaryPassed ? summary.trends || [] : trends;
+  const currentSpikes = summaryPassed ? summary.spikes || [] : spikes;
+  const currentToday  = summaryPassed ? summary.todaySummary || {} : todaySummary;
+  const currentStock  = summaryPassed ? summary.stockAlerts || { critical: 0, out_of_stock: 0, total_alerts: 0 } : stockAlerts;
+  const currentLoading = summaryPassed ? !summaryLoaded : loading;
 
-  // Auto-refresh every 30 seconds (matches live data generation interval)
   useEffect(() => {
+    if (summaryPassed) {
+      return;
+    }
+    fetchData();
+  }, [fetchData, summaryPassed]);
+
+  useEffect(() => {
+    if (summaryPassed) return;
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, summaryPassed]);
 
-  const totalPeriod = trends.reduce((s, t) => s + (t.total_cases || 0), 0);
-  const spikeCount  = spikes.filter(s => s.is_spike).length;
-  const topDisease  = trends[0]?.disease_name || '—';
-  const todayCount  = todaySummary?.total_today || 0;
-  const todayDate   = todaySummary?.date || '';
+  const totalPeriod = currentTrends.reduce((s, t) => s + (t.total_cases || 0), 0);
+  const spikeCount  = currentSpikes.filter(s => s.is_spike).length;
+  const topDisease  = currentTrends[0]?.disease_name || '—';
+  const todayCount  = currentToday?.total_today || 0;
+  const todayDate   = currentToday?.date || '';
 
   const colors = ['#2563eb', '#0891b2', '#dc2626', '#7c3aed', '#d97706'];
 
   const cards = [
     {
       label: 'Cases today',
-      value: loading ? '—' : todayCount.toLocaleString(),
+      value: currentLoading ? '—' : todayCount.toLocaleString(),
       sub:   todayDate,
       color: '#2563eb',
     },
     {
       label: `Cases (${days}d)`,
-      value: loading ? '—' : totalPeriod.toLocaleString(),
+      value: currentLoading ? '—' : totalPeriod.toLocaleString(),
       sub:   `Last ${days} days`,
       color: '#0891b2',
     },
     {
       label: 'Active spikes',
-      value: loading ? '—' : spikeCount,
+      value: currentLoading ? '—' : spikeCount,
       sub:   'Diseases above threshold',
       color: '#dc2626',
     },
     {
       label: 'Top disease',
-      value: loading ? '—' : topDisease,
-      sub:   `Score: ${trends[0]?.trend_score || 0}`,
+      value: currentLoading ? '—' : topDisease,
+      sub:   `Score: ${currentTrends[0]?.trend_score || 0}`,
       color: '#7c3aed',
     },
     {
       label: 'Stock alerts',
-      value: loading ? '—' : stockAlerts.total_alerts?.toLocaleString(),
-      sub:   loading ? '—' : `${stockAlerts.critical} critical · ${stockAlerts.out_of_stock} out of stock`,
+      value: currentLoading ? '—' : currentStock.total_alerts?.toLocaleString(),
+      sub:   currentLoading ? '—' : `${currentStock.critical} critical · ${currentStock.out_of_stock} out of stock`,
       color: '#d97706',
     },
   ];
@@ -104,7 +115,7 @@ export default function SummaryCards({ days }) {
         gridTemplateColumns: 'repeat(5, 1fr)',
         gap: 14, marginBottom: 24
       }}>
-        {loading ? (
+        {currentLoading ? (
           colors.map((color) => (
             <SkeletonCard key={color} color={color} />
           ))

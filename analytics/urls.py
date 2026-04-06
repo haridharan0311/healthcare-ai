@@ -27,6 +27,10 @@ urlpatterns = [
     path('reports/weekly/',            views.WeeklyReportView.as_view(),      name='report-weekly'),
     path('reports/monthly/',           views.MonthlyReportView.as_view(),     name='report-monthly'),
     path('today-summary/', views.TodaySummaryView.as_view(), name='today-summary'),
+    path('what-changed-today/', views.WhatChangedTodayView.as_view(), name='what-changed-today'),
+    path('medicine-dependency/', views.MedicineDependencyView.as_view(), name='medicine-dependency'),
+    path('stock-depletion/', views.StockDepletionForecastView.as_view(), name='stock-depletion'),
+    path('adaptive-buffer/', views.AdaptiveBufferView.as_view(), name='adaptive-buffer'),
 
     # ── CSV Exports (all respect ?days= and ?district=) ────────────────
     path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(),  name='export-trends'),

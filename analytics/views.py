@@ -23,6 +23,9 @@ from .serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
+from .services.medicine_analytics import MedicineAnalyticsService
+from .services.restock_service import RestockService
+from .utils.validators import validate_positive_int
 
 # Add this import at the top of views.py:
 from django.core.cache import cache
@@ -1662,4 +1665,234 @@ class TodaySummaryView(APIView):
                 for k, v in sorted(by_type.items(), key=lambda x: -x[1])
             ],
         })
-    
+
+
+class WhatChangedTodayView(APIView):
+    """
+    GET /api/what-changed-today/
+
+    Summarizes today’s key changes: appointments, spike alerts, stock risks,
+    and fast-moving disease trends.
+    """
+    @cache_api_response(timeout=30)
+    def get(self, request):
+        latest = Appointment.objects.aggregate(latest=Max('appointment_datetime'))['latest']
+        today = latest.date() if latest else date.today()
+
+        # Today counts by disease type
+        today_qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date=today,
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .values('disease__name')
+            .annotate(cnt=Count('id'))
+        )
+
+        today_by_disease = defaultdict(int)
+        for row in today_qs:
+            today_by_disease[get_disease_type(row['disease__name'])] += row['cnt']
+
+        today_count = sum(today_by_disease.values())
+        history_start = today - timedelta(days=8)
+        spike_qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(history_start, today),
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .annotate(appt_date=TruncDate('appointment_datetime'))
+            .values('appt_date', 'disease__name')
+            .annotate(case_count=Count('id'))
+            .order_by('disease__name', 'appt_date')
+        )
+
+        daily_by_disease = defaultdict(lambda: defaultdict(int))
+        for row in spike_qs:
+            dtype = get_disease_type(row['disease__name'])
+            daily_by_disease[dtype][row['appt_date']] += row['case_count']
+
+        spike_alerts = []
+        for dtype, daily_map in daily_by_disease.items():
+            daily_list = [
+                daily_map.get(history_start + timedelta(days=i), 0)
+                for i in range(9)
+            ]
+            spike_info = detect_spike(daily_list, baseline_days=7)
+            spike_alerts.append({
+                'disease_name':      dtype,
+                'today_count':       spike_info['today_count'],
+                'mean_last_7_days':  spike_info['mean_last_7_days'],
+                'threshold':         spike_info['threshold'],
+                'std_dev':           spike_info['std_dev'],
+                'is_spike':          spike_info['is_spike'],
+            })
+
+        spike_alerts = sorted(
+            spike_alerts,
+            key=lambda x: (not x['is_spike'], -x['today_count'])
+        )[:8]
+
+        critical_stock = DrugMaster.objects.filter(current_stock__lte=10).count()
+        out_of_stock = DrugMaster.objects.filter(current_stock=0).count()
+        low_stock_qs = (
+            DrugMaster.objects
+            .filter(current_stock__lte=50)
+            .values('drug_name', 'generic_name')
+            .annotate(total_stock=Sum('current_stock'))
+            .order_by('total_stock')[:5]
+        )
+        low_stock_top = [
+            {
+                'drug_name':    row['drug_name'],
+                'generic_name': row['generic_name'] or '',
+                'current_stock': row['total_stock'] or 0,
+            }
+            for row in low_stock_qs
+        ]
+
+        recent_start = today - timedelta(days=6)
+        older_start = today - timedelta(days=14)
+        older_end = today - timedelta(days=7)
+
+        recent_qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(recent_start, today),
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .values('disease__name')
+            .annotate(cnt=Count('id'))
+        )
+        older_qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(older_start, older_end),
+                disease__isnull=False,
+            )
+            .select_related('disease')
+            .values('disease__name')
+            .annotate(cnt=Count('id'))
+        )
+
+        recent_map = defaultdict(int)
+        older_map = defaultdict(int)
+        for row in recent_qs:
+            recent_map[get_disease_type(row['disease__name'])] += row['cnt']
+        for row in older_qs:
+            older_map[get_disease_type(row['disease__name'])] += row['cnt']
+
+        trend_shifts = []
+        for dtype in set(recent_map) | set(older_map):
+            recent_value = recent_map.get(dtype, 0)
+            older_value = older_map.get(dtype, 0)
+            growth_rate = round(
+                ((recent_value - older_value) / max(older_value, 1)) * 100,
+                1
+            )
+            trend_shifts.append({
+                'disease_name': dtype,
+                'recent_count': recent_value,
+                'prior_count': older_value,
+                'growth_rate': growth_rate,
+                'trend': 'up' if recent_value > older_value else 'down' if recent_value < older_value else 'stable',
+            })
+
+        trend_shifts = sorted(trend_shifts, key=lambda x: -x['growth_rate'])
+
+        return Response({
+            'date':              str(today),
+            'total_appointments': today_count,
+            'today_by_disease':  [
+                {'disease_name': d, 'count': c}
+                for d, c in sorted(today_by_disease.items(), key=lambda x: -x[1])
+            ],
+            'spike_alerts':      spike_alerts,
+            'stock_risks': {
+                'critical_count': critical_stock,
+                'out_of_stock_count': out_of_stock,
+                'top_low_stock': low_stock_top,
+            },
+            'trend_shifts': {
+                'top_gainers': trend_shifts[:5],
+                'top_decliners': list(reversed(trend_shifts[-5:])),
+            },
+        })
+
+
+class MedicineDependencyView(APIView):
+    """
+    GET /api/medicine-dependency/?days=30&disease=Flu
+
+    Returns which medicines are most commonly used for each disease.
+    """
+    def get(self, request):
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
+        min_usage = validate_positive_int(request.query_params.get('min_usage'), 'min_usage', default=0, min_value=0)
+        disease_name = request.query_params.get('disease')
+        start, end = _get_db_date_range(days)
+
+        service = MedicineAnalyticsService()
+        result = service.map_medicine_dependencies(
+            disease_name=disease_name,
+            start_date=start,
+            end_date=end,
+            min_usage=min_usage,
+        )
+        return Response(result)
+
+
+class StockDepletionForecastView(APIView):
+    """
+    GET /api/stock-depletion/?drug_id=5&days=30
+
+    Provides stock depletion forecast for a specific medicine.
+    """
+    def get(self, request):
+        drug_id = request.query_params.get('drug_id')
+        drug_name = request.query_params.get('drug_name')
+        if not drug_id and not drug_name:
+            return Response(
+                {'error': 'Provide drug_id or drug_name'},
+                status=drf_status.HTTP_400_BAD_REQUEST
+            )
+
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
+        start, end = _get_db_date_range(days)
+
+        if not drug_id:
+            match = DrugMaster.objects.filter(drug_name__icontains=drug_name).first()
+            if not match:
+                return Response({'error': 'Drug not found'}, status=drf_status.HTTP_404_NOT_FOUND)
+            drug_id = match.id
+
+        service = MedicineAnalyticsService()
+        result = service.forecast_stock_depletion(
+            drug_id=int(drug_id),
+            start_date=start,
+            end_date=end,
+            forecast_days=validate_positive_int(request.query_params.get('forecast_days'), 'forecast_days', default=30, min_value=1, max_value=90)
+        )
+
+        if result.get('error'):
+            return Response(result, status=drf_status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+
+class AdaptiveBufferView(APIView):
+    """
+    GET /api/adaptive-buffer/?days=30
+
+    Calculates the adaptive safety buffer based on current spike activity.
+    """
+    def get(self, request):
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
+        start, end = _get_db_date_range(days)
+
+        service = RestockService()
+        result = service.calculate_adaptive_buffer(start_date=start, end_date=end)
+        return Response(result)

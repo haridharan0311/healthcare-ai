@@ -6,6 +6,9 @@ import {
   fetchDoctorTrends,
   fetchWeeklyReport,
   fetchMonthlyReport,
+  fetchMedicineDependency,
+  fetchStockDepletionForecast,
+  fetchAdaptiveBuffer,
 } from '../api';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -17,6 +20,9 @@ const TABS = [
   'Doctor Trends',
   'Weekly',
   'Monthly',
+  'Medicine Dependencies',
+  'Stock Depletion Forecast',
+  'Adaptive Buffers',
 ];
 
 const WEEKLY_RANGES = [
@@ -49,6 +55,9 @@ const DEFAULT_DAYS = {
   'Doctor Trends':    30,
   'Weekly':           60,
   'Monthly':          365,
+  'Medicine Dependencies': 30,
+  'Stock Depletion Forecast': 90,
+  'Adaptive Buffers': 30,
 };
 
 const SEASON_COLORS = {
@@ -113,6 +122,11 @@ export default function ReportsPage() {
   const [error,     setError]     = useState(null);
   const [days,      setDays]      = useState(DEFAULT_DAYS['Top Medicines']);
   const [threshold, setThreshold] = useState(50);
+  const [medicineDeps, setMedicineDeps] = useState(null);
+  const [stockForecast, setStockForecast] = useState(null);
+  const [adaptiveBufferData, setAdaptiveBufferData] = useState(null);
+  const [stockDrugOptions, setStockDrugOptions] = useState([]);
+  const [stockDrugName, setStockDrugName] = useState('');
 
   // ── Data fetcher ────────────────────────────────────────────────────────────
 
@@ -128,25 +142,69 @@ export default function ReportsPage() {
       'Doctor Trends':    () => fetchDoctorTrends(days, 30),
       'Weekly':           () => fetchWeeklyReport(days),
       'Monthly':          () => fetchMonthlyReport(days),
+      'Medicine Dependencies': () => fetchMedicineDependency(null, days),
+      'Stock Depletion Forecast': () => stockDrugName
+        ? fetchStockDepletionForecast(stockDrugName, days)
+        : Promise.resolve({ data: null }),
+      'Adaptive Buffers': () => fetchAdaptiveBuffer(days),
     };
 
-    fetchers[tab]()
+    const request = fetchers[tab]
+      ? fetchers[tab]()
+      : Promise.reject(new Error('Unknown report tab'));
+
+    request
       .then(res => {
-        const payload = tab === 'Top Medicines'
-          ? (res.data?.top_medicines || [])
-          : res.data;
-        setData(payload);
-        setLoading(false);
+        if (tab === 'Medicine Dependencies') {
+          setMedicineDeps(res.data);
+        } else if (tab === 'Stock Depletion Forecast') {
+          setStockForecast(res.data);
+        } else if (tab === 'Adaptive Buffers') {
+          setAdaptiveBufferData(res.data);
+        } else {
+          const payload = tab === 'Top Medicines'
+            ? (res.data?.top_medicines || [])
+            : res.data;
+          setData(payload);
+        }
       })
       .catch(() => {
         setError('Failed to load data. Please try again.');
+      })
+      .finally(() => {
         setLoading(false);
       });
-  }, [tab, days, threshold]);
+  }, [tab, days, threshold, stockDrugName]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (tab !== 'Stock Depletion Forecast') return;
+    if (stockDrugOptions.length > 0) return;
+
+    fetchTopMedicines(365, 50)
+      .then(res => {
+        const options = (res.data?.top_medicines || []).map(drug => ({
+          value: drug.drug_name,
+          label: `${drug.drug_name}${drug.generic_name ? ` (${drug.generic_name})` : ''}`,
+        }));
+        setStockDrugOptions(options);
+        if (options.length > 0 && !stockDrugName) {
+          setStockDrugName(options[0].value);
+        }
+      })
+      .catch(() => {
+        // ignore load failure, user can still select a drug manually if needed
+      });
+  }, [tab, stockDrugName, stockDrugOptions.length]);
+
+  useEffect(() => {
+    if (tab === 'Stock Depletion Forecast' && stockDrugName) {
+      fetchData();
+    }
+  }, [stockDrugName, tab, days, fetchData]);
 
   // ── Tab switch ──────────────────────────────────────────────────────────────
 
@@ -157,6 +215,9 @@ export default function ReportsPage() {
     }
     setData(null);
     setError(null);
+    setMedicineDeps(null);
+    setStockForecast(null);
+    setAdaptiveBufferData(null);
     setDays(DEFAULT_DAYS[newTab] || 30);
     setTab(newTab);
   };
@@ -220,6 +281,50 @@ export default function ReportsPage() {
               }}
             >
               {opt.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    if (tab === 'Medicine Dependencies' || tab === 'Adaptive Buffers') {
+      return (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[7, 14, 30, 60, 90].map(d => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              style={{
+                padding: '4px 10px', borderRadius: 5, border: 'none',
+                cursor: 'pointer', fontSize: 12,
+                fontWeight: days === d ? 600 : 400,
+                background: days === d ? '#2563eb' : '#f3f4f6',
+                color: days === d ? '#fff' : '#555',
+              }}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    if (tab === 'Stock Depletion Forecast') {
+      return (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[30, 60, 90, 120, 180].map(d => (
+            <button
+              key={d}
+              onClick={() => setDays(d)}
+              style={{
+                padding: '4px 10px', borderRadius: 5, border: 'none',
+                cursor: 'pointer', fontSize: 12,
+                fontWeight: days === d ? 600 : 400,
+                background: days === d ? '#2563eb' : '#f3f4f6',
+                color: days === d ? '#fff' : '#555',
+              }}
+            >
+              {d}d
             </button>
           ))}
         </div>
@@ -753,6 +858,218 @@ export default function ReportsPage() {
                       <DiseaseList diseases={month.diseases} color="#7c3aed" />
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 6. Medicine Dependencies ───────────────────────────────────── */}
+          {!loading && !error && medicineDeps && tab === 'Medicine Dependencies' && (
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600 }}>
+                Medicine Dependencies & Co-occurrence
+              </h3>
+              <p style={{ margin: '0 0 20px', fontSize: 12, color: '#9ca3af' }}>
+                Medicine usage patterns by disease over the last {days} days
+              </p>
+
+              {Array.isArray(medicineDeps) && medicineDeps.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  No dependency data available
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 18 }}>
+                  {Array.isArray(medicineDeps) ? medicineDeps.slice(0, 6).map((disease, i) => (
+                    <div key={i} style={{
+                      border: '1px solid #e5e7eb', borderRadius: 10,
+                      padding: 18, background: '#f8fafc'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{disease.disease_name}</div>
+                          <div style={{ fontSize: 12, color: '#6b7280' }}>
+                            {disease.unique_medicines} medicines · {disease.total_prescriptions.toLocaleString()} prescriptions
+                          </div>
+                        </div>
+                        <div style={{
+                          background: '#dbeafe', color: '#1d4ed8',
+                          padding: '4px 10px', borderRadius: 12,
+                          fontSize: 12, fontWeight: 600
+                        }}>
+                          Top medicines
+                        </div>
+                      </div>
+
+                      {disease.medicines && disease.medicines.length > 0 ? (
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          {disease.medicines.slice(0, 5).map((med, j) => (
+                            <div key={j} style={{
+                              display: 'flex', justifyContent: 'space-between',
+                              padding: '8px 12px', borderRadius: 8,
+                              background: '#fff', border: '1px solid #e5e7eb'
+                            }}>
+                              <div>
+                                <div style={{ fontWeight: 600 }}>{med.drug_name}</div>
+                                <div style={{ fontSize: 11, color: '#6b7280' }}>{med.generic_name}</div>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontWeight: 700 }}>{(med.prescriptions || 0).toLocaleString()}</div>
+                                <div style={{ fontSize: 11, color: '#9ca3af' }}>prescriptions</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                          No medicines found for this disease.
+                        </div>
+                      )}
+                    </div>
+                  )) : (
+                    <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                      Unexpected dependency data format.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 7. Stock Depletion Forecast ──────────────────────────────── */}
+          {!loading && !error && tab === 'Stock Depletion Forecast' && (
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600 }}>
+                Stock Depletion Forecast
+              </h3>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: '#9ca3af' }}>
+                Forecast stock depletion for a selected medicine using the last {days} days of history.
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Select medicine</div>
+                  <select
+                    value={stockDrugName}
+                    onChange={e => setStockDrugName(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e5e7eb', minWidth: 260 }}
+                  >
+                    <option value="">Choose a medicine</option>
+                    {stockDrugOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>
+                  Forecast horizon: {days} days
+                </div>
+              </div>
+
+              {!stockDrugName ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  Select a medicine to view its stock forecast.
+                </div>
+              ) : !stockForecast ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  Loading forecast...
+                </div>
+              ) : stockForecast.error ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>
+                  {stockForecast.error}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 18, background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 16 }}>{stockForecast.drug_name}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{stockForecast.generic_name}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#2563eb' }}>
+                          {stockForecast.urgency?.toUpperCase() || 'UNKNOWN'}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>Urgency level</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 16 }}>
+                      <div style={{ background: '#fff', borderRadius: 10, padding: 14, border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Current stock</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{stockForecast.current_stock.toLocaleString()} units</div>
+                      </div>
+                      <div style={{ background: '#fff', borderRadius: 10, padding: 14, border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Avg. daily usage</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{stockForecast.avg_daily_usage.toFixed(2)} units</div>
+                      </div>
+                      <div style={{ background: '#fff', borderRadius: 10, padding: 14, border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Days until depletion</div>
+                        <div style={{ fontWeight: 700, fontSize: 18 }}>{stockForecast.days_until_depletion} days</div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 16, fontSize: 12, color: '#374151' }}>
+                      Recommended reorder: <strong>{stockForecast.recommended_reorder.toLocaleString()} units</strong>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 11, color: '#6b7280' }}>
+                      Forecast period: {stockForecast.analysis_period}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── 8. Adaptive Buffers ───────────────────────────────────────── */}
+          {!loading && !error && adaptiveBufferData && tab === 'Adaptive Buffers' && (
+            <div>
+              <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600 }}>
+                Adaptive Stock Buffers
+              </h3>
+              <p style={{ margin: '0 0 20px', fontSize: 12, color: '#9ca3af' }}>
+                Recommended buffer multiplier based on recent demand and spike activity
+              </p>
+
+              {adaptiveBufferData.error ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>
+                  {adaptiveBufferData.error}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 18, background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Adaptive buffer</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: '#1d4ed8' }}>
+                          {adaptiveBufferData.adaptive_buffer}x
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>Interpretation</div>
+                        <div style={{ fontWeight: 700, fontSize: 16, textTransform: 'capitalize' }}>
+                          {adaptiveBufferData.interpretation || 'N/A'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: 14, fontSize: 12, color: '#374151' }}>
+                      Recommended ordering buffer is calculated from spike activity and disease risk.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                    {[
+                      { label: 'Spike count', value: adaptiveBufferData.spike_count },
+                      { label: 'Active diseases', value: adaptiveBufferData.total_diseases },
+                      { label: 'Spike %', value: `${adaptiveBufferData.spike_percentage}%` },
+                      { label: 'Base buffer', value: `${adaptiveBufferData.base_buffer}x` },
+                      { label: 'Max buffer', value: `${adaptiveBufferData.max_buffer}x` },
+                      { label: 'Buffer increase', value: `${adaptiveBufferData.buffer_increase}x` },
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ background: '#fff', borderRadius: 10, padding: 14, border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{item.label}</div>
+                        <div style={{ fontWeight: 700, marginTop: 6 }}>{item.value ?? 'N/A'}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

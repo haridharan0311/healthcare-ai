@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   fetchTrends, fetchSpikes,
-  fetchTrendComparison,
   fetchTopMedicines, fetchLowStockAlerts,
   fetchSeasonality, fetchDoctorTrends,
-  fetchWeeklyReport, fetchMonthlyReport,
+  fetchTodaySummary, fetchWhatChangedToday,
   getExportUrl
 } from '../api';
 import TrendChart       from '../components/TrendChart';
@@ -12,6 +11,61 @@ import SpikeAlerts      from '../components/SpikeAlerts';
 import DistrictRestock  from '../components/DistrictRestock';
 import SummaryCards     from '../components/SummaryCards';
 import CsvPreviewModal  from '../components/CsvPreviewModal';
+
+// ── Transform "What Changed Today" API response ──────────────────────────
+function transformWhatChangedData(data) {
+  const changes = [];
+
+  // Total appointments
+  if (data.total_appointments) {
+    changes.push({
+      title: 'Total Appointments',
+      description: 'Appointments recorded today',
+      value: `${data.total_appointments.toLocaleString()} appointments`
+    });
+  }
+
+  // Top disease today
+  if (data.today_by_disease && data.today_by_disease.length > 0) {
+    const topDisease = data.today_by_disease[0];
+    changes.push({
+      title: 'Top Disease Today',
+      description: `${topDisease.disease_name} cases recorded`,
+      value: `${topDisease.count} cases`
+    });
+  }
+
+  // Stock risks
+  if (data.stock_risks) {
+    const { critical_count, out_of_stock_count } = data.stock_risks;
+    if (critical_count > 0) {
+      changes.push({
+        title: 'Critical Stock Alerts',
+        description: 'Medicines at critical stock levels',
+        value: `${critical_count.toLocaleString()} items`
+      });
+    }
+    if (out_of_stock_count > 0) {
+      changes.push({
+        title: 'Out of Stock',
+        description: 'Medicines completely out of stock',
+        value: `${out_of_stock_count.toLocaleString()} items`
+      });
+    }
+  }
+
+  // Trend shifts
+  if (data.trend_shifts && data.trend_shifts.top_gainers && data.trend_shifts.top_gainers.length > 0) {
+    const topGainer = data.trend_shifts.top_gainers[0];
+    changes.push({
+      title: 'Rising Trend',
+      description: `${topGainer.disease_name} showing growth`,
+      value: `+${topGainer.growth_rate}% increase`
+    });
+  }
+
+  return changes;
+}
 
 export default function Dashboard() {
   const [days]                        = useState(30);
@@ -21,47 +75,66 @@ export default function Dashboard() {
   const [refreshKey, setRefreshKey]   = useState(0);  // Force re-render of child components
   const [currentTime, setCurrentTime] = useState(new Date());  // Live timer
 
+  const [summaryTrends, setSummaryTrends] = useState([]);
+  const [summarySpikes, setSummarySpikes] = useState([]);
+  const [summaryToday, setSummaryToday] = useState(null);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
   const [topMedicines, setTopMedicines] = useState([]);
   const [lowStock, setLowStock] = useState({});
   const [seasonality, setSeasonality] = useState({});
   const [doctorTrends, setDoctorTrends] = useState([]);
   const [doctorSummary, setDoctorSummary] = useState({});
-  const [weeklySummary, setWeeklySummary] = useState({});
-  const [monthlySummary, setMonthlySummary] = useState({});
+  const [whatChangedToday, setWhatChangedToday] = useState(null);
 
-  const loadAll = useCallback(() => {
-    setRefreshing(true);
-    Promise.all([
+  const loadSummaryData = useCallback(() => {
+    return Promise.allSettled([
       fetchTrends(days),
       fetchSpikes(Math.max(days, 8), true),
-      fetchTrendComparison(days),
-      fetchTopMedicines(days, 5),
+      fetchTodaySummary(),
       fetchLowStockAlerts(50),
-      fetchSeasonality(365),
-      fetchDoctorTrends(days, 10),
-      fetchWeeklyReport(60),
-      fetchMonthlyReport(365),
-    ]).then(([trendsRes, spikesRes, trendCompRes, topMedRes, lowStockRes, seasonRes, doctorRes, weeklyRes, monthlyRes]) => {
-      setTopMedicines(topMedRes.data?.top_medicines || []);
-      setLowStock(lowStockRes.data || {});
-      setSeasonality(seasonRes.data || {});
-      setDoctorSummary(doctorRes.data || {});
-      setDoctorTrends((doctorRes.data && doctorRes.data.data) || []);
-      setWeeklySummary(weeklyRes.data || {});
-      setMonthlySummary(monthlyRes.data || {});
-      setLastRefresh(new Date());
-      setRefreshKey(k => k + 1);
-      setRefreshing(false);
-    }).catch(() => {
-      setRefreshing(false);
+    ]).then(([trendsRes, spikesRes, todayRes, stockRes]) => {
+      setSummaryTrends(trendsRes.status === 'fulfilled' ? trendsRes.value.data || [] : []);
+      setSummarySpikes(spikesRes.status === 'fulfilled' ? spikesRes.value.data || [] : []);
+      setSummaryToday(todayRes.status === 'fulfilled' ? todayRes.value.data || {} : {});
+      setLowStock(stockRes.status === 'fulfilled' ? stockRes.value.data || {} : {});
+      setSummaryLoaded(true);
     });
   }, [days]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  const loadInsights = useCallback(() => {
+    return Promise.allSettled([
+      fetchTopMedicines(days, 5),
+      fetchSeasonality(365),
+      fetchDoctorTrends(days, 10),
+      fetchWhatChangedToday(),
+    ]).then(([topMedRes, seasonRes, doctorRes, whatChangedRes]) => {
+      setTopMedicines(topMedRes.status === 'fulfilled' ? topMedRes.value.data?.top_medicines || [] : []);
+      setSeasonality(seasonRes.status === 'fulfilled' ? seasonRes.value.data || {} : {});
+      setDoctorSummary(doctorRes.status === 'fulfilled' ? doctorRes.value.data || {} : {});
+      setDoctorTrends(doctorRes.status === 'fulfilled' ? (doctorRes.value.data?.data || []) : []);
+      setWhatChangedToday(whatChangedRes.status === 'fulfilled' ? (whatChangedRes.value.data ? transformWhatChangedData(whatChangedRes.value.data) : null) : null);
+    });
+  }, [days]);
 
-  // Auto-refresh every 30 seconds (matches live data generation interval)
+  const loadAll = useCallback(() => {
+    setRefreshing(true);
+    return Promise.all([loadSummaryData(), loadInsights()])
+      .then(() => {
+        setLastRefresh(new Date());
+        setRefreshKey(k => k + 1);
+      })
+      .finally(() => setRefreshing(false));
+  }, [loadInsights, loadSummaryData]);
+
   useEffect(() => {
-    const interval = setInterval(loadAll, 30000);
+    loadSummaryData();
+    const ticket = setTimeout(loadInsights, 200);
+    return () => clearTimeout(ticket);
+  }, [loadSummaryData, loadInsights]);
+
+  // Auto-refresh every 2 minutes to reduce load
+  useEffect(() => {
+    const interval = setInterval(loadAll, 120000);
     return () => clearInterval(interval);
   }, [loadAll]);
 
@@ -164,7 +237,17 @@ export default function Dashboard() {
       <div style={{ maxWidth: 1300, margin: '0 auto', padding: '28px 24px' }}>
 
         {/* Summary cards */}
-        <SummaryCards key={refreshKey} days={days} />
+        <SummaryCards
+          key={refreshKey}
+          days={days}
+          summary={{
+            loaded: summaryLoaded,
+            trends: summaryTrends,
+            spikes: summarySpikes,
+            todaySummary: summaryToday,
+            stockAlerts: lowStock,
+          }}
+        />
 
         {/* Immediate insights from new analytics endpoints */}
         <section style={{
@@ -251,6 +334,26 @@ export default function Dashboard() {
             )}
             {seasonality?.note && (
               <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>{seasonality.note}</div>
+            )}
+          </div>
+          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>What Changed Today</div>
+            {!whatChangedToday ? (
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>Loading today's changes...</div>
+            ) : whatChangedToday.length === 0 ? (
+              <div style={{ color: '#9ca3af', fontSize: 12 }}>No significant changes today.</div>
+            ) : (
+              whatChangedToday.slice(0, 3).map((change, i) => (
+                <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8fafc', borderRadius: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{change.title}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{change.description}</div>
+                  {change.value && (
+                    <div style={{ fontSize: 11, color: '#059669', marginTop: 2, fontWeight: 500 }}>
+                      {change.value}
+                    </div>
+                  )}
+                </div>
+              ))
             )}
           </div>
         </section>

@@ -31,6 +31,20 @@ export const fetchDoctorTrends     = (days = 30, limit = 20) =>
 export const fetchWeeklyReport     = (days = 90)   => api('/reports/weekly/', { days });
 export const fetchMonthlyReport    = (days = 365)  => api('/reports/monthly/', { days });
 export const fetchTodaySummary = () => api('/today-summary/');
+export const fetchWhatChangedToday = () => api('/what-changed-today/');
+export const fetchMedicineDependency = (disease = null, days = 30, min_usage = 0) =>
+  api('/medicine-dependency/', {
+    ...(disease ? { disease } : {}),
+    days,
+    min_usage,
+  });
+export const fetchStockDepletionForecast = (drugName, days = 30, forecastDays = 30) =>
+  api('/stock-depletion/', {
+    drug_name: drugName,
+    days,
+    forecast_days: forecastDays,
+  });
+export const fetchAdaptiveBuffer = (days = 30) => api('/adaptive-buffer/', { days });
 
 // ── CSV exports ───────────────────────────────────────────────────────
 export const getExportUrl = (type, params = {}) => {
