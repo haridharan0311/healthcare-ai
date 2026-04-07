@@ -278,7 +278,7 @@ class RestockService:
             qty_qs = (
                 PrescriptionLine.objects
                 .filter(
-                    prescription__prescription_date__range=(start_date, end_date),
+                    prescription_date__range=(start_date, end_date),
                     disease__isnull=False
                 )
                 .select_related('drug', 'disease')

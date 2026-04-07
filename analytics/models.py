@@ -23,7 +23,7 @@ class Disease(models.Model):
 
 
 class Appointment(models.Model):
-    appointment_datetime = models.DateTimeField()
+    appointment_datetime = models.DateTimeField(db_index=True)
 
     appointment_status = models.CharField(max_length=50)
 

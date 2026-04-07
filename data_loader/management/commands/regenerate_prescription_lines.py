@@ -110,6 +110,7 @@ class Command(BaseCommand):
             for drug in chosen_drugs:
                 to_create.append(PrescriptionLine(
                     prescription=prescription,
+                    prescription_date=prescription.prescription_date,
                     drug=drug,
                     disease=disease,
                     quantity=random.choice([1, 1, 2, 2, 3]),

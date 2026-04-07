@@ -110,7 +110,7 @@ class MedicineAnalyticsService:
                 qs = (
                     PrescriptionLine.objects
                     .filter(
-                        prescription__prescription_date__range=(start_date, end_date),
+                        prescription_date__range=(start_date, end_date),
                         disease__name__icontains=disease_name,
                         disease__isnull=False
                     )
@@ -163,11 +163,11 @@ class MedicineAnalyticsService:
                 return result
             
             else:
-                # All diseases
+                # All diseases - optimize query with select_related and better aggregation
                 qs = (
                     PrescriptionLine.objects
                     .filter(
-                        prescription__prescription_date__range=(start_date, end_date),
+                        prescription_date__range=(start_date, end_date),
                         disease__isnull=False
                     )
                     .select_related('drug', 'disease')
@@ -180,6 +180,7 @@ class MedicineAnalyticsService:
                         prescriptions=Count('id'),
                         total_quantity=Sum('quantity')
                     )
+                    .order_by('disease__name', '-prescriptions')  # Add ordering to reduce Python sorting
                 )
                 
                 disease_map = defaultdict(lambda: {
@@ -264,7 +265,7 @@ class MedicineAnalyticsService:
             qs = (
                 PrescriptionLine.objects
                 .filter(
-                    prescription__prescription_date__range=(start_date, end_date),
+                    prescription_date__range=(start_date, end_date),
                     drug__isnull=False
                 )
                 .select_related('drug')
@@ -370,10 +371,10 @@ class MedicineAnalyticsService:
             qs = (
                 PrescriptionLine.objects
                 .filter(
-                    prescription__prescription_date__range=(start_date, end_date),
+                    prescription_date__range=(start_date, end_date),
                     drug_id=drug_id
                 )
-                .annotate(rx_date=TruncDate('prescription__prescription_date'))
+                .annotate(rx_date=TruncDate('prescription_date'))
                 .values('rx_date')
                 .annotate(daily_qty=Sum('quantity'))
             )
@@ -547,10 +548,10 @@ class MedicineAnalyticsService:
             qs = (
                 PrescriptionLine.objects
                 .filter(
-                    prescription__prescription_date__range=(start_date, end_date),
+                    prescription_date__range=(start_date, end_date),
                     drug_id=drug_id
                 )
-                .annotate(rx_date=TruncDate('prescription__prescription_date'))
+                .annotate(rx_date=TruncDate('prescription_date'))
                 .values('rx_date')
                 .annotate(daily_qty=Sum('quantity'))
                 .order_by('rx_date')

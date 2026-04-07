@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from collections import defaultdict
 
 from django.http import HttpResponse
-from django.db.models import Count, Avg, Max, Sum, Min
+from django.db.models import Count, Avg, Max, Sum, Min, Q
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -335,7 +335,7 @@ class MedicineUsageView(APIView):
         usage_qs = (
             PrescriptionLine.objects
             .filter(
-                prescription__prescription_date__range=(start, end),
+                prescription_date__range=(start, end),
                 disease__isnull=False,
             )
             .select_related('drug', 'disease')
@@ -519,7 +519,7 @@ class RestockSuggestionView(APIView):
         qty_qs = (
             PrescriptionLine.objects
             .filter(
-                prescription__prescription_date__range=(start, end),
+                prescription_date__range=(start, end),
                 disease__isnull=False,
             )
             .select_related('drug', 'disease')
@@ -630,14 +630,38 @@ class DistrictRestockView(APIView):
         start, end      = _get_date_range(request)
         current_month   = date.today().month
         district_filter = request.query_params.get('district', None)
+        district_search = None
+        clinic_ids = []
 
-        # Shared demand computation
+        if not district_filter:
+            district_addresses = DrugMaster.objects.select_related('clinic').values_list(
+                'clinic__clinic_address_1', flat=True
+            ).distinct()
+
+            all_districts = {
+                _extract_district(addr) for addr in district_addresses
+            }
+
+            if not all_districts or all_districts == {'Unknown'}:
+                clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
+                all_districts = set(clinics)
+
+            return Response({
+                'districts': sorted(all_districts),
+                'total':     len(all_districts),
+            })
+
+        # Shared demand computation - optimize with select_related
+        appt_filter = {
+            'appointment_datetime__date__range': (start, end),
+            'disease__isnull': False,
+        }
+        if district_filter and clinic_ids:
+            appt_filter['clinic__in'] = clinic_ids
+
         appt_qs = (
             Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
+            .filter(**appt_filter)
             .select_related('disease')
             .annotate(appt_date=TruncDate('appointment_datetime'))
             .values('appt_date', 'disease__name', 'disease__season')
@@ -652,12 +676,41 @@ class DistrictRestockView(APIView):
             dtype_season[dtype] = row['disease__season']
             daily_by_dtype[dtype][row['appt_date']] += row['day_count']
 
+        # Optimize queries by narrowing to clinics in the selected district.
+        qty_filter = {
+            'prescription_date__range': (start, end),
+            'disease__isnull': False,
+        }
+        district_search = None
+        clinic_ids = []
+        if district_filter:
+            district_search = district_filter.strip()
+            clinic_ids = list(
+                Clinic.objects
+                .filter(clinic_address_1__icontains=district_search)
+                .values_list('id', flat=True)
+            )
+            if not clinic_ids:
+                return Response({
+                    'district': district_filter,
+                    'clinic_count': 0,
+                    'period': f'{start} to {end}',
+                    'results': [],
+                    'summary': {'total_drugs': 0, 'critical': 0, 'low': 0, 'sufficient': 0}
+                })
+            qty_filter['prescription__clinic__in'] = clinic_ids
+            selected_drug_names = list(
+                DrugMaster.objects
+                .filter(clinic__in=clinic_ids)
+                .values_list('drug_name', flat=True)
+                .distinct()
+            )
+        else:
+            selected_drug_names = []
+
         qty_qs = (
             PrescriptionLine.objects
-            .filter(
-                prescription__prescription_date__range=(start, end),
-                disease__isnull=False,
-            )
+            .filter(**qty_filter)
             .select_related('drug', 'disease')
             .values('drug__drug_name', 'disease__name')
             .annotate(total_qty=Sum('quantity'))
@@ -708,17 +761,33 @@ class DistrictRestockView(APIView):
             combined  = apply_multi_disease_contribution(demands) if demands else 0.0
             return round(combined * avg_usage * 1.2, 2), contributing
 
-        # Load DrugMaster with clinic addresses
-        drug_qs = (
-            DrugMaster.objects
-            .select_related('clinic')
-            .values(
-                'drug_name', 'generic_name',
-                'drug_strength', 'dosage_type',
-                'clinic__id', 'clinic__clinic_name',
-                'clinic__clinic_address_1', 'current_stock'
+        if district_filter and selected_drug_names:
+            drug_qs = (
+                DrugMaster.objects
+                .filter(
+                    drug_name__in=selected_drug_names,
+                    clinic__clinic_address_1__icontains=district_search,
+                )
+                .select_related('clinic')
+                .values(
+                    'drug_name', 'generic_name',
+                    'drug_strength', 'dosage_type',
+                    'clinic__id', 'clinic__clinic_name',
+                    'clinic__clinic_address_1', 'current_stock'
+                )
             )
-        )
+        else:
+            drug_qs = (
+                DrugMaster.objects
+                .filter(drug_name__in=list(drug_qty_map.keys()))
+                .select_related('clinic')
+                .values(
+                    'drug_name', 'generic_name',
+                    'drug_strength', 'dosage_type',
+                    'clinic__id', 'clinic__clinic_name',
+                    'clinic__clinic_address_1', 'current_stock'
+                )
+            )
 
         district_drug = defaultdict(lambda: defaultdict(lambda: {
             'generic_name': '', 'total_stock': 0, 'clinic_count': 0
@@ -982,7 +1051,7 @@ class ExportRestockView(APIView):
 
         qty_qs = (
             PrescriptionLine.objects
-            .filter(prescription__prescription_date__range=(start, end), disease__isnull=False)
+            .filter(prescription_date__range=(start, end), disease__isnull=False)
             .select_related('drug', 'disease')
             .values('drug__drug_name', 'disease__name')
             .annotate(total_qty=Sum('quantity'))
@@ -1218,56 +1287,42 @@ class TopMedicinesView(APIView):
             limit = 10
         limit = min(max(limit, 1), 50)
 
-        # Current stock from DrugMaster — Sum per drug name
-        stock_qs = (
-            DrugMaster.objects
-            .values('drug_name', 'generic_name', 'dosage_type')
-            .annotate(
-                current_stock=Sum('current_stock'),
-                variant_count=Count('id'),
+        # Find top medicines by usage in one aggregated query.
+        usage_qs = (
+            PrescriptionLine.objects
+            .filter(prescription_date__range=(start, end))
+            .values(
+                'drug__id', 'drug__drug_name', 'drug__generic_name', 'drug__dosage_type'
             )
-            .order_by('-current_stock')
+            .annotate(
+                current_stock=Sum('drug__current_stock'),
+                variant_count=Count('drug', distinct=True),
+                prescription_count=Count('id'),
+                total_quantity=Sum('quantity'),
+            )
+            .order_by('-total_quantity', '-prescription_count')
         )
 
-        # Prescription counts and quantity in period
-        rx_qs = (
-            PrescriptionLine.objects
-            .filter(prescription__prescription_date__range=(start, end))
-            .select_related('drug')
-            .values('drug__drug_name')
-            .annotate(
-                rx_count=Count('id'),
-                total_quantity=Sum('quantity')
-            )
-        )
-        rx_map = {r['drug__drug_name']: r['rx_count'] for r in rx_qs}
-        qty_map = {r['drug__drug_name']: r['total_quantity'] or 0 for r in rx_qs}
+        total_drugs = usage_qs.count()
+        top_rows = list(usage_qs[:limit])
 
         results = []
-        seen = set()
-        for row in stock_qs:
-            name = row['drug_name']
-            if name in seen:
-                continue
-            seen.add(name)
+        for row in top_rows:
             results.append({
-                'drug_name':          name,
-                'generic_name':       row['generic_name'] or '',
-                'dosage_type':        row['dosage_type'] or '',
+                'drug_name':          row['drug__drug_name'],
+                'generic_name':       row['drug__generic_name'] or '',
+                'dosage_type':        row['drug__dosage_type'] or '',
                 'current_stock':      row['current_stock'] or 0,
-                'prescription_count': rx_map.get(name, 0),
-                'total_quantity':     qty_map.get(name, 0),
-                'variant_count':      row['variant_count'],
+                'prescription_count': row['prescription_count'] or 0,
+                'total_quantity':     row['total_quantity'] or 0,
+                'variant_count':      row['variant_count'] or 0,
                 'note':              'Top medicines are sorted by usage, not stock',
             })
 
-        # Sort by usage (total quantity) then by prescription count.
-        results.sort(key=lambda r: (-r['total_quantity'], -r['prescription_count']))
-
         return Response({
             'period':        f'{start} to {end}',
-            'total_drugs':   len(results),
-            'top_medicines': results[:limit],
+            'total_drugs':   total_drugs,
+            'top_medicines': results,
         })
 
 # ── New Feature 3: Low Stock Alert System ────────────────────────────────────
@@ -1297,6 +1352,7 @@ class LowStockAlertView(APIView):
                 total_stock=Sum('current_stock'),
                 clinic_count=DCount('clinic', distinct=True),
             )
+            .filter(avg_stock__isnull=False)  # Avoid null values
             .order_by('avg_stock')
         )
 
@@ -1841,6 +1897,7 @@ class MedicineDependencyView(APIView):
 
     Returns which medicines are most commonly used for each disease.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
         min_usage = validate_positive_int(request.query_params.get('min_usage'), 'min_usage', default=0, min_value=0)

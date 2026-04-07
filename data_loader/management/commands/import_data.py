@@ -245,11 +245,13 @@ class Command(BaseCommand):
                         disease_id_val = row.get("disease_id", "").strip()
                         disease_obj = disease_map.get(int(disease_id_val)) if disease_id_val else None
 
+                        prescription_obj = prescription_map[int(row["prescription_id"])]
                         lines.append(PrescriptionLine(
                             id=int(row["id"]),
                             duration=row["duration"],
                             instructions=row["instructions"],
-                            prescription=prescription_map[int(row["prescription_id"])],
+                            prescription=prescription_obj,
+                            prescription_date=prescription_obj.prescription_date,
                             disease=disease_obj,
                             quantity=int(row["quantity"]),
                             drug=drug_map[int(row["drug_id"])]

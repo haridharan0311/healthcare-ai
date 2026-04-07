@@ -1,9 +1,15 @@
 asgiref==3.11.1
+certifi==2026.2.25
+channels==4.0.0
+channels-redis==4.1.0
+charset-normalizer==3.4.7
 click==8.3.1
 colorama==0.4.6
+daphne==4.0.0
 Django==6.0.3
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
+idna==3.11
 mysql-connector-python==9.6.0
 mysqlclient==2.2.8
 numpy==2.4.3
@@ -14,6 +20,8 @@ python-dateutil==2.9.0.post0
 python-decouple==3.8
 python-dotenv==1.2.2
 pytimeparse2==1.7.1
+redis==5.0.1
+requests==2.33.1
 simplejson==3.20.2
 six==1.17.0
 sqlglot==30.0.3
@@ -23,3 +31,4 @@ tabulate==0.10.0
 tqdm==4.67.3
 tzdata==2025.3
 Unidecode==1.4.0
+urllib3==2.6.3

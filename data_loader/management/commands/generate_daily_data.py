@@ -181,6 +181,7 @@ class Command(BaseCommand):
 
                 prescription_lines.append(PrescriptionLine(
                     prescription=prescription,
+                    prescription_date=prescription.prescription_date,
                     drug=drug,
                     disease=disease,
                     quantity=qty,

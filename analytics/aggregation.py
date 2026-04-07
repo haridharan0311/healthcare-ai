@@ -127,7 +127,7 @@ def aggregate_medicine_usage(start: date, end: date) -> list:
     usage_qs = (
         PrescriptionLine.objects
         .filter(
-            prescription__prescription_date__range=(start, end),
+            prescription_date__range=(start, end),
             disease__isnull=False,
         )
         .select_related('drug', 'disease')
@@ -224,7 +224,7 @@ def aggregate_top_medicines(start: date, end: date, limit: int = 10) -> list:
     """
     qs = (
         PrescriptionLine.objects
-        .filter(prescription__prescription_date__range=(start, end))
+        .filter(prescription_date__range=(start, end))
         .select_related('drug')
         .values('drug__drug_name', 'drug__generic_name', 'drug__dosage_type')
         .annotate(

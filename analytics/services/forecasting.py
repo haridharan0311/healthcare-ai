@@ -310,10 +310,10 @@ class ForecastingService:
             qs = (
                 PrescriptionLine.objects
                 .filter(
-                    prescription__prescription_date__range=(start_date, end_date),
+                    prescription_date__range=(start_date, end_date),
                     drug__drug_name=drug_name
                 )
-                .annotate(rx_date=TruncDate('prescription__prescription_date'))
+                .annotate(rx_date=TruncDate('prescription_date'))
                 .values('rx_date')
                 .annotate(daily_qty=Sum('quantity'))
                 .order_by('rx_date')

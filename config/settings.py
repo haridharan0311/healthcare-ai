@@ -18,6 +18,8 @@ ALLOWED_HOSTS = ['*']  # Allow all hosts for development
 # Application definition
 
 INSTALLED_APPS = [
+    'channels',  # Django Channels for WebSocket support (Requirement 6)
+    'daphne',    # Daphne ASGI server
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -141,3 +143,34 @@ STATIC_URL = 'static/'
 # To disable: Set ENABLE_LIVE_DATA_GENERATOR = False in .env or override here
 ENABLE_LIVE_DATA_GENERATOR = DEBUG  # Only in development mode
 LIVE_DATA_INTERVAL = 30  # Generate new data every 30 seconds
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REQUIREMENT 6: LIVE UPDATES - Django Channels & WebSocket Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ASGI Application - enables WebSocket support alongside HTTP
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel Layers - message broker for real-time updates
+# Development: In-memory layer (no Redis needed)
+# Production: Use Redis for multi-process deployments
+CHANNEL_LAYERS = {
+    'default': {
+        # Development mode: In-memory channels
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        
+        # Production mode: Redis channels (uncomment to use)
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     'hosts': [('127.0.0.1', 6379)],
+        #     'capacity': 1500,
+        #     'expiry': 10,
+        # },
+    }
+}
+
+# WebSocket Configuration
+WEBSOCKET_ACCEPT_ALL = True  # Accept all WebSocket connections
+WEBSOCKET_TIMEOUT = 3600  # Timeout in seconds (1 hour)
+

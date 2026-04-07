@@ -2,8 +2,8 @@ from django.db import models
 
 
 class DrugMaster(models.Model):
-    drug_name = models.CharField(max_length=255)
-    generic_name = models.CharField(max_length=255, blank=True, null=True)
+    drug_name = models.CharField(max_length=255, db_index=True)
+    generic_name = models.CharField(max_length=255, blank=True, null=True, db_index=True)
     drug_strength = models.CharField(max_length=100)
     dosage_type = models.CharField(max_length=100)
 
@@ -20,7 +20,7 @@ class DrugMaster(models.Model):
 
 
 class Prescription(models.Model):
-    prescription_date = models.DateField()
+    prescription_date = models.DateField(db_index=True)
 
     appointment = models.ForeignKey(
         'analytics.Appointment',
@@ -68,7 +68,13 @@ class PrescriptionLine(models.Model):
         db_index=True
     )
 
-    quantity = models.IntegerField()
+    quantity = models.IntegerField(db_index=True)
+
+    prescription_date = models.DateField(
+        null=True,
+        db_index=True,
+        help_text='Denormalized copy of prescription.prescription_date for faster range filtering'
+    )
 
     drug = models.ForeignKey(
         DrugMaster,
@@ -78,3 +84,8 @@ class PrescriptionLine(models.Model):
 
     def __str__(self):
         return f"{self.drug} - {self.quantity}"
+
+    def save(self, *args, **kwargs):
+        if self.prescription_date is None and self.prescription_id is not None:
+            self.prescription_date = self.prescription.prescription_date
+        super().save(*args, **kwargs)
