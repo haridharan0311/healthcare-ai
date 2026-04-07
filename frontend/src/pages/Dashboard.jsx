@@ -3,7 +3,7 @@ import {
   fetchTrends, fetchSpikes,
   fetchTopMedicines, fetchLowStockAlerts,
   fetchSeasonality, fetchDoctorTrends,
-  fetchTodaySummary, fetchWhatChangedToday,
+  fetchTodaySummary,
   getExportUrl
 } from '../api';
 import TrendChart       from '../components/TrendChart';
@@ -11,61 +11,6 @@ import SpikeAlerts      from '../components/SpikeAlerts';
 import DistrictRestock  from '../components/DistrictRestock';
 import SummaryCards     from '../components/SummaryCards';
 import CsvPreviewModal  from '../components/CsvPreviewModal';
-
-// ── Transform "What Changed Today" API response ──────────────────────────
-function transformWhatChangedData(data) {
-  const changes = [];
-
-  // Total appointments
-  if (data.total_appointments) {
-    changes.push({
-      title: 'Total Appointments',
-      description: 'Appointments recorded today',
-      value: `${data.total_appointments.toLocaleString()} appointments`
-    });
-  }
-
-  // Top disease today
-  if (data.today_by_disease && data.today_by_disease.length > 0) {
-    const topDisease = data.today_by_disease[0];
-    changes.push({
-      title: 'Top Disease Today',
-      description: `${topDisease.disease_name} cases recorded`,
-      value: `${topDisease.count} cases`
-    });
-  }
-
-  // Stock risks
-  if (data.stock_risks) {
-    const { critical_count, out_of_stock_count } = data.stock_risks;
-    if (critical_count > 0) {
-      changes.push({
-        title: 'Critical Stock Alerts',
-        description: 'Medicines at critical stock levels',
-        value: `${critical_count.toLocaleString()} items`
-      });
-    }
-    if (out_of_stock_count > 0) {
-      changes.push({
-        title: 'Out of Stock',
-        description: 'Medicines completely out of stock',
-        value: `${out_of_stock_count.toLocaleString()} items`
-      });
-    }
-  }
-
-  // Trend shifts
-  if (data.trend_shifts && data.trend_shifts.top_gainers && data.trend_shifts.top_gainers.length > 0) {
-    const topGainer = data.trend_shifts.top_gainers[0];
-    changes.push({
-      title: 'Rising Trend',
-      description: `${topGainer.disease_name} showing growth`,
-      value: `+${topGainer.growth_rate}% increase`
-    });
-  }
-
-  return changes;
-}
 
 export default function Dashboard() {
   const [days]                        = useState(30);
@@ -84,7 +29,6 @@ export default function Dashboard() {
   const [seasonality, setSeasonality] = useState({});
   const [doctorTrends, setDoctorTrends] = useState([]);
   const [doctorSummary, setDoctorSummary] = useState({});
-  const [whatChangedToday, setWhatChangedToday] = useState(null);
 
   const loadSummaryData = useCallback(() => {
     return Promise.allSettled([
@@ -106,13 +50,11 @@ export default function Dashboard() {
       fetchTopMedicines(days, 5),
       fetchSeasonality(365),
       fetchDoctorTrends(days, 10),
-      fetchWhatChangedToday(),
-    ]).then(([topMedRes, seasonRes, doctorRes, whatChangedRes]) => {
+    ]).then(([topMedRes, seasonRes, doctorRes]) => {
       setTopMedicines(topMedRes.status === 'fulfilled' ? topMedRes.value.data?.top_medicines || [] : []);
       setSeasonality(seasonRes.status === 'fulfilled' ? seasonRes.value.data || {} : {});
       setDoctorSummary(doctorRes.status === 'fulfilled' ? doctorRes.value.data || {} : {});
       setDoctorTrends(doctorRes.status === 'fulfilled' ? (doctorRes.value.data?.data || []) : []);
-      setWhatChangedToday(whatChangedRes.status === 'fulfilled' ? (whatChangedRes.value.data ? transformWhatChangedData(whatChangedRes.value.data) : null) : null);
     });
   }, [days]);
 
@@ -132,9 +74,9 @@ export default function Dashboard() {
     return () => clearTimeout(ticket);
   }, [loadSummaryData, loadInsights]);
 
-  // Auto-refresh every 2 minutes to reduce load
+  // Auto-refresh every 30 seconds for live data
   useEffect(() => {
-    const interval = setInterval(loadAll, 120000);
+    const interval = setInterval(loadAll, 30000);
     return () => clearInterval(interval);
   }, [loadAll]);
 
@@ -336,26 +278,7 @@ export default function Dashboard() {
               <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>{seasonality.note}</div>
             )}
           </div>
-          <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', padding: 16 }}>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>What Changed Today</div>
-            {!whatChangedToday ? (
-              <div style={{ color: '#9ca3af', fontSize: 12 }}>Loading today's changes...</div>
-            ) : whatChangedToday.length === 0 ? (
-              <div style={{ color: '#9ca3af', fontSize: 12 }}>No significant changes today.</div>
-            ) : (
-              whatChangedToday.slice(0, 3).map((change, i) => (
-                <div key={i} style={{ marginBottom: 8, padding: 8, background: '#f8fafc', borderRadius: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{change.title}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{change.description}</div>
-                  {change.value && (
-                    <div style={{ fontSize: 11, color: '#059669', marginTop: 2, fontWeight: 500 }}>
-                      {change.value}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
+
         </section>
 
         {/* Spike alerts */}

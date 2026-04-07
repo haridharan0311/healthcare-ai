@@ -38,6 +38,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from django.db import transaction
+from django.db.utils import OperationalError
 from django.utils import timezone
 from django.db.models import Max
 from django.conf import settings
@@ -229,25 +230,32 @@ class LiveDataGenerator:
         
         # ── Create prescription lines ─────────────────────────────
         if prescription_lines:
-            max_retries = 3
+            max_retries = 4
             for attempt in range(1, max_retries + 1):
                 try:
                     with transaction.atomic():
                         PrescriptionLine.objects.bulk_create(prescription_lines, batch_size=100)
                     break
-                except Exception as exc:
-                    if 'deadlock' in str(exc).lower() and attempt < max_retries:
+                except OperationalError as exc:
+                    error_code = exc.args[0] if exc.args else 0
+                    # Retry on: 1205 (lock timeout) and 1213 (deadlock)
+                    if error_code in (1205, 1213) and attempt < max_retries:
+                        wait_time = 2 ** (attempt - 1)  # Exponential backoff: 1s, 2s, 4s, 8s
                         logger.warning(
-                            f'Deadlock detected during prescription lines bulk create (attempt {attempt}), retrying...'
+                            f'Database lock issue (code {error_code}) during prescription lines create '
+                            f'(attempt {attempt}/{max_retries}), retrying in {wait_time}s...'
                         )
-                        time.sleep(0.5 * attempt)
+                        time.sleep(wait_time)
                         continue
+                    logger.error('Prescription lines bulk create failed', exc_info=exc)
+                    break
+                except Exception as exc:
                     logger.error('Prescription lines bulk create failed', exc_info=exc)
                     break
 
         # ── Update drug stock ────────────────────────────────────
         if drug_usage:
-            max_retries = 3
+            max_retries = 4
             for attempt in range(1, max_retries + 1):
                 try:
                     with transaction.atomic():
@@ -256,13 +264,20 @@ class LiveDataGenerator:
                             d.current_stock = max(0, d.current_stock - drug_usage[d.id])
                         DrugMaster.objects.bulk_update(drug_objs, ['current_stock'], batch_size=200)
                     break
-                except Exception as exc:
-                    if 'deadlock' in str(exc).lower() and attempt < max_retries:
+                except OperationalError as exc:
+                    error_code = exc.args[0] if exc.args else 0
+                    # Retry on: 1205 (lock timeout) and 1213 (deadlock)
+                    if error_code in (1205, 1213) and attempt < max_retries:
+                        wait_time = 2 ** (attempt - 1)  # Exponential backoff: 1s, 2s, 4s, 8s
                         logger.warning(
-                            f'Deadlock detected during drug stock bulk update (attempt {attempt}), retrying...'
+                            f'Database lock issue (code {error_code}) during drug stock update '
+                            f'(attempt {attempt}/{max_retries}), retrying in {wait_time}s...'
                         )
-                        time.sleep(0.5 * attempt)
+                        time.sleep(wait_time)
                         continue
+                    logger.error('Drug stock bulk update failed', exc_info=exc)
+                    break
+                except Exception as exc:
                     logger.error('Drug stock bulk update failed', exc_info=exc)
                     break
 

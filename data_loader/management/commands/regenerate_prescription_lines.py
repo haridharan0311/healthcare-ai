@@ -1,5 +1,7 @@
 import random
+import time
 from django.core.management.base import BaseCommand
+from django.db.utils import OperationalError
 from inventory.models import Prescription, PrescriptionLine, DrugMaster
 from core.models import Clinic
 
@@ -11,9 +13,28 @@ class Command(BaseCommand):
         parser.add_argument(
             '--batch-size',
             type=int,
-            default=1000,
-            help='Batch size for bulk_create (default: 1000)'
+            default=500,
+            help='Batch size for bulk_create (default: 500)'
         )
+
+    def bulk_create_with_retry(self, objects, max_retries=3):
+        """Insert objects with retry logic for deadlocks."""
+        for attempt in range(max_retries):
+            try:
+                PrescriptionLine.objects.bulk_create(objects)
+                return True
+            except OperationalError as e:
+                if '1213' in str(e) and attempt < max_retries - 1:  # Deadlock error code
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f'    Deadlock detected, retrying in {wait_time}s... '
+                            f'(attempt {attempt + 1}/{max_retries})'
+                        )
+                    )
+                    time.sleep(wait_time)
+                else:
+                    raise
 
     def handle(self, *args, **options):
         batch_size = options['batch_size']
@@ -98,9 +119,9 @@ class Command(BaseCommand):
 
             processed += 1
 
-            # Batch insert
+            # Batch insert with deadlock retry logic
             if len(to_create) >= batch_size:
-                PrescriptionLine.objects.bulk_create(to_create)
+                self.bulk_create_with_retry(to_create)
                 created_count += len(to_create)
                 to_create = []
                 self.stdout.write(
@@ -110,7 +131,7 @@ class Command(BaseCommand):
 
         # Final batch
         if to_create:
-            PrescriptionLine.objects.bulk_create(to_create)
+            self.bulk_create_with_retry(to_create)
             created_count += len(to_create)
 
         self.stdout.write(self.style.SUCCESS(

@@ -31,7 +31,6 @@ export const fetchDoctorTrends     = (days = 30, limit = 20) =>
 export const fetchWeeklyReport     = (days = 90)   => api('/reports/weekly/', { days });
 export const fetchMonthlyReport    = (days = 365)  => api('/reports/monthly/', { days });
 export const fetchTodaySummary = () => api('/today-summary/');
-export const fetchWhatChangedToday = () => api('/what-changed-today/');
 export const fetchMedicineDependency = (disease = null, days = 30, min_usage = 0) =>
   api('/medicine-dependency/', {
     ...(disease ? { disease } : {}),

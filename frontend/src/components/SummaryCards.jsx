@@ -69,7 +69,12 @@ export default function SummaryCards({ days, summary = null }) {
 
   const totalPeriod = currentTrends.reduce((s, t) => s + (t.total_cases || 0), 0);
   const spikeCount  = currentSpikes.filter(s => s.is_spike).length;
-  const topDisease  = currentTrends[0]?.disease_name || '—';
+  
+  // Top disease today (from todaySummary.by_disease, not from trends)
+  const topDiseaseToday = currentToday?.by_disease?.[0];
+  const topDisease = topDiseaseToday?.disease || '—';
+  const topDiseaseCount = topDiseaseToday?.count || 0;
+  
   const todayCount  = currentToday?.total_today || 0;
   const todayDate   = currentToday?.date || '';
 
@@ -97,7 +102,7 @@ export default function SummaryCards({ days, summary = null }) {
     {
       label: 'Top disease',
       value: currentLoading ? '—' : topDisease,
-      sub:   `Score: ${currentTrends[0]?.trend_score || 0}`,
+      sub:   currentLoading ? '—' : `${topDiseaseCount} cases today`,
       color: '#7c3aed',
     },
     {

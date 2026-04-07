@@ -39,10 +39,10 @@ from .restock_calculator import calculate_dynamic_safety_buffer
 
 # ─── Response Caching Utility ──────────────────────────────────────────────────
 
-def cache_api_response(timeout=300):
+def cache_api_response(timeout=30):
     """
     Decorator to cache API responses.
-    timeout: cache duration in seconds (default: 5 minutes)
+    timeout: cache duration in seconds (default: 30 seconds to match frontend refresh)
     """
     def decorator(view_func):
         def wrapper(self, request, *args, **kwargs):
@@ -165,6 +165,7 @@ class DiseaseTrendView(APIView):
     No Python loops for aggregation. Uses select_related for performance.
     Supports date filtering via ?days= param.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end    = _get_date_range(request)
         current_month = date.today().month
@@ -248,6 +249,7 @@ class TimeSeriesView(APIView):
     Groups by disease. Supports last 7 / 30 days via ?days= param.
     Uses ORM aggregation — no Python loops.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end     = _get_date_range(request)
         disease_filter = request.query_params.get('disease', None)
@@ -305,6 +307,7 @@ class MedicineUsageView(APIView):
     avg_usage = total_quantity / total_cases  (DB-driven, no hardcoding)
     No Python loops for aggregation.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
 
@@ -479,6 +482,7 @@ class RestockSuggestionView(APIView):
     Uses select_related. No Python loops for DB aggregation.
     Handles: zero stock, zero demand, new disease edge cases.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end    = _get_date_range(request)
         current_month = date.today().month
@@ -621,6 +625,7 @@ class DistrictRestockView(APIView):
     Returns drug+strength+dosage detail for selected district.
     Demand prorated by clinic proportion per district.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end      = _get_date_range(request)
         current_month   = date.today().month
@@ -1164,6 +1169,7 @@ class TrendComparisonView(APIView):
     Returns increase/decrease % per disease.
     Example: days=7 → this week vs last week.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         try:
             days = int(request.query_params.get('days', 7))
@@ -1353,6 +1359,7 @@ class SeasonalityView(APIView):
     Total across all seasons will exceed total appointments because one
     appointment may be counted in its specific season bucket only.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
 
@@ -1422,6 +1429,7 @@ class DoctorWiseTrendsView(APIView):
     Only returns rows where case_count >= min_cases (default 10).
     Respects ?days= date range.
     """
+    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
         try:
@@ -1625,6 +1633,10 @@ class TodaySummaryView(APIView):
     GET /api/today-summary/
     Returns counts for today based on latest DB date.
     No date param — always uses latest appointment date in DB.
+    
+    IMPORTANT: Only counts appointments with a disease assigned for consistency
+    with SpikeAlertView and WhatChangedTodayView. This ensures the dashboard
+    shows consistent case counts across all sections.
     """
     @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
@@ -1634,12 +1646,8 @@ class TodaySummaryView(APIView):
         )['latest']
         today = latest.date() if latest else date.today()
 
-        # Total appointments today
-        today_count = Appointment.objects.filter(
-            appointment_datetime__date=today
-        ).count()
-
         # Per disease today — ORM Count, no loops
+        # Only count appointments with a disease assigned for consistency with other views
         disease_today = (
             Appointment.objects
             .filter(
@@ -1650,6 +1658,9 @@ class TodaySummaryView(APIView):
             .values('disease__name')
             .annotate(cnt=Count('id'))
         )
+
+        # Total appointments today (with disease assigned)
+        today_count = sum(row['cnt'] for row in disease_today)
 
         # Group by disease type
         by_type = defaultdict(int)
