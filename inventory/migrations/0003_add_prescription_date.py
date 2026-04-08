@@ -1,10 +1,19 @@
 from django.db import migrations, models
+from django.db.models import OuterRef, Subquery
 
 
 def populate_prescription_date(apps, schema_editor):
     PrescriptionLine = apps.get_model('inventory', 'PrescriptionLine')
+    Prescription = apps.get_model('inventory', 'Prescription')
+    
+    # Get prescription dates using a subquery
+    prescription_dates = Prescription.objects.filter(
+        pk=OuterRef('prescription_id')
+    ).values('prescription_date')[:1]
+    
+    # Update PrescriptionLine with the subquery
     PrescriptionLine.objects.filter(prescription_date__isnull=True).update(
-        prescription_date=models.F('prescription__prescription_date')
+        prescription_date=Subquery(prescription_dates)
     )
 
 
