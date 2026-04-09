@@ -11,6 +11,7 @@ import SpikeAlerts      from '../components/SpikeAlerts';
 import DistrictRestock  from '../components/DistrictRestock';
 import SummaryCards     from '../components/SummaryCards';
 import CsvPreviewModal  from '../components/CsvPreviewModal';
+import useWebSocket     from '../hooks/useWebSocket';
 
 export default function Dashboard() {
   const [days]                        = useState(30);
@@ -29,6 +30,24 @@ export default function Dashboard() {
   const [seasonality, setSeasonality] = useState({});
   const [doctorTrends, setDoctorTrends] = useState([]);
   const [doctorSummary, setDoctorSummary] = useState({});
+
+  // Real-time WebSockets
+  const wsTrends  = useWebSocket('/disease-trends/');
+  const wsSpikes  = useWebSocket('/spike-alerts/');
+  const wsRestock = useWebSocket('/restock/');
+
+  // Override summary arrays if WS data flows in
+  useEffect(() => {
+    if (wsTrends.data)  setSummaryTrends(wsTrends.data.data || []);
+  }, [wsTrends.data]);
+
+  useEffect(() => {
+    if (wsSpikes.data)  setSummarySpikes(wsSpikes.data.data || []);
+  }, [wsSpikes.data]);
+
+  useEffect(() => {
+    if (wsRestock.data) setLowStock(wsRestock.data.data || {});
+  }, [wsRestock.data]);
 
   const loadSummaryData = useCallback(() => {
     return Promise.allSettled([
@@ -73,12 +92,6 @@ export default function Dashboard() {
     const ticket = setTimeout(loadInsights, 200);
     return () => clearTimeout(ticket);
   }, [loadSummaryData, loadInsights]);
-
-  // Auto-refresh every 30 seconds for live data
-  useEffect(() => {
-    const interval = setInterval(loadAll, 30000);
-    return () => clearInterval(interval);
-  }, [loadAll]);
 
   // Live timer - update every second to show fresh time
   useEffect(() => {
