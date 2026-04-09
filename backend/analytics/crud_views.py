@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from django.views.decorators.cache import cache_page
 
 
 from .models import Disease, Appointment
@@ -101,6 +102,7 @@ class PrescriptionLineViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
+@cache_page(60 * 10)  # Cache for 10 minutes
 def dropdown_options(request):
     """
     Returns all FK dropdown options for all models in one call.

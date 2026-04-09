@@ -48,7 +48,7 @@ class DiseaseTrendView(APIView):
     No Python loops for aggregation. Uses select_related for performance.
     Supports date filtering via ?days= param.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end    = _get_date_range(request)
         current_month = date.today().month
@@ -134,7 +134,7 @@ class TimeSeriesView(APIView):
     Groups by disease. Supports last 7 / 30 days via ?days= param.
     Uses ORM aggregation — no Python loops.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end     = _get_date_range(request)
         disease_filter = request.query_params.get('disease', None)
@@ -192,7 +192,7 @@ class TrendComparisonView(APIView):
     Returns increase/decrease % per disease.
     Example: days=7 → this week vs last week.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         try:
             days = int(request.query_params.get('days', 7))
@@ -238,7 +238,7 @@ class SeasonalityView(APIView):
     Total across all seasons will exceed total appointments because one
     appointment may be counted in its specific season bucket only.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
 
@@ -310,7 +310,7 @@ class DoctorWiseTrendsView(APIView):
     Only returns rows where case_count >= min_cases (default 10).
     Respects ?days= date range.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
         try:

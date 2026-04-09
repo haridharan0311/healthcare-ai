@@ -50,7 +50,7 @@ class MedicineUsageView(APIView):
     avg_usage = total_quantity / total_cases  (DB-driven, no hardcoding)
     No Python loops for aggregation.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
 
@@ -149,7 +149,7 @@ class TopMedicinesView(APIView):
     Shows current stock per drug from DrugMaster (not prescription-based).
     Prescription count = total prescriptions written in period (for context).
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
         try:
@@ -207,7 +207,7 @@ class LowStockAlertView(APIView):
     Uses average stock per clinic per drug, not system total.
     This makes the threshold meaningful at clinic level.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         try:
             threshold = int(request.query_params.get('threshold', 50))
@@ -285,7 +285,7 @@ class MedicineDependencyView(APIView):
 
     Returns which medicines are most commonly used for each disease.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
         min_usage = validate_positive_int(request.query_params.get('min_usage'), 'min_usage', default=0, min_value=0)

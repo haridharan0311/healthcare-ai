@@ -54,7 +54,7 @@ class RestockSuggestionView(APIView):
     Uses select_related. No Python loops for DB aggregation.
     Handles: zero stock, zero demand, new disease edge cases.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end    = _get_date_range(request)
         current_month = date.today().month
@@ -199,7 +199,7 @@ class DistrictRestockView(APIView):
     Returns drug+strength+dosage detail for selected district.
     Demand prorated by clinic proportion per district.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end      = _get_date_range(request)
         current_month   = date.today().month

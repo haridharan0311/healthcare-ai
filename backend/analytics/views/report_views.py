@@ -204,7 +204,7 @@ class TodaySummaryView(APIView):
     with SpikeAlertView and WhatChangedTodayView. This ensures the dashboard
     shows consistent case counts across all sections.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         # Latest date in DB
         latest = Appointment.objects.aggregate(
@@ -253,7 +253,7 @@ class WhatChangedTodayView(APIView):
     Summarizes today’s key changes: appointments, spike alerts, stock risks,
     and fast-moving disease trends.
     """
-    @cache_api_response(timeout=30)
+    @cache_api_response(timeout=300)
     def get(self, request):
         latest = Appointment.objects.aggregate(latest=Max('appointment_datetime'))['latest']
         today = latest.date() if latest else date.today()

@@ -49,7 +49,7 @@ class SpikeAlertView(APIView):
     Configurable baseline window via ?days= param (minimum 8).
     Returns period_count = total cases across the selected window.
     """
-    @cache_api_response(timeout=30)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
 

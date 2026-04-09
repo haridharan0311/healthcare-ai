@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django.db.models import Max
 from analytics.models import Appointment
 
-def cache_api_response(timeout=30):
+def cache_api_response(timeout=300):
     def decorator(view_func):
         def wrapper(self, request, *args, **kwargs):
             cache_key = f"{self.__class__.__name__}:{request.GET.urlencode()}"

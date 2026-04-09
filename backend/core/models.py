@@ -17,8 +17,8 @@ class Doctor(models.Model):
         ('U', 'Unknown'),
     )
 
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100, blank=True, null=True)
+    first_name = models.CharField(max_length=100, db_index=True)
+    last_name = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     qualification = models.CharField(max_length=255)
 
@@ -47,14 +47,14 @@ class Patient(models.Model):
         ('Dr', 'Dr'),
     )
 
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    first_name = models.CharField(max_length=100, db_index=True)
+    last_name = models.CharField(max_length=100, db_index=True)
 
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     title = models.CharField(max_length=10, choices=TITLE_CHOICES)
 
     dob = models.DateField()
-    mobile_number = models.CharField(max_length=15)
+    mobile_number = models.CharField(max_length=15, db_index=True)
 
     address_line_1 = models.TextField()
 
