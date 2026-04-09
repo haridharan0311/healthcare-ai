@@ -21,7 +21,8 @@ class DiseaseTrendConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
         """Accept WebSocket connection."""
-        self.user_id = self.scope.get('user', {}).get('id', 'anonymous')
+        user = self.scope.get('user')
+        self.user_id = getattr(user, 'id', 'anonymous') if user else 'anonymous'
         self.days = 30
         
         await self.channel_layer.group_add('disease_trends', self.channel_name)
