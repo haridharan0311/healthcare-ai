@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .views import crud_views
 from .views.crud_views import dropdown_options
+from .views import insight_views
 
 urlpatterns = [
     # ── Core Analytics (Layer 1 + 2 + 3) ──────────────────────────────
@@ -37,6 +38,33 @@ urlpatterns = [
     path('export/spike-alerts/',       views.ExportSpikeAlertsView.as_view(),    name='export-spikes'),
     path('export/restock/',            views.ExportRestockView.as_view(),         name='export-restock'),
     path('export-report/',             views.ExportReportView.as_view(),          name='export-report'),
+
+    # ── NEW: INSIGHT API (Layered Architecture) ────────────────────────
+    # Analytics Engine Endpoints
+    path('insights/health-dashboard/',         insight_views.HealthDashboardView.as_view(),           name='health-dashboard'),
+    path('insights/disease-trends/analysis/',  insight_views.DiseaseTrendAnalysisView.as_view(),     name='disease-trends-analysis'),
+    path('insights/medicine-usage/analysis/',  insight_views.MedicineUsageAnalysisView.as_view(),    name='medicine-usage-analysis'),
+
+    # Prediction Engine Endpoints
+    path('insights/predictions/disease-outbreaks/', insight_views.DiseaseOutbreakForecastView.as_view(), name='disease-outbreak-forecast'),
+    path('insights/predictions/medicine-demand/',   insight_views.MedicineDemandForecastView.as_view(),   name='medicine-demand-forecast'),
+    path('insights/predictions/resource-needs/',    insight_views.ResourceNeedsForecastView.as_view(),    name='resource-needs-forecast'),
+    path('insights/predictions/dashboard/',         insight_views.ForecastDashboardView.as_view(),         name='forecast-dashboard'),
+
+    # Decision Engine Endpoints
+    path('insights/decisions/dashboard/',           insight_views.DecisionDashboardView.as_view(),           name='decision-dashboard'),
+    path('insights/decisions/restock/',             insight_views.RestockDecisionsView.as_view(),             name='restock-decisions'),
+    path('insights/decisions/outbreak-response/',   insight_views.OutbreakResponseDecisionsView.as_view(),   name='outbreak-response-decisions'),
+    path('insights/decisions/resource-allocation/', insight_views.ResourceAllocationDecisionsView.as_view(), name='resource-allocation-decisions'),
+    path('insights/decisions/risk-mitigation/',     insight_views.RiskMitigationDecisionsView.as_view(),     name='risk-mitigation-decisions'),
+
+    # Feedback Engine Endpoints
+    path('insights/feedback/prediction-accuracy/', insight_views.PredictionAccuracyView.as_view(), name='prediction-accuracy'),
+    path('insights/feedback/decision-outcomes/',   insight_views.DecisionOutcomesView.as_view(),   name='decision-outcomes'),
+    path('insights/feedback/improvement-recommendations/', insight_views.ImprovementRecommendationsView.as_view(), name='improvement-recommendations'),
+
+    # Unified Platform Endpoint
+    path('insights/platform-dashboard/', insight_views.AnalyticsPlatformDashboardView.as_view(), name='platform-dashboard'),
 
     # ── CRUD ───────────────────────────────────────────────────────────
     path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),
