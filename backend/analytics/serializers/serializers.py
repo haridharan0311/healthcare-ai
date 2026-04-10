@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Disease, Appointment
+from ..models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 

@@ -8,7 +8,7 @@ from django.test import TestCase
 from django.utils import timezone
 from datetime import timedelta
 
-from analytics.live_data_generator import LiveDataGenerator
+from analytics.utils.live_data_generator import LiveDataGenerator
 from analytics.models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Clinic, Doctor, Patient

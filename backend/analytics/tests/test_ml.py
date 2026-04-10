@@ -1,9 +1,9 @@
 from django.test import TestCase
-from analytics.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from analytics.spike_detector import detect_spike, get_seasonal_weight
-from analytics.restock_calculator import calculate_restock, apply_multi_disease_contribution
-from analytics.restock_calculator import calculate_dynamic_safety_buffer
-from analytics.aggregation import get_disease_type
+from analytics.services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
+from analytics.services.spike_detector import detect_spike, get_seasonal_weight
+from analytics.services.restock_calculator import calculate_restock, apply_multi_disease_contribution
+from analytics.services.restock_calculator import calculate_dynamic_safety_buffer
+from analytics.services.aggregation import get_disease_type
 
 
 class TestMovingAverage(TestCase):

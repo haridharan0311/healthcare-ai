@@ -5,11 +5,11 @@ from rest_framework.response import Response
 from django.views.decorators.cache import cache_page
 
 
-from .models import Disease, Appointment
+from ..models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
-from .crud_serializers import (
+from ..serializers.crud_serializers import (
     ClinicSerializer, DoctorSerializer, PatientSerializer,
     DiseaseSerializer, AppointmentSerializer, DrugMasterSerializer,
     PrescriptionSerializer, PrescriptionLineSerializer

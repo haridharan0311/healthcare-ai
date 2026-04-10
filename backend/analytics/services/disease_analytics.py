@@ -47,9 +47,9 @@ from django.db.models.functions import TruncDate, TruncMonth, TruncWeek
 
 from analytics.models import Disease, Appointment
 from core.models import Doctor
-from ..aggregation import get_disease_type
-from ..ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..spike_detector import get_seasonal_weight, detect_spike
+from ..services.aggregation import get_disease_type
+from .ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
+from .spike_detector import get_seasonal_weight, detect_spike
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range, validate_positive_int
 

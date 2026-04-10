@@ -1,8 +1,8 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from . import views
-from . import crud_views
-from .crud_views import dropdown_options
+from .views import crud_views
+from .views.crud_views import dropdown_options
 
 urlpatterns = [
     # ── Core Analytics (Layer 1 + 2 + 3) ──────────────────────────────

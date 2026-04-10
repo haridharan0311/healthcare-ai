@@ -15,10 +15,10 @@ from analytics.models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
-from ..ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..spike_detector import detect_spike, get_seasonal_weight
-from ..restock_calculator import calculate_restock, apply_multi_disease_contribution, calculate_dynamic_safety_buffer
-from ..serializers import (
+from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
+from ..services.spike_detector import detect_spike, get_seasonal_weight
+from ..services.restock_calculator import calculate_restock, apply_multi_disease_contribution, calculate_dynamic_safety_buffer
+from ..serializers.serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
@@ -26,7 +26,7 @@ from ..services.medicine_analytics import MedicineAnalyticsService
 from ..services.restock_service import RestockService
 from ..utils.validators import validate_positive_int
 
-from ..aggregation import (
+from ..services.aggregation import (
     aggregate_disease_counts, aggregate_daily_counts, build_daily_list,
     aggregate_medicine_usage, compare_disease_trends, aggregate_top_medicines,
     aggregate_seasonality, aggregate_doctor_wise,

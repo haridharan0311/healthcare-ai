@@ -35,20 +35,20 @@ from django.db.models.functions import TruncDate
 from analytics.models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Clinic
-from ..aggregation import get_disease_type
-from ..ml_engine import (
+from ..services.aggregation import get_disease_type
+from .ml_engine import (
     moving_average_forecast,
     weighted_trend_score,
     predict_demand
 )
-from ..restock_calculator import (
+from .restock_calculator import (
     calculate_restock,
     calculate_dynamic_safety_buffer,
     apply_multi_disease_contribution,
     BASE_SAFETY_BUFFER,
     MAX_SAFETY_BUFFER
 )
-from ..spike_detector import get_seasonal_weight, detect_spike
+from .spike_detector import get_seasonal_weight, detect_spike
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 

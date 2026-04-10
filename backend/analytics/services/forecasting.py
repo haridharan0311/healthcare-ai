@@ -37,14 +37,14 @@ from django.db.models.functions import TruncDate
 
 from analytics.models import Appointment
 from inventory.models import PrescriptionLine, DrugMaster
-from ..aggregation import get_disease_type
-from ..ml_engine import (
+from ..services.aggregation import get_disease_type
+from .ml_engine import (
     moving_average_forecast,
     weighted_trend_score,
     predict_demand,
     time_decay_weight
 )
-from ..spike_detector import get_seasonal_weight
+from .spike_detector import get_seasonal_weight
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 

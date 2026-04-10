@@ -38,8 +38,8 @@ from django.db.models.functions import TruncDate
 
 from analytics.models import Disease, Appointment
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
-from ..aggregation import get_disease_type
-from ..ml_engine import moving_average_forecast
+from ..services.aggregation import get_disease_type
+from .ml_engine import moving_average_forecast
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range, validate_positive_int
 

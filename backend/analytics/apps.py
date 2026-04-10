@@ -34,7 +34,7 @@ class AnalyticsConfig(AppConfig):
         # Start live data generator for development/debugging (not during tests)
         if 'test' not in sys.argv:
             try:
-                from .live_data_generator import start_live_data_generator
+                from .utils.live_data_generator import start_live_data_generator
                 start_live_data_generator()
             except Exception as e:
                 import logging
