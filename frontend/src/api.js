@@ -2,17 +2,15 @@ import axios from 'axios';
 
 const BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 const CRUD = `${BASE}/crud`;
-export const WS_BASE = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
 
 const api = (url, params = {}) =>
-  axios.get(`${BASE}${url}`, { params });
+  axios.get(`${BASE}${url}`, { params, timeout: 120000 });
 
 // ── Core analytics ────────────────────────────────────────────────────
 export const fetchTrends       = (days = 30)  => api('/disease-trends/', { days });
 export const fetchTimeSeries   = (days = 7)   => api('/disease-trends/timeseries/', { days });
 export const fetchMedicineUsage= (days = 30)  => api('/medicine-usage/', { days });
-export const fetchSpikes       = (days = 8, all = true) =>
-  api('/spike-alerts/', { days, all });
+export const fetchSpikes       = (all = true) => api('/spike-alerts/', { all });
 export const fetchRestock      = (days = 30)  => api('/restock-suggestions/', { days });
 
 // ── District restock ──────────────────────────────────────────────────
@@ -45,6 +43,9 @@ export const fetchStockDepletionForecast = (drugName, days = 30, forecastDays = 
     forecast_days: forecastDays,
   });
 export const fetchAdaptiveBuffer = (days = 30) => api('/adaptive-buffer/', { days });
+export const fetchPlatformDashboard = (days = 30, forecastDays = 14) => 
+  api('/insights/platform-dashboard/', { days, forecast_days: forecastDays });
+
 
 // ── CSV exports ───────────────────────────────────────────────────────
 export const getExportUrl = (type, params = {}) => {

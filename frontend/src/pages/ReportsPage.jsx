@@ -108,25 +108,27 @@ export default function ReportsPage() {
   // ── Range selector ────────────────────────────────────────────────────────
 
   const btnStyle = (active) => ({
-    padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-    fontSize: 12, fontWeight: active ? 600 : 400,
-    background: active ? '#2563eb' : '#f3f4f6',
-    color: active ? '#fff' : '#555', transition: 'all 0.15s',
+    padding: '6px 14px', borderRadius: 8, border: '1px solid',
+    borderColor: active ? '#1e293b' : '#e2e8f0',
+    cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    background: active ? '#1e293b' : '#fff',
+    color: active ? '#fff' : '#64748b', transition: 'all 0.2s',
   });
 
   const renderRangeSelector = () => {
     if (tab === 'Low Stock Alerts') return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label style={{ fontSize: 12, color: '#6b7280' }}>Threshold (avg/clinic):</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <label style={{ fontSize: 13, color: '#64748b', fontWeight: 600 }}>Threshold (avg/clinic):</label>
         <input type="number" value={threshold} min={0}
           onChange={e => setThreshold(Number(e.target.value))}
-          style={{ width: 90, padding: '5px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13 }}
+          style={{ width: 100, padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600 }}
         />
       </div>
     );
 
     const rangeButtons = (ranges) => (
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 6 }}>
         {ranges.map(opt => (
           <button key={opt.days ?? opt} onClick={() => setDays(opt.days ?? opt)}
             style={btnStyle(days === (opt.days ?? opt))}>
@@ -143,7 +145,7 @@ export default function ReportsPage() {
 
     return (
       <select value={days} onChange={e => setDays(Number(e.target.value))}
-        style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13 }}>
+        style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 600, background: '#fff' }}>
         {GENERAL_RANGES.map(d => <option key={d} value={d}>Last {d} days</option>)}
       </select>
     );
@@ -152,73 +154,95 @@ export default function ReportsPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f5f6fa', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: '#f8fafc',
+      backgroundImage: 'radial-gradient(#e2e8f0 0.5px, transparent 0.5px)',
+      backgroundSize: '24px 24px',
+      fontFamily: '"Inter", system-ui, sans-serif' 
+    }}>
 
-      {/* Top bar */}
-      <div style={{
-        background: '#fff', borderBottom: '1px solid #eee',
-        padding: '0 32px', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between', height: 60,
-        position: 'sticky', top: 0, zIndex: 10,
+      {/* Glassmorphism Top bar */}
+      <header style={{
+        background: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid #f1f5f9',
+        padding: '0 40px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between',
+        height: 72, position: 'sticky', top: 0, zIndex: 100,
+        boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <a href="/" style={{ color: '#6b7280', textDecoration: 'none', fontSize: 13 }}>← Dashboard</a>
-          <span style={{ fontWeight: 600, fontSize: 16 }}>Reports &amp; Analytics</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <a href="/" style={{ 
+            display: 'flex', alignItems: 'center', gap: 8,
+            color: '#64748b', textDecoration: 'none', fontSize: 14, fontWeight: 700 
+          }}>
+            <span style={{ fontSize: 18 }}>←</span> Dashboard
+          </a>
+          <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
+          <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Reports & Intelligence</h1>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           {renderRangeSelector()}
         </div>
-      </div>
+      </header>
 
-      <div style={{ maxWidth: 1300, margin: '0 auto', padding: '24px' }}>
+      <main style={{ maxWidth: 1440, margin: '0 auto', padding: '40px' }}>
 
-        {/* Active tab label */}
-        <div style={{ marginBottom: 8 }}>
-          <span style={{ fontSize: 12, color: '#6b7280', marginRight: 8 }}>Active tab:</span>
-          <strong style={{ fontSize: 14 }}>{tab}</strong>
-        </div>
-
-        {/* Tabs */}
+        {/* Tab Navigation */}
         <div style={{
-          display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap',
-          background: '#fff', padding: 6, borderRadius: 10,
-          border: '1px solid #eee', width: 'fit-content',
+          display: 'flex', gap: 4, marginBottom: 32, flexWrap: 'wrap',
+          background: '#fff', padding: 4, borderRadius: 12,
+          border: '1px solid #e2e8f0', width: 'fit-content',
+          boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
         }}>
           {TABS.map(t => (
             <button key={t} onClick={() => handleTabChange(t)} style={{
-              padding: '7px 16px', borderRadius: 7, border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: tab === t ? 600 : 400,
-              background: tab === t ? '#2563eb' : 'transparent',
-              color: tab === t ? '#fff' : '#6b7280', transition: 'all 0.15s',
+              padding: '10px 20px', borderRadius: 9, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: tab === t ? 700 : 500,
+              background: tab === t ? '#1e293b' : 'transparent',
+              color: tab === t ? '#fff' : '#64748b', transition: 'all 0.2s',
             }}>
               {t}
             </button>
           ))}
         </div>
 
-        {/* Content panel */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 28, border: '1px solid #eee', minHeight: 420 }}>
+        {/* Content Area */}
+        <div style={{ 
+          background: '#fff', 
+          borderRadius: 16, 
+          padding: 32, 
+          border: '1px solid #e2e8f0', 
+          minHeight: 500,
+          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)'
+        }}>
 
           {loading && (
-            <div style={{ padding: 60, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
-              Loading {tab}...
+            <div style={{ height: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
+              <div style={{ width: 32, height: 32, border: '4px solid #f1f5f9', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div style={{ marginTop: 16, fontSize: 15, fontWeight: 600 }}>Aggregating {tab}...</div>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           )}
 
           {error && !loading && (
-            <div style={{ padding: 40, textAlign: 'center' }}>
-              <div style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</div>
+            <div style={{ height: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>⚠️</div>
+              <div style={{ color: '#0f172a', fontWeight: 700, fontSize: 18, marginBottom: 8 }}>{error}</div>
+              <p style={{ color: '#64748b', marginBottom: 24 }}>The analytics engine encountered an issue processing this request.</p>
               <button onClick={fetchData} style={{
-                padding: '7px 20px', borderRadius: 6, border: '1px solid #e5e7eb',
-                cursor: 'pointer', fontSize: 13, background: '#fff',
+                padding: '12px 32px', borderRadius: 10, border: 'none',
+                cursor: 'pointer', fontSize: 14, background: '#1e293b', color: '#fff', fontWeight: 600
               }}>
-                Retry
+                Retry Analysis
               </button>
             </div>
           )}
 
           {!loading && !error && (
-            <>
+            <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+              <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
               {data && tab === 'Top Medicines' && Array.isArray(data) && (
                 <TopMedicines data={data} days={days} />
               )}
@@ -252,10 +276,10 @@ export default function ReportsPage() {
               {tab === 'Adaptive Buffers' && (
                 <AdaptiveBuffers data={adaptiveBufferData} />
               )}
-            </>
+            </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -1,184 +1,134 @@
 import { useState, useEffect } from 'react';
 import { fetchSpikes } from '../api';
 
-const RANGE_OPTIONS = [
-  { label: '8D',  days: 8   },
-  { label: '2W',  days: 14  },
-  { label: '3W',  days: 21  },
-  { label: '1M',  days: 30  },
-  { label: '2M',  days: 60  },
-  { label: '3M',  days: 90  },
-  { label: '6M',  days: 180 },
-  { label: '1Y',  days: 365 },
-];
-
 export default function SpikeAlerts({ onExport }) {
-  // SpikeAlerts owns its range — NOT driven by global days
-  const [range,   setRange]   = useState(8);
   const [data,    setData]    = useState([]);
   const [showAll, setShowAll] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  // Re-fetch whenever local range changes
+  // Fixed 8-day range logic
   useEffect(() => {
     setLoading(true);
-    fetchSpikes(range, true).then(res => {
+    fetchSpikes(true).then(res => {
       setData(res.data || []);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [range]); // ← ONLY local range, not global days
+  }, []);
 
   const spikes  = data.filter(a => a.is_spike);
   const normal  = data.filter(a => !a.is_spike);
   const visible = showAll ? [...spikes, ...normal] : spikes;
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, border: '1px solid #e5e7eb' }}>
+    <div style={{ 
+      background: '#fff', 
+      borderRadius: 16, 
+      padding: 24, 
+      marginBottom: 24, 
+      border: '1px solid #f1f5f9',
+      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)'
+    }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Spike alerts</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Outbreak Detection</h2>
           {spikes.length > 0 && (
-            <span style={{ background: '#dc2626', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600 }}>
-              {spikes.length} spike{spikes.length > 1 ? 's' : ''}
+            <span style={{ 
+              background: '#fee2e2', color: '#dc2626', borderRadius: 20, 
+              padding: '2px 12px', fontSize: 12, fontWeight: 700, border: '1px solid #fecaca' 
+            }}>
+              {spikes.length} Alert{spikes.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Local range pills — independent of global days */}
-          <div style={{ display: 'flex', gap: 3 }}>
-            {RANGE_OPTIONS.map(opt => (
-              <button
-                key={opt.label}
-                onClick={() => setRange(opt.days)}
-                style={{
-                  padding: '4px 10px', borderRadius: 5, border: 'none',
-                  cursor: 'pointer', fontSize: 11,
-                  fontWeight: range === opt.days ? 600 : 400,
-                  background: range === opt.days ? '#dc2626' : '#f3f4f6',
-                  color: range === opt.days ? '#fff' : '#555',
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={() => setShowAll(s => !s)}
             style={{
-              padding: '4px 12px', borderRadius: 5, border: '1px solid #e5e7eb',
-              background: '#fff', cursor: 'pointer', fontSize: 12, color: '#555'
+              padding: '6px 14px', borderRadius: 8, border: '1px solid #e2e8f0',
+              background: '#fff', cursor: 'pointer', fontSize: 13, color: '#444',
+              fontWeight: 600
             }}
           >
             {showAll ? 'Spikes only' : 'Show all'}
           </button>
           <button
-            onClick={() => onExport && onExport(range)}
+            onClick={() => onExport && onExport(8)}
             style={{
-              padding: '4px 12px', borderRadius: 5, border: 'none',
-              background: '#f3f4f6', cursor: 'pointer', fontSize: 12
+              padding: '6px 14px', borderRadius: 8, border: 'none',
+              background: '#f1f5f9', cursor: 'pointer', fontSize: 13, color: '#475569',
+              fontWeight: 600
             }}
           >
-            Export CSV
+            Export
           </button>
         </div>
       </div>
 
-      {/* Formula — shows actual baseline window */}
       <div style={{
-        fontSize: 11, color: '#6b7280', marginBottom: 14,
-        padding: '6px 12px', background: '#f9fafb', borderRadius: 6, fontFamily: 'monospace'
+        fontSize: 11, color: '#64748b', marginBottom: 16,
+        padding: '8px 16px', background: '#f8fafc', borderRadius: 8, fontFamily: 'monospace',
+        border: '1px solid #f1f5f9'
       }}>
-        Formula: spike if today_count &gt; mean(last {range - 1} days) + 2 × std_dev
-        &nbsp;·&nbsp; Baseline: {range} days &nbsp;·&nbsp;
-        {loading ? 'Loading...' : `${data.length} diseases · ${spikes.length} spikes`}
+        Formula: <span style={{ color: '#2563eb' }}>spike</span> if <span style={{ fontWeight: 700 }}>today_count</span> &gt; mean(last 7 days) + 2 × std_dev
       </div>
 
       {loading ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Analyzing baseline...</div>
       ) : visible.length === 0 ? (
-        <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>No data for this range</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 12 }}>
+          No anomalies detected in the current 8-day window.
+        </div>
       ) : (
-        <>
-          {/* Column headers */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1.4fr 80px 70px 80px 70px 90px 80px',
-            padding: '6px 14px', fontSize: 10, color: '#9ca3af',
-            fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px'
-          }}>
-            <span>Disease</span>
-            <span style={{ textAlign: 'right' }}>Count ({range}d)</span>
-            <span style={{ textAlign: 'right' }}>Today</span>
-            <span style={{ textAlign: 'right' }}>Mean</span>
-            <span style={{ textAlign: 'right' }}>Std Dev</span>
-            <span style={{ textAlign: 'right' }}>Threshold</span>
-            <span style={{ textAlign: 'right' }}>Status</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
-            {visible.map(a => (
-              <div
-                key={a.disease_name}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1.4fr 80px 70px 80px 70px 90px 80px',
-                  alignItems: 'center',
-                  padding: '10px 14px', borderRadius: 8,
-                  background: a.is_spike ? '#fef2f2' : '#fafafa',
-                  border: `1px solid ${a.is_spike ? '#fecaca' : '#e5e7eb'}`,
-                }}
-              >
-                {/* Disease name */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: a.is_spike ? '#dc2626' : '#d1d5db',
-                    display: 'inline-block', flexShrink: 0
-                  }} />
-                  <span style={{
-                    fontWeight: a.is_spike ? 600 : 400, fontSize: 13,
-                    color: a.is_spike ? '#991b1b' : '#374151'
-                  }}>
-                    {a.disease_name}
-                  </span>
-                  {a.is_spike && (
-                    <span style={{
-                      fontSize: 9, background: '#dc2626', color: '#fff',
-                      borderRadius: 3, padding: '1px 5px', fontWeight: 700, letterSpacing: '0.5px'
-                    }}>SPIKE</span>
-                  )}
-                </div>
-
-                {/* Period count */}
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{
-                    background: a.is_spike ? '#fee2e2' : '#f3f4f6',
-                    padding: '2px 7px', borderRadius: 4, fontSize: 12, fontWeight: 500
-                  }}>
-                    {a.period_count}
-                  </span>
-                </div>
-
-                <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: a.is_spike ? '#991b1b' : '#111' }}>
-                  {a.today_count}
-                </div>
-                <div style={{ textAlign: 'right', fontSize: 12, color: '#6b7280' }}>{a.mean_last_7_days}</div>
-                <div style={{ textAlign: 'right', fontSize: 12, color: '#6b7280' }}>{a.std_dev}</div>
-                <div style={{ textAlign: 'right', fontSize: 12, color: '#6b7280' }}>{a.threshold}</div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{
-                    fontSize: 11, padding: '3px 9px', borderRadius: 5, fontWeight: 600,
-                    background: a.is_spike ? '#dc2626' : '#dcfce7',
-                    color: a.is_spike ? '#fff' : '#166534',
-                  }}>
-                    {a.is_spike ? 'Spike' : 'Normal'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                <th style={{ padding: '12px 16px' }}>Disease</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Baseline (7d)</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Today</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Std Dev</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Threshold</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(a => (
+                <tr 
+                  key={a.disease_name} 
+                  style={{ 
+                    borderBottom: '1px solid #f8fafc',
+                    background: a.is_spike ? '#fffafb' : 'transparent',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <td style={{ padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ 
+                        width: 8, height: 8, borderRadius: '50%', 
+                        background: a.is_spike ? '#dc2626' : '#94a3b8' 
+                      }} />
+                      <span style={{ fontWeight: 600, color: a.is_spike ? '#991b1b' : '#334155' }}>{a.disease_name}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>{a.mean_last_7_days}</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: a.is_spike ? '#dc2626' : '#1e293b' }}>{a.today_count}</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>{a.std_dev}</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>{a.threshold}</td>
+                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                    <span style={{ 
+                      fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 6,
+                      background: a.is_spike ? '#dc2626' : '#f1f5f9',
+                      color: a.is_spike ? '#fff' : '#64748b'
+                    }}>
+                      {a.is_spike ? 'SPIKE' : 'NORMAL'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

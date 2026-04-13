@@ -1,213 +1,183 @@
-import { useState, useEffect } from 'react';
-import { fetchTimeSeries, fetchTrendComparison } from '../api';
+import { useState, useEffect, useRef } from 'react';
+import { fetchTimeSeries } from '../api';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 
-const COLORS = ['#2563eb','#16a34a','#dc2626','#7c3aed','#d97706','#db2777','#0891b2','#ea580c'];
-const RANGE_OPTIONS = [
-  { label: '3D', days: 3 }, { label: '1W', days: 7 },
-  { label: '2W', days: 14 }, { label: '1M', days: 30 },
-  { label: '3M', days: 90 }, { label: '6M', days: 180 }, { label: '1Y', days: 365 },
+const COLORS = [
+  '#4f46e5', '#0d9488', '#64748b', '#7c3aed', 
+  '#e11d48', '#2563eb', '#db2777', '#b45309',
+  '#0f172a', '#10b981', '#ef4444', '#f59e0b'
 ];
 
-function periodLabel(days) {
-  if (days <= 3)  return 'last 3 days';
-  if (days <= 7)  return 'this week';
-  if (days <= 14) return 'last 2 weeks';
-  if (days <= 30) return 'this month';
-  if (days <= 90) return 'last 3 months';
-  if (days <= 180) return 'last 6 months';
-  return 'this year';
-}
+export default function TrendChart({ onExport }) {
+  const [days,             setDays]             = useState(30);
+  const [chartData,        setChartData]        = useState([]);
+  const [allDiseases,      setAllDiseases]      = useState([]);
+  const [selectedDiseases, setSelectedDiseases] = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [isLayoutReady,    setIsLayoutReady]    = useState(false);
+  
+  const containerRef = useRef(null);
 
-function prevPeriodLabel(days) {
-  if (days <= 3)  return 'previous 3 days';
-  if (days <= 7)  return 'last week';
-  if (days <= 14) return '2 weeks before';
-  if (days <= 30) return 'last month';
-  if (days <= 90) return '3 months before';
-  if (days <= 180) return '6 months before';
-  return 'last year';
-}
+  // Definitive Layout Stabilization: Use ResizeObserver for accurate ready state
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        setIsLayoutReady(true);
+      }
+    });
 
-export default function TrendChart({ globalDays, onExport }) {
-  const [localDays,       setLocalDays]       = useState(globalDays || 30);
-  const [chartData,       setChartData]       = useState([]);
-  const [diseases,        setDiseases]        = useState([]);
-  const [comparison,      setComparison]      = useState(null);
-  const [showComparison,  setShowComparison]  = useState(false);
-  const [loading,         setLoading]         = useState(true);
-  const [compLoading,     setCompLoading]     = useState(false);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
-  useEffect(() => { setLocalDays(globalDays || 30); }, [globalDays]);
-
-  // Fetch time-series when local days changes
+  // Fetch data
   useEffect(() => {
     setLoading(true);
-    fetchTimeSeries(localDays).then(res => {
-      const raw        = res.data || [];
-      const dateSet    = [...new Set(raw.map(r => r.date))].sort();
-      const diseaseSet = [...new Set(raw.map(r => r.disease_name))];
-      const lookup     = {};
+    fetchTimeSeries(days).then(res => {
+      const raw = res.data || [];
+      const dateSet = [...new Set(raw.map(r => r.date))].sort();
+      
+      const totals = {};
+      raw.forEach(r => {
+        totals[r.disease_name] = (totals[r.disease_name] || 0) + r.case_count;
+      });
+      
+      const sortedByVolume = Object.keys(totals).sort((a,b) => totals[b] - totals[a]);
+      setAllDiseases(sortedByVolume);
+      
+      setSelectedDiseases(prev => {
+        if (prev.length === 0) {
+          return sortedByVolume.slice(0, 4);
+        }
+        return prev;
+      });
+
+      const lookup = {};
       raw.forEach(r => {
         if (!lookup[r.date]) lookup[r.date] = { date: r.date };
         lookup[r.date][r.disease_name] = r.case_count;
       });
-      setChartData(dateSet.map(d => lookup[d] || { date: d }));
-      setDiseases(diseaseSet);
+      
+      const processedData = dateSet.map(d => {
+        const entry = { date: d };
+        sortedByVolume.forEach(dis => {
+          entry[dis] = (lookup[d] && lookup[d][dis]) ? lookup[d][dis] : 0;
+        });
+        return entry;
+      });
+      
+      setChartData(processedData);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [localDays]);
+    }).catch(err => {
+      console.error("TrendChart fetch error:", err);
+      setLoading(false);
+    });
+  }, [days]);
 
-  // Fetch comparison when toggled or days changes
-  useEffect(() => {
-    if (!showComparison) return;
-    setCompLoading(true);
-    fetchTrendComparison(localDays).then(res => {
-      setComparison(res.data);
-      setCompLoading(false);
-    }).catch(() => setCompLoading(false));
-  }, [showComparison, localDays]);
+  const toggleDisease = (name) => {
+    setSelectedDiseases(prev => 
+      prev.includes(name) ? prev.filter(d => d !== name) : [...prev, name]
+    );
+  };
+
+  const setPreset = (count) => {
+    if (count === 'all') setSelectedDiseases([...allDiseases]);
+    else if (count === 0) setSelectedDiseases([]);
+    else setSelectedDiseases(allDiseases.slice(0, count));
+  };
 
   const formatXAxis = (d) => {
-    if (localDays <= 14) return d?.slice(5) || '';    // MM-DD
-    if (localDays <= 90) return d?.slice(5) || '';
-    return d?.slice(0, 7) || '';                       // YYYY-MM
+    if (!d) return '';
+    const parts = d.split('-');
+    return parts.length < 3 ? d : `${parts[1]}-${parts[2]}`;
   };
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, padding: 24, marginBottom: 24, border: '1px solid #e5e7eb' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Disease trends</h2>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 3 }}>
-            {RANGE_OPTIONS.map(opt => (
+    <div style={{ 
+      background: '#fff', borderRadius: 16, padding: 24, marginBottom: 24, 
+      border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Disease Trends</h2>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Comparison analysis and longitudinal monitoring</div>
+        </div>
+        
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 2 }}>
+            {[7, 14, 30, 90].map(d => (
               <button
-                key={opt.label}
-                onClick={() => setLocalDays(opt.days)}
+                key={d} onClick={() => setDays(d)}
                 style={{
-                  padding: '4px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                  fontSize: 11, fontWeight: localDays === opt.days ? 600 : 400,
-                  background: localDays === opt.days ? '#2563eb' : '#f3f4f6',
-                  color: localDays === opt.days ? '#fff' : '#555',
+                  padding: '6px 12px', border: 'none', borderRadius: 6,
+                  background: days === d ? '#1e293b' : 'transparent',
+                  color: days === d ? '#fff' : '#64748b',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer'
                 }}
               >
-                {opt.label}
+                {d}D
               </button>
             ))}
           </div>
-
-          <button
-            onClick={() => setShowComparison(s => !s)}
-            style={{
-              padding: '4px 12px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-              border: '1px solid #e5e7eb',
-              background: showComparison ? '#eff6ff' : '#fff',
-              color: showComparison ? '#2563eb' : '#555',
-              fontWeight: showComparison ? 600 : 400,
-            }}
-          >
-            Compare periods
-          </button>
-
-          <button
-            onClick={() => onExport && onExport(localDays)}
-            style={{
-              padding: '4px 12px', borderRadius: 5, border: 'none',
-              background: '#f3f4f6', cursor: 'pointer', fontSize: 12
-            }}
-          >
-            Export CSV
-          </button>
+          <button onClick={() => onExport && onExport(days)} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', fontWeight: 600 }}>📊 Export</button>
         </div>
       </div>
 
-      {/* Comparison panel — human readable */}
-      {showComparison && (
-        <div style={{
-          background: '#f8faff', border: '1px solid #dbeafe',
-          borderRadius: 8, padding: '12px 16px', marginBottom: 16
-        }}>
-          <div style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 600, marginBottom: 8 }}>
-            Comparing: &nbsp;
-            <span style={{ fontWeight: 700 }}>{periodLabel(localDays)}</span>
-            &nbsp; vs &nbsp;
-            <span style={{ fontWeight: 700 }}>{prevPeriodLabel(localDays)}</span>
-          </div>
-
-          {compLoading ? (
-            <div style={{ fontSize: 12, color: '#9ca3af' }}>Loading comparison...</div>
-          ) : comparison?.results?.length > 0 ? (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {comparison.results.map(r => (
-                <div
-                  key={r.disease_name}
-                  title={`${periodLabel(localDays)}: ${r.period2_count} cases | ${prevPeriodLabel(localDays)}: ${r.period1_count} cases`}
-                  style={{
-                    padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                    background: r.direction === 'up' ? '#fef2f2' : r.direction === 'down' ? '#f0fdf4' : '#f9fafb',
-                    color:      r.direction === 'up' ? '#dc2626' : r.direction === 'down' ? '#16a34a' : '#6b7280',
-                    border:     `1px solid ${r.direction === 'up' ? '#fecaca' : r.direction === 'down' ? '#bbf7d0' : '#e5e7eb'}`,
-                    cursor: 'default',
-                  }}
-                >
-                  <span style={{ fontWeight: 700 }}>{r.disease_name}</span>
-                  &nbsp;
-                  {r.direction === 'up' ? '↑' : r.direction === 'down' ? '↓' : '→'}
-                  &nbsp;
-                  {/* Show absolute change, not raw % */}
-                  <span>
-                    {r.period2_count} vs {r.period1_count} cases
-                  </span>
-                  &nbsp;
-                  <span style={{ fontSize: 11, opacity: 0.8 }}>
-                    ({r.pct_change > 0 ? '+' : ''}{r.pct_change}%)
-                  </span>
-                </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 32 }}>
+        <div style={{ borderRight: '1px solid #f1f5f9', paddingRight: 24 }}>
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12 }}>Presets</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {[2, 5, 'all', 0].map(p => (
+                <button key={p} onClick={() => setPreset(p)} style={{ padding: '8px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 11, background: '#f8fafc' }}>
+                  {p === 'all' ? 'All' : p === 0 ? 'Clear' : `Top ${p}`}
+                </button>
               ))}
             </div>
-          ) : (
-            <div style={{ fontSize: 12, color: '#9ca3af' }}>No comparison data available</div>
-          )}
-
-          {/* Period date labels */}
-          {comparison && (
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
-              Current: {comparison.period2} &nbsp;|&nbsp; Previous: {comparison.period1}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Chart */}
-      {loading ? (
-        <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
-          Loading...
-        </div>
-      ) : (
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={formatXAxis} />
-            <YAxis tick={{ fontSize: 11 }} />
-            <Tooltip
-              contentStyle={{ fontSize: 12, borderRadius: 8 }}
-              labelFormatter={l => `Date: ${l}`}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {diseases.map((d, i) => (
-              <Line
-                key={d} type="monotone" dataKey={d}
-                stroke={COLORS[i % COLORS.length]}
-                strokeWidth={2} dot={false} connectNulls
-              />
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12 }}>Disease List</div>
+          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {allDiseases.map((d, i) => (
+              <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+                <input type="checkbox" checked={selectedDiseases.includes(d)} onChange={() => toggleDisease(d)} />
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: COLORS[i % COLORS.length] }} />
+                {d}
+              </label>
             ))}
-          </LineChart>
-        </ResponsiveContainer>
-      )}
+          </div>
+        </div>
+
+        <div ref={containerRef} style={{ height: 400, width: '100%', minHeight: 400, position: 'relative' }}>
+          {loading || !isLayoutReady ? (
+            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 24, height: 24, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                  Analyzing patterns...
+              </div>
+            </div>
+          ) : (
+            <ResponsiveContainer width="99%" height="99%" minWidth={0} minHeight={0}>
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 700 }} />
+                {selectedDiseases.map((d, i) => (
+                  <Line key={d} type="monotone" dataKey={d} stroke={COLORS[allDiseases.indexOf(d) % COLORS.length]} strokeWidth={2.5} dot={false} activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }} />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

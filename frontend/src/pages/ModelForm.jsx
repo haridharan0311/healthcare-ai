@@ -196,15 +196,18 @@ export default function ModelForm() {
 
     if (field.type === 'checkbox') {
       return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <label style={{ 
+          display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+          padding: '12px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0'
+        }}>
           <input
             type="checkbox"
             checked={!!form[field.name]}
             onChange={e => handleChange(field.name, e.target.checked)}
-            style={{ width: 16, height: 16 }}
+            style={{ width: 18, height: 18, accentColor: '#2563eb' }}
           />
-          <span style={{ fontSize: 14, color: '#555' }}>
-            {form[field.name] ? 'Yes' : 'No'}
+          <span style={{ fontSize: 14, fontWeight: 700, color: form[field.name] ? '#0f172a' : '#64748b' }}>
+            {form[field.name] ? 'ACTIVE / YES' : 'INACTIVE / NO'}
           </span>
         </label>
       );
@@ -218,15 +221,13 @@ export default function ModelForm() {
       );
 
       return (
-        <div>
-          {/* Search input */}
+        <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #e2e8f0' }}>
           <input
             placeholder={`Search ${field.label}...`}
             value={searchVal}
             onChange={e => setSearch(prev => ({ ...prev, [field.name]: e.target.value }))}
-            style={{ ...inputStyle, marginBottom: 6 }}
+            style={{ ...inputStyle, marginBottom: 8, background: '#fff' }}
           />
-          {/* Dropdown */}
           <select
             value={form[field.name] || ''}
             onChange={e => {
@@ -237,28 +238,27 @@ export default function ModelForm() {
             style={{
               ...inputStyle,
               height: 'auto',
+              background: '#fff',
               overflowY: 'auto',
               display: filtered.length > 0 || !searchVal ? 'block' : 'none'
             }}
           >
             <option value="">— Select —</option>
             {filtered.map(opt => (
-              <option key={opt.value} value={opt.value}>
+              <option key={opt.value} value={opt.value} style={{ padding: '8px' }}>
                 {opt.label}
               </option>
             ))}
           </select>
-          {/* Show selected value */}
           {form[field.name] && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#1D9E75' }}>
-              Selected: {options.find(o => o.value === form[field.name])?.label || `ID ${form[field.name]}`}
+            <div style={{ marginTop: 10, fontSize: 12, fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>✓</span> {options.find(o => o.value === form[field.name])?.label || `Entry ID ${form[field.name]}`}
             </div>
           )}
         </div>
       );
     }
 
-    // Default: text, number, date, datetime-local
     return (
       <input
         type={field.type}
@@ -272,55 +272,93 @@ export default function ModelForm() {
     );
   };
 
-  if (loading) return <div style={{ padding: 40, color: '#aaa' }}>Loading...</div>;
+  if (loading) return (
+    <div style={{ height: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+      <div style={{ width: 32, height: 32, border: '4px solid #f1f5f9', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+      <div style={{ marginTop: 16, fontSize: 15, fontWeight: 600 }}>Loading record data...</div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 
   return (
-    <div style={{ padding: 32, maxWidth: 680 }}>
+    <div style={{ animation: 'fadeIn 0.3s ease-out', maxWidth: 800 }}>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32 }}>
         <button onClick={() => navigate(`/admin-panel/${model}`)} style={backBtnStyle}>
-          ← Back
+          <span style={{ fontSize: 18 }}>←</span> Back
         </button>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 500 }}>
-          {isNew ? 'Add new' : 'Edit'} — {model.replace(/-/g, ' ')}
-          {!isNew && <span style={{ fontSize: 14, color: '#888', marginLeft: 8 }}>ID: {id}</span>}
-        </h1>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            Resource Editor 
+          </div>
+          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.75px' }}>
+            {isNew ? 'New' : 'Edit'} {model.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')}
+          </h1>
+        </div>
       </div>
 
-      {/* Error */}
+      {/* Error Alert */}
       {error && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', background: '#FCEBEB', border: '1px solid #F09595', borderRadius: 8, fontSize: 13, color: '#A32D2D', whiteSpace: 'pre-wrap' }}>
-          {typeof error === 'object' ? JSON.stringify(error, null, 2) : error}
+        <div style={{ 
+          marginBottom: 24, padding: '16px 20px', background: '#fee2e2', 
+          border: '1px solid #fecaca', borderRadius: 12, fontSize: 14, color: '#991b1b', 
+          fontWeight: 600, boxShadow: '0 2px 4px 0 rgb(0 0 0 / 0.05)'
+        }}>
+          <div style={{ marginBottom: 4 }}>Submission Error</div>
+          <p style={{ margin: 0, fontSize: 13, opacity: 0.8, fontWeight: 500 }}>
+            {typeof error === 'object' ? JSON.stringify(error) : error}
+          </p>
         </div>
       )}
 
-      {/* Form */}
-      <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #eee', padding: 28 }}>
-        {fields.map(field => (
-          <div key={field.name} style={{ marginBottom: 22 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#444', marginBottom: 6 }}>
-              {field.label}
-              {field.required && <span style={{ color: '#E24B4A', marginLeft: 4 }}>*</span>}
-            </label>
-            {renderField(field)}
-          </div>
-        ))}
+      {/* Form Card */}
+      <div style={{ 
+        background: '#fff', 
+        borderRadius: 16, 
+        padding: 40, 
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)'
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 32 }}>
+          {fields.map(field => (
+            <div key={field.name} style={{ marginBottom: 8 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                {field.label}
+                {field.required && <span style={{ color: '#ef4444', marginLeft: 4 }}>*</span>}
+              </label>
+              {renderField(field)}
+            </div>
+          ))}
+        </div>
 
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+        <div style={{ 
+          display: 'flex', gap: 12, marginTop: 48, paddingTop: 24, borderTop: '1px solid #f1f5f9'
+        }}>
           <button
             onClick={handleSubmit}
             disabled={saving}
             style={{
-              padding: '10px 24px', borderRadius: 8, border: 'none',
-              background: saving ? '#aaa' : '#89b4fa', color: '#1e1e2e',
-              fontWeight: 500, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer'
+              padding: '12px 32px', borderRadius: 10, border: 'none',
+              background: saving ? '#94a3b8' : '#1e293b', color: '#fff',
+              fontWeight: 700, fontSize: 15, cursor: saving ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
             }}
+            onMouseOver={(e) => !saving && (e.target.style.background = '#0f172a')}
+            onMouseOut={(e) => !saving && (e.target.style.background = '#1e293b')}
           >
-            {saving ? 'Saving...' : isNew ? 'Create' : 'Save changes'}
+            {saving ? 'Processing...' : isNew ? 'Create Repository Entry' : 'Update Record'}
           </button>
           <button
             onClick={() => navigate(`/admin-panel/${model}`)}
-            style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', fontSize: 14, cursor: 'pointer' }}
+            style={{ 
+              padding: '12px 24px', borderRadius: 10, border: '1px solid #e2e8f0', 
+              background: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              color: '#475569', transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.borderColor = '#cbd5e1'}
+            onMouseOut={(e) => e.target.style.borderColor = '#e2e8f0'}
           >
             Cancel
           </button>
@@ -332,13 +370,16 @@ export default function ModelForm() {
 
 // Shared styles
 const inputStyle = {
-  width: '100%', padding: '8px 12px', borderRadius: 6,
-  border: '1px solid #ddd', fontSize: 14,
-  boxSizing: 'border-box', outline: 'none'
+  width: '100%', padding: '12px 14px', borderRadius: 10,
+  border: '1px solid #e2e8f0', fontSize: 14, fontWeight: 500,
+  boxSizing: 'border-box', outline: 'none', background: '#f8fafc',
+  transition: 'all 0.2s'
 };
 
 const backBtnStyle = {
-  padding: '6px 14px', borderRadius: 6,
-  border: '1px solid #ddd', background: '#fff',
-  cursor: 'pointer', fontSize: 13
+  padding: '10px 16px', borderRadius: 10,
+  border: '1px solid #e2e8f0', background: '#fff',
+  cursor: 'pointer', fontSize: 13, fontWeight: 700,
+  color: '#64748b', transition: 'all 0.2s',
+  display: 'flex', alignItems: 'center', gap: 8
 };
