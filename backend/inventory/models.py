@@ -82,8 +82,14 @@ class PrescriptionLine(models.Model):
         db_index=True
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['prescription_date', 'drug', 'disease']),
+        ]
+
     def __str__(self):
         return f"{self.drug} - {self.quantity}"
+
 
     def save(self, *args, **kwargs):
         if self.prescription_date is None and self.prescription_id is not None:

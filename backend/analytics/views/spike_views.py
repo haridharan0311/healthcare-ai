@@ -16,13 +16,12 @@ from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
 from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..services.spike_detector import detect_spike, get_seasonal_weight
-from ..services.restock_calculator import calculate_restock, apply_multi_disease_contribution, calculate_dynamic_safety_buffer
+from ..services.timeseries import get_seasonal_weight
+from ..services.spike_detection import detect_spike_logic as detect_spike
 from ..serializers.serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
-from ..services.medicine_analytics import MedicineAnalyticsService
 from ..services.restock_service import RestockService
 from ..utils.validators import validate_positive_int
 
@@ -52,13 +51,9 @@ class SpikeAlertView(APIView):
     @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
-
-        try:
-            days = int(request.query_params.get('days', 8))
-        except ValueError:
-            days = 8
-        days = max(days, 8)
-
+        
+        # Hardcoded to 8 days baseline window (7 days + today) as per fixed formula
+        days = 8
         latest = Appointment.objects.aggregate(
             latest=Max('appointment_datetime')
         )['latest']

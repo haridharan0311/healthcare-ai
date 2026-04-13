@@ -16,13 +16,15 @@ from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
 from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..services.spike_detector import detect_spike, get_seasonal_weight
+from ..services.timeseries import get_seasonal_weight
+from ..services.spike_detection import detect_spike_logic as detect_spike
 from ..services.restock_calculator import calculate_restock, apply_multi_disease_contribution, calculate_dynamic_safety_buffer
 from ..serializers.serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
-from ..services.medicine_analytics import MedicineAnalyticsService
+from ..services.usage import UsageIntelligence
+from ..services.forecasting import ForecastingService
 from ..services.restock_service import RestockService
 from ..utils.validators import validate_positive_int
 
@@ -292,12 +294,10 @@ class MedicineDependencyView(APIView):
         disease_name = request.query_params.get('disease')
         start, end = _get_db_date_range(days)
 
-        service = MedicineAnalyticsService()
-        result = service.map_medicine_dependencies(
-            disease_name=disease_name,
-            start_date=start,
-            end_date=end,
-            min_usage=min_usage,
+        service = UsageIntelligence()
+        result = service.get_medicine_usage_per_disease(
+            disease_name=disease_name or "All",
+            days=days
         )
         return Response(result)
 
@@ -313,28 +313,26 @@ class StockDepletionForecastView(APIView):
     def get(self, request):
         drug_id = request.query_params.get('drug_id')
         drug_name = request.query_params.get('drug_name')
+        
+        # Use a more generous window for depletion analysis if requested
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
+        
         if not drug_id and not drug_name:
             return Response(
                 {'error': 'Provide drug_id or drug_name'},
                 status=drf_status.HTTP_400_BAD_REQUEST
             )
 
-        days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
-        start, end = _get_db_date_range(days)
+        # If we have a drug_id, we get its specific name for the aggregated service
+        target_name = drug_name
+        if not target_name and drug_id:
+            try:
+                target_name = DrugMaster.objects.get(id=drug_id).drug_name
+            except DrugMaster.DoesNotExist:
+                return Response({'error': 'Drug ID not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
-        if not drug_id:
-            match = DrugMaster.objects.filter(drug_name__icontains=drug_name).first()
-            if not match:
-                return Response({'error': 'Drug not found'}, status=drf_status.HTTP_404_NOT_FOUND)
-            drug_id = match.id
-
-        service = MedicineAnalyticsService()
-        result = service.forecast_stock_depletion(
-            drug_id=int(drug_id),
-            start_date=start,
-            end_date=end,
-            forecast_days=validate_positive_int(request.query_params.get('forecast_days'), 'forecast_days', default=30, min_value=1, max_value=90)
-        )
+        service = ForecastingService()
+        result = service.forecast_stock_depletion(drug_name=target_name, days=days)
 
         if result.get('error'):
             return Response(result, status=drf_status.HTTP_400_BAD_REQUEST)

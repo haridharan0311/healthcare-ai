@@ -16,13 +16,13 @@ from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
 from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..services.spike_detector import detect_spike, get_seasonal_weight
+from ..services.timeseries import get_seasonal_weight
+from ..services.spike_detection import detect_spike_logic as detect_spike
 from ..services.restock_calculator import calculate_restock, apply_multi_disease_contribution, calculate_dynamic_safety_buffer
 from ..serializers.serializers import (
     DiseaseTrendSerializer, TimeSeriesPointSerializer,
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
-from ..services.medicine_analytics import MedicineAnalyticsService
 from ..services.restock_service import RestockService
 from ..utils.validators import validate_positive_int
 
@@ -240,13 +240,18 @@ class ExportRestockView(APIView):
 
         total_clinics = Clinic.objects.count() or 1
 
+        active_drugs = set(avg_usage_map.keys())
         grouped = (
             DrugMaster.objects
             .select_related('clinic')
+            .filter(Q(drug_name__in=active_drugs) | Q(current_stock__lt=10))
             .values('drug_name', 'generic_name', 'drug_strength', 'dosage_type',
                     'clinic__clinic_name', 'clinic__clinic_address_1')
-            .annotate(total_stock=Sum('current_stock'))
-            .order_by('drug_name', 'clinic__clinic_name')
+            .annotate(
+                total_stock=Sum('current_stock'),
+                clinic_row_count=Count('id')
+            )
+            .order_by('total_stock', 'drug_name', 'clinic__clinic_name')
         )
 
         STATUS_ORDER = {'critical': 0, 'low': 1, 'sufficient': 2}
@@ -264,10 +269,7 @@ class ExportRestockView(APIView):
                 for d in contributing if d in dtype_demand
             ]
             combined        = apply_multi_disease_contribution(demands) if demands else 0.0
-            clinic_count    = DrugMaster.objects.filter(
-                drug_name=drug_name,
-                clinic__clinic_name=g['clinic__clinic_name']
-            ).count() or 1
+            clinic_count    = g['clinic_row_count'] or 1
             district_ratio  = clinic_count / total_clinics
             district_demand = round(combined * avg_usage * 1.2 * district_ratio, 2)
             suggested       = max(0, int(district_demand - current_stock))
@@ -281,13 +283,18 @@ class ExportRestockView(APIView):
                 pct    = (district_demand - current_stock) / district_demand * 100 if district_demand > 0 else 100
                 status = 'critical' if pct > 50 else 'low'
 
-            district = _extract_district(g['clinic__clinic_address_1'])
-            rows.append([
-                drug_name, g['generic_name'] or '', g['drug_strength'] or '',
-                g['dosage_type'] or '', g['clinic__clinic_name'] or '', district,
-                current_stock, district_demand, suggested, status,
-                ', '.join(contributing[:5]), f'{start} to {end}',
-            ])
+            if suggested > 0 or current_stock == 0:
+                district = _extract_district(g['clinic__clinic_address_1'])
+                rows.append([
+                    drug_name, g['generic_name'] or '', g['drug_strength'] or '',
+                    g['dosage_type'] or '', g['clinic__clinic_name'] or '', district,
+                    current_stock, district_demand, suggested, status,
+                    ', '.join(contributing[:5]), f'{start} to {end}',
+                ])
+            
+            # Capping for performance on massive datasets
+            if len(rows) >= 10000:
+                break
 
         rows.sort(key=lambda x: (STATUS_ORDER.get(x[9], 3), x[0], x[4]))
         for row in rows:
@@ -352,20 +359,27 @@ class ExportReportView(APIView):
         writer.writerow([])
         writer.writerow(['SPIKE ALERTS', f'As of: {end}'])
         writer.writerow(['Disease', 'Today Count', 'Mean (7d)', 'Std Dev', 'Threshold', 'Spike?'])
-        for dtype, data in type_data.items():
-            qs2 = (
-                Appointment.objects
-                .filter(
-                    appointment_datetime__date__range=(end - timedelta(days=8), end),
-                    disease__name__icontains=dtype
-                )
-                .annotate(appt_date=TruncDate('appointment_datetime'))
-                .values('appt_date')
-                .annotate(cnt=Count('id'))
+        # Optimized Spike Detection Section
+        spike_range_start = end - timedelta(days=8)
+        spike_qs = (
+            Appointment.objects
+            .filter(
+                appointment_datetime__date__range=(spike_range_start, end),
+                disease__isnull=False
             )
-            d_map = {row['appt_date']: row['cnt'] for row in qs2}
-            daily = _build_daily_list(defaultdict(lambda: d_map, {dtype: d_map}),
-                                      dtype, end - timedelta(days=8), end)
+            .annotate(appt_date=TruncDate('appointment_datetime'))
+            .values('appt_date', 'disease__name')
+            .annotate(cnt=Count('id'))
+        )
+        
+        spike_data_map = defaultdict(lambda: defaultdict(int))
+        for row in spike_qs:
+            dt = get_disease_type(row['disease__name'])
+            spike_data_map[dt][row['appt_date']] += row['cnt']
+
+        for dtype, data in type_data.items():
+            d_map = spike_data_map.get(dtype, {})
+            daily = _build_daily_list(spike_data_map, dtype, spike_range_start, end)
             s = detect_spike(daily)
             writer.writerow([dtype, s['today_count'], s['mean_last_7_days'],
                              s['std_dev'], s['threshold'], 'YES' if s['is_spike'] else 'no'])
@@ -374,13 +388,22 @@ class ExportReportView(APIView):
         writer.writerow([])
         writer.writerow(['RESTOCK SUGGESTIONS'])
         writer.writerow(['Drug', 'Generic Name', 'Current Stock', 'Predicted Demand', 'Suggested Restock', 'Status'])
+        # Filter Section 3 to only include active or low stock items
+        usage_drugs = {r['drug__drug_name'] for r in qty_qs}
         stock_map = {
             r['drug_name']: r['total']
-            for r in DrugMaster.objects.values('drug_name').annotate(total=Sum('current_stock'))
+            for r in DrugMaster.objects
+            .filter(Q(drug_name__in=usage_drugs) | Q(current_stock__lt=10))
+            .values('drug_name')
+            .annotate(total=Sum('current_stock'))
         }
+        count = 0
         for drug_name, stock in sorted(stock_map.items()):
             status = 'critical' if stock == 0 else 'sufficient'
             writer.writerow([drug_name, _get_generic(drug_name), stock, '—', '—', status])
+            count += 1
+            if count >= 1000: # Legacy report cap
+                break
 
         return response
     

@@ -12,7 +12,7 @@ FEATURES:
 
 CONFIGURATION:
 - ENABLE_LIVE_DATA_GENERATOR (default: True in DEBUG mode, False in PRODUCTION)
-- LIVE_DATA_INTERVAL (default: 30 seconds between data generation cycles)
+- LIVE_DATA_INTERVAL (default: 60 seconds between data generation cycles)
 
 USAGE:
 - Starts automatically when Django boots (see analytics/apps.py)
@@ -56,7 +56,7 @@ class LiveDataGenerator:
     def __init__(self):
         self.thread = None
         self.running = False
-        self.interval = getattr(settings, 'LIVE_DATA_INTERVAL', 30)
+        self.interval = getattr(settings, 'LIVE_DATA_INTERVAL', 60)
         self.enabled = getattr(settings, 'ENABLE_LIVE_DATA_GENERATOR', settings.DEBUG)
         
     def start(self):

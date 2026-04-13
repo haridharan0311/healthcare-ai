@@ -77,7 +77,7 @@ def validate_date_range(
     """
     # Get reference end date
     if relative_to_latest_db:
-        latest = Appointment.objects.aggregate(Max('appointment_datetime'))['latest']
+        latest = Appointment.objects.aggregate(latest=Max('appointment_datetime'))['latest']
         ref_end = latest.date() if latest else date.today()
     else:
         ref_end = date.today()

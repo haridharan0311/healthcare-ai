@@ -105,10 +105,22 @@ def build_daily_list(daily_map: dict, start: date, end: date) -> list:
 def aggregate_medicine_usage(start: date, end: date) -> list:
     """
     Sum(quantity) grouped by drug + disease.
-    avg_usage = total_quantity / total_cases (DB-driven formula)
-    No hardcoded drug-disease mapping.
+    Optimized: 2-step process to handle 1.6M+ rows.
     """
-    # Case counts per disease type
+    # 1. Identify top 50 medicines first (faster grouping)
+    top_drugs_qs = (
+        PrescriptionLine.objects
+        .filter(prescription_date__range=(start, end))
+        .values('drug_id')
+        .annotate(total_qty=Sum('quantity'))
+        .order_by('-total_qty')[:50]
+    )
+    top_drug_ids = [row['drug_id'] for row in top_drugs_qs]
+    
+    if not top_drug_ids:
+        return []
+
+    # 2. Case counts per disease type
     case_qs = (
         Appointment.objects
         .filter(
@@ -123,43 +135,61 @@ def aggregate_medicine_usage(start: date, end: date) -> list:
     for row in case_qs:
         case_map[get_disease_type(row['disease__name'])] += row['total_cases']
 
-    # ORM Sum(quantity)
+    # 3. Group by medicine + disease ONLY for the top drugs
     usage_qs = (
         PrescriptionLine.objects
         .filter(
             prescription_date__range=(start, end),
+            drug_id__in=top_drug_ids,
             disease__isnull=False,
         )
-        .select_related('drug', 'disease')
-        .values('drug__drug_name', 'drug__generic_name',
-                'disease__name', 'disease__season')
+        .values('drug_id', 'disease_id')
         .annotate(
             total_quantity=Sum('quantity'),
             rx_count=Count('id'),
         )
-        .order_by('drug__drug_name')
     )
 
+    # Pre-fetch metadata
+    disease_ids = {row['disease_id'] for row in usage_qs}
+    
+    from analytics.models import Disease
+    from inventory.models import DrugMaster
+    
+    drug_map = {d.id: d for d in DrugMaster.objects.filter(id__in=top_drug_ids)}
+    disease_map = {d.id: d for d in Disease.objects.filter(id__in=disease_ids)}
+
     type_usage = defaultdict(lambda: defaultdict(lambda: {
-        'generic': '', 'season': '', 'qty': 0, 'rx': 0
+        'generic': '', 'season': '', 'qty': 0, 'rx': 0, 'strength': '', 'dosage': ''
     }))
 
     for row in usage_qs:
-        drug_name = row['drug__drug_name']
-        dtype     = get_disease_type(row['disease__name'])
+        drug = drug_map.get(row['drug_id'])
+        disease = disease_map.get(row['disease_id'])
+        
+        if not drug or not disease:
+            continue
+            
+        drug_name = drug.drug_name
+        dtype     = get_disease_type(disease.name)
         entry     = type_usage[drug_name][dtype]
-        entry['generic'] = row['drug__generic_name'] or ''
-        entry['season']  = row['disease__season']
+        
+        entry['generic'] = drug.generic_name or ''
+        entry['season']  = disease.season
         entry['qty']    += row['total_quantity'] or 0
         entry['rx']     += row['rx_count'] or 0
+        entry['strength'] = drug.drug_strength
+        entry['dosage']   = drug.dosage_type
 
     results = []
-    for drug_name, disease_map in type_usage.items():
-        for dtype, data in disease_map.items():
+    for drug_name, disease_map_obj in type_usage.items():
+        for dtype, data in disease_map_obj.items():
             total_cases = case_map.get(dtype, 1) or 1
             results.append({
                 'drug_name':          drug_name,
                 'generic_name':       data['generic'],
+                'drug_strength':      data['strength'],
+                'dosage_type':        data['dosage'],
                 'disease_name':       dtype,
                 'season':             data['season'],
                 'total_quantity':     data['qty'],

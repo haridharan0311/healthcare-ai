@@ -48,7 +48,8 @@ from .restock_calculator import (
     BASE_SAFETY_BUFFER,
     MAX_SAFETY_BUFFER
 )
-from .spike_detector import get_seasonal_weight, detect_spike
+from .timeseries import get_seasonal_weight
+from .spike_detection import detect_spike_logic as detect_spike
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 

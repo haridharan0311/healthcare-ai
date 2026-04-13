@@ -44,7 +44,8 @@ from .ml_engine import (
     predict_demand,
     time_decay_weight
 )
-from .spike_detector import get_seasonal_weight
+from .timeseries import get_seasonal_weight
+from .spike_detection import detect_spike_logic as detect_spike
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 
@@ -395,7 +396,7 @@ class ForecastingService:
                 if 'error' not in forecast:
                     results.append(forecast)
             
-            return results
+            return sorted(results, key=lambda x: -x['total'])
         
         except Exception as e:
             self.logger.error(
@@ -403,3 +404,46 @@ class ForecastingService:
                 exception=e
             )
             return []
+
+    def forecast_stock_depletion(self, drug_name: str, days: int = 14) -> Dict:
+        """
+        FEATURE 4: Stock Depletion Forecast.
+        Forecasts when medicine stock will hit 0 based on current usage trends.
+        Aggregates across all clinics for a professional system-wide view.
+        """
+        try:
+            # Aggregate current stock across clinics
+            stock_data = DrugMaster.objects.filter(drug_name=drug_name).aggregate(
+                total_stock=Sum('current_stock')
+            )
+            current_stock = stock_data['total_stock'] or 0
+            
+            # Get usage in the specified days window
+            end_date = date.today()
+            start_date = end_date - timedelta(days=days)
+            
+            usage_sum = PrescriptionLine.objects.filter(
+                prescription_date__range=(start_date, end_date),
+                drug__drug_name=drug_name
+            ).aggregate(total=Sum('quantity'))['total'] or 0
+            
+            avg_daily_usage = usage_sum / max(days, 1)
+            
+            if avg_daily_usage <= 0:
+                days_left = 999
+                status = "stable"
+            else:
+                days_left = current_stock / avg_daily_usage
+                status = "critical" if days_left < 7 else "low" if days_left < 14 else "sufficient"
+                
+            return {
+                'drug_name': drug_name,
+                'current_stock': current_stock,
+                'avg_daily_usage': round(avg_daily_usage, 2),
+                'days_until_depletion': round(days_left, 1),
+                'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
+                'status': status,
+                'analysis_period_days': days
+            }
+        except Exception as e:
+            return {'error': str(e)}

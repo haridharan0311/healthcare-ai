@@ -4,6 +4,16 @@ from django.core.cache import cache
 from rest_framework.response import Response
 from django.db.models import Max
 from analytics.models import Appointment
+from ..services.aggregation import build_daily_list
+
+def _build_daily_list(daily_map_by_type, disease_type, start_date, end_date):
+    """
+    Adapter for legacy views using the 4-arg signature.
+    Fills zeros for missing days in a range.
+    """
+    daily_counts = daily_map_by_type.get(disease_type, {})
+    return build_daily_list(daily_counts, start_date, end_date)
+
 
 def cache_api_response(timeout=300):
     def decorator(view_func):
@@ -18,6 +28,7 @@ def cache_api_response(timeout=300):
             return response
         return wrapper
     return decorator
+
 
 GENERIC_MAP = {
     'Paracetamol':       'Acetaminophen',
@@ -76,10 +87,3 @@ def _get_date_range(request):
         days = 30
     return _get_db_date_range(days)
 
-def _build_daily_list(daily_by_dtype: dict, dtype: str, start: date, end: date) -> list:
-    counts = []
-    cursor = start
-    while cursor <= end:
-        counts.append(daily_by_dtype[dtype].get(cursor, 0))
-        cursor += timedelta(days=1)
-    return counts

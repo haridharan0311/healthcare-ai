@@ -53,6 +53,12 @@ class Appointment(models.Model):
 
     op_number = models.CharField(max_length=50, db_index=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['appointment_datetime', 'disease']),
+        ]
+
     def __str__(self):
         return f"{self.op_number} - {self.appointment_datetime}"
+
 

@@ -13,15 +13,12 @@ class AnalyticsConfig(AppConfig):
 
         def invalidate_analytics_cache(sender, **kwargs):
             """
-            New Feature 8: Cache invalidation on new appointment/prescription.
-            Clears all analytics cache keys so APIs return fresh data.
+            Granular cache invalidation instead of cache.clear().
+            Prevents the 'Death Loop' where background generation wipes performance.
             """
-            cache.delete_many([
-                'top_medicines_*',
-                'district_restock_*',
-            ])
-            # Pattern-based clear for versioned keys
-            cache.clear()
+            # cache.clear()  <-- REMOVED: Too aggressive, kills dashboard performance
+            cache.delete('platform_dashboard_data') # Targeted invalidation only
+            pass
 
         try:
             from core.models import Appointment
@@ -31,7 +28,10 @@ class AnalyticsConfig(AppConfig):
         except Exception:
             pass
         
-        # Start live data generator for development/debugging (not during tests)
+        # FIXED: Removed auto-starting generator from here. 
+        # Starting background threads in ready() causes deadlocks with Django's reloader.
+        # Use 'python manage.py generate_live_data' instead.
+        """
         if 'test' not in sys.argv:
             try:
                 from .utils.live_data_generator import start_live_data_generator
@@ -39,3 +39,4 @@ class AnalyticsConfig(AppConfig):
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f'Failed to start live data generator: {e}')
+        """

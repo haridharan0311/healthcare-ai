@@ -74,6 +74,8 @@ class SpikeAlertSerializer(serializers.Serializer):
     std_dev = serializers.FloatField()
     threshold = serializers.FloatField()
     is_spike = serializers.BooleanField()
+    confidence = serializers.FloatField(required=False, default=0.0)
+
 
 
 class RestockSuggestionSerializer(serializers.Serializer):
