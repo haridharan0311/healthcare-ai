@@ -35,9 +35,10 @@ export default function Dashboard() {
     fetchPlatformStats(30).then(res => {
       const health = res.data || {};
       setSummaryToday({
-         total_today: Math.round((health.total_appointments || 0) / 30),
-         by_disease: [], // Filled by trends soon
-         date: 'Daily Avg'
+         total_today: health.total_today || 0,
+         total_last_30_days: health.total_last_30_days || 0,
+         by_disease: [],
+         date: 'As of Today'
       });
       setSummaryLoaded(true);
     }).catch(err => console.error(err));
@@ -53,7 +54,7 @@ export default function Dashboard() {
       if (diseases.length > 0) {
         setSummaryToday(prev => ({
           ...prev,
-          by_disease: [{ disease: diseases[0].name, count: diseases[0].count / 30 }]
+          by_disease: [{ disease: diseases[0].name, count: Math.round(diseases[0].count / 30) }]
         }));
       }
     }).catch(err => console.error(err));
@@ -81,7 +82,7 @@ export default function Dashboard() {
       setSeasonality({ seasons: res.data?.seasons || res.data?.seasonal_patterns || {} });
     }).catch(err => console.error(err));
 
-    fetchDoctorTrends(30, 4).then(res => {
+    fetchDoctorTrends(30, 3).then(res => {
       const data = res.data?.data || res.data || [];
       setDoctorTrends(data);
       setDoctorSummary({
@@ -178,12 +179,12 @@ export default function Dashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{
                   width: 8, height: 8, borderRadius: '50%',
-                  background: simStatus.running ? '#22c55e' : '#94a3b8',
-                  boxShadow: simStatus.running ? '0 0 8px #22c55e' : 'none',
-                  animation: simStatus.running ? 'pulse 2s infinite' : 'none'
+                  background: '#94a3b8',
+                  boxShadow: 'none',
+                  animation: 'none'
                 }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {simStatus.running ? 'Live Gen Active' : 'Simulator Off'}
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Live Gen Disabled
                 </span>
               </div>
 
@@ -191,29 +192,27 @@ export default function Dashboard() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <select 
+                  disabled
                   value={simStatus.interval}
-                  onChange={(e) => handleIntervalChange(e.target.value)}
                   style={{
                     background: 'transparent', border: 'none', fontSize: 12, fontWeight: 600,
-                    color: '#1e293b', outline: 'none', cursor: 'pointer'
+                    color: '#94a3b8', outline: 'none', cursor: 'not-allowed'
                   }}
                 >
                   <option value={30}>30s</option>
-                  <option value={60}>60s</option>
-                  <option value={90}>90s</option>
-                  <option value={120}>120s</option>
                 </select>
                 
                 <button 
-                  onClick={handleToggleSimulator}
+                  disabled
+                  title="Temporarily Disabled"
                   style={{
-                    background: simStatus.running ? '#ef4444' : '#2563eb',
-                    color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6,
-                    fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                    background: '#e2e8f0',
+                    color: '#94a3b8', border: 'none', padding: '4px 12px', borderRadius: 6,
+                    fontSize: 11, fontWeight: 700, cursor: 'not-allowed', transition: 'all 0.2s',
                     textTransform: 'uppercase'
                   }}
                 >
-                  {simStatus.running ? 'Stop' : 'Start'}
+                  Start
                 </button>
               </div>
             </div>
@@ -231,7 +230,7 @@ export default function Dashboard() {
         
         {/* Welcome Section */}
         <div style={{ marginBottom: 40 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.75px', color: '#0f172a' }}>Intelligence Dashboard</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.75px', color: '#0f172a' }}>Analytics Dashboard</h1>
           <p style={{ margin: 0, color: '#64748b', fontSize: 16, fontWeight: 500 }}>Real-time epidemiological monitoring & inventory analysis</p>
         </div>
 
@@ -244,7 +243,7 @@ export default function Dashboard() {
           {/* Medicines */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Top Medicines</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Priority Pharmacy Stock</div>
               <span style={{ fontSize: 20 }}>💊</span>
             </div>
             {!medicinesLoaded ? (
@@ -252,7 +251,7 @@ export default function Dashboard() {
                  <div className="spinner" />
                  Analyzing 2.8M rows...
                </div>
-            ) : topMedicines.slice(0, 4).map((m, i) => (
+            ) : topMedicines.slice(0, 3).map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{m.drug_name}</div>
@@ -269,10 +268,10 @@ export default function Dashboard() {
           {/* Doctor Activity */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Doctor Load</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Specialist Utility Map</div>
               <span style={{ fontSize: 20 }}>👨‍⚕️</span>
             </div>
-            {doctorTrends.slice(0, 4).map((d, i) => (
+            {doctorTrends.slice(0, 3).map((d, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{d.doctor_name}</div>
@@ -291,7 +290,7 @@ export default function Dashboard() {
           {/* Seasonal Trends */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Seasonality</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Regional Wellness Patterns <span style={{fontSize: 10, opacity: 0.7}}>(Last 30 Days)</span></div>
               <span style={{ fontSize: 20 }}>🌍</span>
             </div>
             {Object.entries(seasonality.seasons || {}).slice(0, 3).map(([k, v]) => (

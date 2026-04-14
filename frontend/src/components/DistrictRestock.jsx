@@ -64,8 +64,8 @@ export default function DistrictRestock({ days, onExport }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Inventory Optimization</h2>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Stock replenishment suggestions by district coverage</div>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Supply Chain Forecast</h2>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Strategic Pharmacy Replenishment Suggestions</div>
         </div>
         <button
           onClick={onExport}
@@ -87,7 +87,7 @@ export default function DistrictRestock({ days, onExport }) {
             fontSize: 14, fontWeight: 600, background: '#f8fafc', minWidth: 200, outline: 'none'
           }}
         >
-          <option value="">{districtLoading ? 'Loading...' : 'Select District'}</option>
+          <option value="">{districtLoading ? 'Loading...' : 'Select Clinic'}</option>
           {districts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
 
@@ -134,7 +134,7 @@ export default function DistrictRestock({ days, onExport }) {
             <thead>
               <tr style={{ borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#94a3b8', textTransform: 'uppercase' }}>
                 <th onClick={() => handleSort('drug_name')} style={{ padding: 12, cursor: 'pointer' }}>Medicine</th>
-                <th style={{ padding: 12 }}>Clinics</th>
+                <th style={{ padding: 12 }}>Distribution</th>
                 <th onClick={() => handleSort('current_stock')} style={{ padding: 12, textAlign: 'right', cursor: 'pointer' }}>Stock</th>
                 <th onClick={() => handleSort('predicted_demand')} style={{ padding: 12, textAlign: 'right', cursor: 'pointer' }}>Demand</th>
                 <th onClick={() => handleSort('suggested_restock')} style={{ padding: 12, textAlign: 'right', cursor: 'pointer' }}>Suggestion</th>

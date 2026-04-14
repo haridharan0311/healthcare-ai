@@ -241,10 +241,17 @@ class ExportRestockView(APIView):
         total_clinics = Clinic.objects.count() or 1
 
         active_drugs = set(avg_usage_map.keys())
+        district_filter = request.query_params.get('district') # This is actually the Clinic Name now
+        
+        grouped_qs = DrugMaster.objects.select_related('clinic').filter(
+            Q(drug_name__in=active_drugs) | Q(current_stock__lt=10)
+        )
+        
+        if district_filter:
+            grouped_qs = grouped_qs.filter(clinic__clinic_name__icontains=district_filter.strip())
+
         grouped = (
-            DrugMaster.objects
-            .select_related('clinic')
-            .filter(Q(drug_name__in=active_drugs) | Q(current_stock__lt=10))
+            grouped_qs
             .values('drug_name', 'generic_name', 'drug_strength', 'dosage_type',
                     'clinic__clinic_name', 'clinic__clinic_address_1')
             .annotate(

@@ -208,21 +208,12 @@ class DistrictRestockView(APIView):
         clinic_ids = []
 
         if not district_filter:
-            district_addresses = DrugMaster.objects.select_related('clinic').values_list(
-                'clinic__clinic_address_1', flat=True
-            ).distinct()
-
-            all_districts = {
-                _extract_district(addr) for addr in district_addresses
-            }
-
-            if not all_districts or all_districts == {'Unknown'}:
-                clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
-                all_districts = set(clinics)
+            # We list all Clinics now, not Districts
+            all_clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
 
             return Response({
-                'districts': sorted(all_districts),
-                'total':     len(all_districts),
+                'districts': sorted(all_clinics),
+                'total':     len(all_clinics),
             })
 
         # Shared demand computation - optimize with select_related
@@ -258,10 +249,9 @@ class DistrictRestockView(APIView):
         district_search = None
         clinic_ids = []
         if district_filter:
-            district_search = district_filter.strip()
             clinic_ids = list(
                 Clinic.objects
-                .filter(clinic_address_1__icontains=district_search)
+                .filter(clinic_name__icontains=district_filter.strip())
                 .values_list('id', flat=True)
             )
             if not clinic_ids:
@@ -335,12 +325,12 @@ class DistrictRestockView(APIView):
             combined  = apply_multi_disease_contribution(demands) if demands else 0.0
             return round(combined * avg_usage * 1.2, 2), contributing
 
-        if district_filter and selected_drug_names:
+        if district_filter:
             drug_qs = (
                 DrugMaster.objects
                 .filter(
                     drug_name__in=selected_drug_names,
-                    clinic__clinic_address_1__icontains=district_search,
+                    clinic__id__in=clinic_ids,
                 )
                 .select_related('clinic')
                 .values(
@@ -366,11 +356,10 @@ class DistrictRestockView(APIView):
         district_drug = defaultdict(lambda: defaultdict(lambda: {
             'generic_name': '', 'total_stock': 0, 'clinic_count': 0
         }))
-        all_districts = set()
 
         for row in drug_qs:
-            district = _extract_district(row['clinic__clinic_address_1'])
-            all_districts.add(district)
+            # Now "district" is actually the CLINIC NAME
+            district = row['clinic__clinic_name']
 
             if district_filter and district.lower() != district_filter.lower():
                 continue

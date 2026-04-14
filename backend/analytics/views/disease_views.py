@@ -305,9 +305,11 @@ class DoctorWiseTrendsView(APIView):
     def get(self, request):
         start, end = _get_date_range(request)
         try:
-            min_cases = int(request.query_params.get('min_cases', 10))
+            min_cases = int(request.query_params.get('min_cases', 1))
+            limit     = int(request.query_params.get('limit', 3))
         except ValueError:
-            min_cases = 10
+            min_cases = 1
+            limit     = 3
 
         # Pure ORM aggregation — group by doctor + disease
         qs = (
@@ -325,8 +327,8 @@ class DoctorWiseTrendsView(APIView):
                 'disease__season',
             )
             .annotate(case_count=Count('id'))
-            .filter(case_count__gte=min_cases)   # ORM-level filter, not Python
-            .order_by('-case_count')
+            .filter(case_count__gte=min_cases)   # Lower threshold
+            .order_by('-case_count')[:limit]      # Limit output items
         )
 
         results = [
@@ -343,6 +345,7 @@ class DoctorWiseTrendsView(APIView):
         return Response({
             'period':     f'{start} to {end}',
             'min_cases':  min_cases,
+            'limit':      limit,
             'total_rows': len(results),
             'data':       results,
         })

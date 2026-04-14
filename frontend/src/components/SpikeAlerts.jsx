@@ -3,7 +3,7 @@ import { fetchSpikes } from '../api';
 
 export default function SpikeAlerts({ onExport }) {
   const [data,    setData]    = useState([]);
-  const [showAll, setShowAll] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Fixed 8-day range logic
@@ -31,7 +31,7 @@ export default function SpikeAlerts({ onExport }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Outbreak Detection</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>Active Outbreak Monitoring</h2>
           {spikes.length > 0 && (
             <span style={{ 
               background: '#fee2e2', color: '#dc2626', borderRadius: 20, 

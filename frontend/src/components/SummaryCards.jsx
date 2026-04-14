@@ -32,43 +32,43 @@ export default function SummaryCards({ days, summary = {} }) {
     );
   }
 
-  const totalPeriod = trends?.reduce((s, t) => s + (t.total_cases || 0), 0) || 0;
+  const totalPeriod = todaySummary?.total_last_30_days || trends?.reduce((s, t) => s + (t.total_cases || 0), 0) || 0;
   const spikeCount  = spikes?.length || 0;
   const topDis      = todaySummary?.by_disease?.[0] || { disease: '—', count: 0 };
 
   const cards = [
     {
-      label: 'Volume Today',
+      label: 'Daily Admissions',
       value: (todaySummary?.total_today || 0).toLocaleString(),
-      sub:   todaySummary?.date || 'Today',
+      sub:   'New patients today',
       color: COLORS.cases,
       icon: '📈'
     },
     {
-      label: `Total Cases`,
+      label: `Operational Throughput`,
       value: totalPeriod.toLocaleString(),
       sub:   `Last ${days} days`,
       color: COLORS.period,
       icon: '📊'
     },
     {
-      label: 'Outbreak Spikes',
+      label: 'Active Outbreaks',
       value: spikeCount,
-      sub:   'Critical alerts detected',
+      sub:   'Security alerts detected',
       color: COLORS.spikes,
       icon: '🚨'
     },
     {
-      label: 'Trend Leader',
+      label: 'Dominant Pathology',
       value: topDis.disease,
-      sub:   `${topDis.count} cases today`,
+      sub:   `Highest prevalence currently`,
       color: COLORS.disease,
       icon: '🦠'
     },
     {
-      label: 'Inventory Risks',
+      label: 'Pharmacy Resource Risks',
       value: ( (stockAlerts?.critical || 0) + (stockAlerts?.out_of_stock || 0) ).toLocaleString(),
-      sub:   `${stockAlerts?.critical || 0} items critical`,
+      sub:   `${stockAlerts?.critical || 0} items at high risk`,
       color: COLORS.inventory,
       icon: '📦'
     },

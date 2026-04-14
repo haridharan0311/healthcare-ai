@@ -1,4 +1,4 @@
-﻿"""
+"""
 IMPORT DATA COMMAND
 ===================
 Imports all database records from CSV files in the data/ folder.
@@ -188,6 +188,7 @@ class Command(BaseCommand):
                             generic_name=row["generic_name"],
                             drug_strength=row["drug_strength"],
                             dosage_type=row["dosage_type"],
+                            current_stock=int(row["current_stock"]),
                             clinic=clinic_map[int(row["clinic_id"])]
                         ))
                 DrugMaster.objects.bulk_create(drugs, batch_size=1000)
