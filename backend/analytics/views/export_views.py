@@ -347,7 +347,7 @@ class ExportReportView(APIView):
         writer.writerow(['RISING THREATS (Growth Analysis)'])
         writer.writerow(['Disease', 'Growth Rate (%)', 'Recent Cases', 'Status'])
         for t in insights['rising_trends']:
-            writer.writerow([t['disease'], t.get('growth_rate', 0), t.get('recent_cases', 0), 'High Growth' if t.get('growth_rate', 0) > 20 else 'Stable'])
+            writer.writerow([t['disease_name'], t.get('growth_rate', 0), t.get('recent_cases', 0), 'High Growth' if t.get('growth_rate', 0) > 20 else 'Stable'])
         writer.writerow([])
         
         # Section 4: Critical Resource & Stock Depletion

@@ -20,24 +20,64 @@ class DashboardService:
     @staticmethod
     def get_unified_dashboard(days: int = 30, forecast_days: int = 8) -> Dict[str, Any]:
         """
-        Coordinates multi-layer analysis to provide a high-level platform summary.
-        Flow: Decision Layer -> Predicition Layer -> Analytics Layer.
+        Coordinates multi-layer analysis with optimized data context.
+        Consolidates redundant scans into a single high-performance pass.
         """
-        logger.info(f"Generating tiered dashboard summary for last {days} days")
+        from analytics.models import Appointment
+        from django.db.models import Count
+        from ..services.aggregation import get_disease_type
+        from collections import defaultdict
+        
+        logger.info(f"Generating optimized tiered dashboard: last {days} days")
+        
+        # ─── DATA CONTEXT PREPARATION (THE PERFORMANCE FIX) ────────────
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days)
+        
+        # Single DB pass for all historical case counts
+        appt_qs = (
+            Appointment.objects
+            .filter(appointment_datetime__date__range=(start_date, end_date), disease__isnull=False)
+            .values('appointment_datetime__date', 'disease__name', 'disease__season')
+            .annotate(day_count=Count('id'))
+        )
+        daily_by_dtype = defaultdict(lambda: defaultdict(int))
+        dtype_season = {}
+        for row in appt_qs:
+            dtype = get_disease_type(row['disease__name'])
+            dtype_season[dtype] = row['disease__season']
+            daily_by_dtype[dtype][row['appointment_datetime__date']] += row['day_count']
+            
+        # Shared Context for Services
+        context = {
+            'daily_by_dtype': daily_by_dtype,
+            'dtype_season': dtype_season,
+            'start_date': start_date,
+            'end_date': end_date
+        }
         
         # 1. Prediction & Decision Layers (The "Insights")
         insights_service = InsightsService()
         forecasting = ForecastingService()
+        restock_service = RestockService()
         
-        strategic_insights = insights_service.get_actionable_insights(days=days)
+        # Pre-calculated buffer info (Feature 5) passed to all layers
+        buffer_info = restock_service.calculate_adaptive_buffer(
+            start_date, end_date, daily_by_disease=daily_by_dtype
+        )
+        context['buffer_info'] = buffer_info
+        
+        strategic_insights = insights_service.get_actionable_insights(
+            days=days, precalculated_context=context
+        )
         
         # 2. Disease Highlights (Analytics + Prediction)
         top_disease_forecasts = forecasting.forecast_all_diseases(days_ahead=forecast_days)
         
         # 3. Decision Support (Medicine/Restock)
-        # Using modular restock service instead of Raw SQL logic
-        restock_service = RestockService()
-        restock_suggestions = restock_service.calculate_restock_suggestions()
+        restock_suggestions = restock_service.calculate_restock_suggestions(
+            start_date, end_date, precalculated_context=context
+        )
         
         # Format for Dashboard UI compatibility
         decisions = []

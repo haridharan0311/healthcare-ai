@@ -367,42 +367,72 @@ class ForecastingService:
     ) -> List[Dict]:
         """
         Generate forecasts for all active diseases.
-        
-        Args:
-            days_ahead: Forecast horizon
-        
-        Returns:
-            List of disease forecasts
+        Optimized: Uses a single bulk aggregation query to avoid N+1 issues.
         """
         try:
-            # Get all active diseases from recent appointments
-            qs = (
+            # 1. Identify top 20 diseases by volume in last 30 days
+            limit_date = date.today() - timedelta(days=30)
+            top_names_qs = (
                 Appointment.objects
                 .filter(
-                    appointment_datetime__date__gte=(date.today() - timedelta(days=30)),
+                    appointment_datetime__date__gte=limit_date,
                     disease__isnull=False,
                     disease__is_active=True
                 )
-                .select_related('disease')
                 .values('disease__name')
                 .annotate(total=Count('id'))
-                .order_by('-total')
+                .order_by('-total')[:20]
             )
             
+            top_names = [row['disease__name'] for row in top_names_qs]
+            if not top_names:
+                return []
+
+            # 2. Bulk fetch historical daily counts for these diseases
+            historical_qs = (
+                Appointment.objects
+                .filter(
+                    appointment_datetime__date__gte=limit_date,
+                    disease__name__in=top_names
+                )
+                .annotate(day=TruncDate('appointment_datetime'))
+                .values('day', 'disease__name')
+                .annotate(count=Count('id'))
+            )
+
+            # 3. Process in memory to avoid 20+ DB hits
+            # Map of { DiseaseType -> { Date -> Count } }
+            disease_daily_map = defaultdict(lambda: defaultdict(int))
+            disease_metadata = {} # Cache for season etc if needed, though get_disease_type is enough
+            
+            for row in historical_qs:
+                dtype = get_disease_type(row['disease__name'])
+                disease_daily_map[dtype][row['day']] += row['count']
+
             results = []
-            for row in qs[:20]:  # Top 20 diseases
-                disease = get_disease_type(row['disease__name'])
-                forecast = self.forecast_next_period(disease, days_ahead)
-                if 'error' not in forecast:
-                    results.append(forecast)
+            for dtype, date_map in disease_daily_map.items():
+                # Build time series
+                counts = [date_map.get(limit_date + timedelta(days=i), 0) for i in range(31)]
+                total = sum(counts)
+                
+                # Prediction logic
+                forecast_val = moving_average_forecast(counts)
+                trend_score = weighted_trend_score(sum(counts[-7:]), sum(counts[:-7]))
+                
+                results.append({
+                    'disease_name': dtype,
+                    'forecast_value': round(forecast_val, 1),
+                    'trend': 'rising' if trend_score > 20 else 'stable',
+                    'days_ahead': days_ahead,
+                    'historical_avg': round(sum(counts)/max(len(counts), 1), 1),
+                    'total': sum(counts),
+                    'trend_score': round(trend_score, 2)
+                })
             
             return sorted(results, key=lambda x: -x['total'])
         
         except Exception as e:
-            self.logger.error(
-                "All disease forecasting failed",
-                exception=e
-            )
+            self.logger.error("Bulk disease forecasting failed", exception=e)
             return []
 
     def forecast_stock_depletion(self, drug_name: str, days: int = 14) -> Dict:

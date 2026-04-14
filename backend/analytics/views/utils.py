@@ -73,10 +73,17 @@ def _extract_district(address: str) -> str:
     return parts[4].strip() if len(parts) >= 5 else 'Unknown'
 
 def _get_db_date_range(days: int = 30):
-    latest = Appointment.objects.aggregate(
-        latest=Max('appointment_datetime')
-    )['latest']
-    end   = latest.date() if latest else date.today()
+    cache_key = 'latest_appointment_date'
+    latest_dt = cache.get(cache_key)
+    
+    if latest_dt is None:
+        latest_dt = Appointment.objects.aggregate(
+            latest=Max('appointment_datetime')
+        )['latest']
+        if latest_dt:
+            cache.set(cache_key, latest_dt, 1800)  # Cache for 30 minutes
+            
+    end   = latest_dt.date() if latest_dt else date.today()
     start = end - timedelta(days=days)
     return start, end
 

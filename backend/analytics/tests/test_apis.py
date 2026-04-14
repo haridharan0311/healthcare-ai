@@ -279,3 +279,53 @@ class AnalyticsCoverageAPITestCase(TestCase):
         self.assertIsInstance(data, dict)
         self.assertIn('out_of_stock', data)
 
+    def test_platform_dashboard_endpoint(self):
+        """Tiered Architecture Dashboard test."""
+        response = self.client.get('/api/insights/platform-dashboard/?days=30&forecast_days=7')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertIn('health_analytics', data['data'])
+        self.assertIn('insights', data['data'])
+
+    def test_insights_summary_endpoint(self):
+        """Decision Layer Summary test."""
+        response = self.client.get('/api/insights/summary/?days=30')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertIn('insights', data)
+        self.assertIn('recommendations', data['insights'])
+
+    def test_unified_alerts_endpoint(self):
+        """Unified Alert Stream test."""
+        response = self.client.get('/api/insights/alerts/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertIn('alerts', data)
+        self.assertIsInstance(data['alerts'], list)
+
+    def test_intelligent_report_export(self):
+        """Intelligent Reporting System CSV test."""
+        response = self.client.get('/api/export-report/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv')
+        content = response.content.decode('utf-8')
+        self.assertIn('DECISION SUPPORT SUMMARY', content)
+        self.assertIn('STRATEGIC RECOMMENDATIONS', content)
+
+    def test_api_parameters_days_validation(self):
+        """Test with different 'days' parameters."""
+        test_days = [1, 7, 30, 90]
+        for d in test_days:
+            response = self.client.get(f'/api/disease-trends/?days={d}')
+            self.assertEqual(response.status_code, 200, f"Failed for days={d}")
+
+    def test_api_parameters_invalid_days(self):
+        """Test with invalid 'days' parameter."""
+        # The view should handle error gracefully or use default
+        response = self.client.get('/api/disease-trends/?days=invalid')
+        # Based on my previous view check, it uses a default if ValueError occurs
+        self.assertEqual(response.status_code, 200)
+

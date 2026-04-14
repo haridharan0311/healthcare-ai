@@ -27,22 +27,32 @@ class InsightsService:
         self.restock = RestockService()
         self.usage_intel = UsageIntelligence()
 
-    def get_actionable_insights(self, days: int = 30) -> Dict[str, Any]:
+    def get_actionable_insights(self, days: int = 30, precalculated_context: Optional[Dict] = None) -> Dict[str, Any]:
         """
-        FEATURE 9, 10: Generate structured actionable insights across all levels.
+        FEATURE 9, 10: Generate structured actionable insights.
+        Optimized: Uses precalculated context to avoid 3x redundant scans.
         """
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
+        ctx = precalculated_context or {}
 
         # 1. Outbreak Alerts (Feature 2, 8)
-        outbreaks = self._detect_active_outbreaks(start_date, end_date)
+        if 'outbreaks' in ctx:
+            outbreaks = ctx['outbreaks']
+        else:
+            outbreaks = self._detect_active_outbreaks(start_date, end_date, context=ctx)
 
         # 2. Rising Threats (Feature 1: Growth Rate)
         growth_trends = self._calculate_growth_rates(days)
 
         # 3. Critical Resource Decisions (Feature 4, 5, 8)
         stock_alerts = self.usage_intel.get_stock_alerts()
-        buffer_info = self.restock.calculate_adaptive_buffer(start_date, end_date)
+        
+        if 'buffer_info' in ctx:
+            buffer_info = ctx['buffer_info']
+        else:
+            daily_by_dtype = ctx.get('daily_by_dtype')
+            buffer_info = self.restock.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype)
 
         return {
             'outbreaks': outbreaks,
@@ -109,13 +119,20 @@ class InsightsService:
         PRIO_MAP = {'Critical': 0, 'High': 1, 'Warning': 2, 'normal': 3}
         return sorted(alerts, key=lambda x: PRIO_MAP.get(x['priority'], 9))
 
-    def _detect_active_outbreaks(self, start: date, end: date) -> List[Dict]:
+    def _detect_active_outbreaks(self, start: date, end: date, context: Optional[Dict] = None) -> List[Dict]:
         """Detect diseases shows continuous upward trends or significant spikes."""
-        daily_map = aggregate_daily_counts(start, end)
+        ctx = context or {}
+        if 'daily_by_dtype' in ctx:
+            daily_map = ctx['daily_by_dtype']
+        else:
+            daily_map = aggregate_daily_counts(start, end)
+        
         outbreaks = []
-
         for dtype, data in daily_map.items():
-            daily_list = [data['daily'].get(start + timedelta(days=i), 0) for i in range((end - start).days + 1)]
+            # Handle both aggregate_daily_counts format and our custom context format
+            daily_dict = data.get('daily', data) if isinstance(data, dict) else data
+            daily_list = [daily_dict.get(start + timedelta(days=i), 0) for i in range((end - start).days + 1)]
+            
             if len(daily_list) < 7: continue
 
             spike_info = detect_spike(daily_list)
@@ -135,21 +152,31 @@ class InsightsService:
         return self.usage_intel.get_all_disease_trends(days=days)
 
     def _generate_strategic_recommendations(self, outbreaks, trends, stock, buffer) -> List[str]:
-        """Feature 10: Logical inference for actionable steps."""
-        actions = []
+        """
+        FEATURE 10: Logical inference for actionable steps.
+        Optimized: Declarative rule-based engine for better readability and scaling.
+        """
+        recommendations = []
         
+        # Rule 1: Outbreak response
         if outbreaks:
-            actions.append(f"Deploy emergency resources for {', '.join([o['disease'] for o in outbreaks[:2]])}.")
-        
-        if buffer['adaptive_buffer'] > 1.4:
-            actions.append(f"System-wide risk level is {buffer['interpretation'].upper()}. Increase safety buffers to {buffer['adaptive_buffer']}.")
-        
-        top_growth = [t['disease'] for t in trends if t.get('growth_rate', 0) > 20]
+            names = [o['disease'] for o in outbreaks[:2]]
+            recommendations.append(f"Deploy emergency resources for {', '.join(names)}.")
+            
+        # Rule 2: Adaptive Buffer adjustment
+        if buffer.get('adaptive_buffer', 0) > 1.4:
+            level = buffer.get('interpretation', 'unknown').upper()
+            val = buffer.get('adaptive_buffer')
+            recommendations.append(f"System-wide risk level is {level}. Increase safety buffers to {val}.")
+            
+        # Rule 3: Proactive restock for high-growth diseases
+        top_growth = [t['disease_name'] for t in trends if t.get('growth_rate', 0) > 20]
         if top_growth:
-            actions.append(f"Proactively restock medicines for fast-growing diseases: {', '.join(top_growth[:3])}.")
-
-        critical_stock = [s['drug_name'] for s in stock if s['status'] == 'critical']
-        if critical_stock:
-            actions.append(f"CRITICAL: Immediate restock required for {', '.join(critical_stock[:3])}.")
-
-        return actions
+            recommendations.append(f"Proactively restock medicines for fast-growing diseases: {', '.join(top_growth[:3])}.")
+            
+        # Rule 4: Immediate stockouts
+        critical_drugs = [s['drug_name'] for s in stock if s.get('status') == 'critical']
+        if critical_drugs:
+            recommendations.append(f"CRITICAL: Immediate restock required for {', '.join(critical_drugs[:3])}.")
+            
+        return recommendations

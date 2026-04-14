@@ -47,78 +47,67 @@ class DiseaseTrendView(APIView):
     No Python loops for aggregation. Uses select_related for performance.
     Supports date filtering via ?days= param.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)
     def get(self, request):
         start, end    = _get_date_range(request)
         current_month = date.today().month
         mid           = end - timedelta(days=7)
 
-        # ORM aggregation — recent window (last 7 days)
-        recent_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(mid, end),
-                disease__isnull=False,
-                disease__is_active=True,
+        # 1. ORM aggregation for both periods
+        # We can actually do this in one query using Case/When but
+        # two optimized QuerySets are often more readable and performant with indices.
+        
+        def get_aggregates(date_start, date_end, label):
+            return (
+                Appointment.objects
+                .filter(
+                    appointment_datetime__date__range=(date_start, date_end),
+                    disease__isnull=False,
+                    disease__is_active=True,
+                )
+                .values('disease__name', 'disease__season', 'disease__category', 'disease__severity')
+                .annotate(count=Count('id'))
             )
-            .select_related('disease')
-            .values('disease__name', 'disease__season',
-                    'disease__category', 'disease__severity')
-            .annotate(recent_count=Count('id'))
-        )
 
-        # ORM aggregation — older window
-        older_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, mid),
-                disease__isnull=False,
-                disease__is_active=True,
-            )
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(older_count=Count('id'))
-        )
+        recent_qs = get_aggregates(mid, end, 'recent')
+        older_qs = get_aggregates(start, mid, 'older')
 
-        older_map = {
-            get_disease_type(r['disease__name']): r['older_count']
-            for r in older_qs
-        }
-
-        # Build result — no loops for DB aggregation
-        type_data = defaultdict(lambda: {
-            'season': 'All', 'category': '', 'severity': 1,
-            'recent': 0, 'older': 0
+        # 2. Build combined map
+        # Use a single pass merge
+        combined = defaultdict(lambda: {
+            'recent': 0, 'older': 0, 'season': 'All', 'category': '', 'severity': 1
         })
 
         for row in recent_qs:
             dtype = get_disease_type(row['disease__name'])
-            type_data[dtype]['season']   = row['disease__season']
-            type_data[dtype]['category'] = row['disease__category'] or ''
-            type_data[dtype]['severity'] = row['disease__severity']
-            type_data[dtype]['recent']  += row['recent_count']
-            type_data[dtype]['older']   += older_map.get(dtype, 0)
+            d = combined[dtype]
+            d['recent'] += row['count']
+            d['season'] = row['disease__season']
+            d['category'] = row['disease__category'] or ''
+            d['severity'] = row['disease__severity']
 
-        if not type_data:
+        for row in older_qs:
+            dtype = get_disease_type(row['disease__name'])
+            combined[dtype]['older'] += row['count']
+
+        if not combined:
             return Response([])
 
+        # 3. Final Score Calculation
         results = []
-        for dtype, data in type_data.items():
-            sw    = get_seasonal_weight(data['season'], current_month)
-            score = round(
-                weighted_trend_score(data['recent'], data['older']) * sw, 2
-            )
+        for dtype, data in combined.items():
+            sw = get_seasonal_weight(data['season'], current_month)
+            score = round(weighted_trend_score(data['recent'], data['older']) * sw, 2)
             results.append({
-                'disease_name':    dtype,
-                'season':          data['season'],
-                'total_cases':     data['recent'] + data['older'],
-                'trend_score':     score,
+                'disease_name': dtype,
+                'season': data['season'],
+                'total_cases': data['recent'] + data['older'],
+                'trend_score': score,
                 'seasonal_weight': sw,
             })
 
         results.sort(key=lambda x: x['trend_score'], reverse=True)
-        serializer = DiseaseTrendSerializer(results, many=True)
-        return Response(serializer.data)
+        return Response(results)
 
 
 # ─── 1.2 Time-Series Aggregation → Time-Series API ───────────────────────────
@@ -133,50 +122,53 @@ class TimeSeriesView(APIView):
     Groups by disease. Supports last 7 / 30 days via ?days= param.
     Uses ORM aggregation — no Python loops.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)
     def get(self, request):
         start, end     = _get_date_range(request)
         disease_filter = request.query_params.get('disease', None)
 
-        # TruncDate for date grouping — pure ORM
+        # 1. ORM Grouping by date and name
+        # We don't need select_related('disease') if we only need disease__name
         qs = (
             Appointment.objects
             .filter(
                 appointment_datetime__date__range=(start, end),
                 disease__isnull=False,
             )
-            .select_related('disease')
             .annotate(appt_date=TruncDate('appointment_datetime'))
             .values('appt_date', 'disease__name')
             .annotate(case_count=Count('id'))
-            .order_by('appt_date', 'disease__name')
+            .order_by('appt_date')
         )
 
         if disease_filter:
             qs = qs.filter(disease__name__icontains=disease_filter)
 
-        # Group by disease TYPE (strip numbers) per date
-        # Use dict to merge "Flu 1", "Flu 2" etc into single "Flu" per date
+        # 2. Tight Python grouping for disease type normalization
+        # We combine "Flu 1", "Flu 2" -> "Flu"
         counts = defaultdict(int)
         for row in qs:
             dtype = get_disease_type(row['disease__name'])
-            key   = (row['appt_date'], dtype)
-            counts[key] += row['case_count']
+            counts[(row['appt_date'], dtype)] += row['case_count']
 
         if not counts:
             return Response([])
 
+        # 3. Efficient result construction
+        # Sorting at the end is usually faster than constant dict re-ordering
+        sorted_keys = sorted(counts.keys())
+        
         results = [
             {
-                'date':         d.isoformat() if hasattr(d, 'isoformat') else str(d),
+                'date': d.isoformat() if hasattr(d, 'isoformat') else str(d),
                 'disease_name': name,
-                'case_count':   count,
+                'case_count': count,
             }
-            for (d, name), count in sorted(counts.items())
+            for (d, name) in sorted_keys
+            if (count := counts[(d, name)])
         ]
 
-        serializer = TimeSeriesPointSerializer(results, many=True)
-        return Response(serializer.data)
+        return Response(results)
 
 
 # ─── 1.3 Medicine Usage Aggregation → Medicine Usage API ─────────────────────
