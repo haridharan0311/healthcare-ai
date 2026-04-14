@@ -43,8 +43,15 @@ export const fetchStockDepletionForecast = (drugName, days = 30, forecastDays = 
     forecast_days: forecastDays,
   });
 export const fetchAdaptiveBuffer = (days = 30) => api('/adaptive-buffer/', { days });
-export const fetchPlatformDashboard = (days = 30, forecastDays = 14) => 
-  api('/insights/platform-dashboard/', { days, forecast_days: forecastDays });
+export const fetchPlatformStats     = (days = 30) => api('/dashboard/stats/', { days });
+export const fetchPlatformTrends    = (days = 30, forecastDays = 14) => 
+  api('/dashboard/trends/', { days, forecast_days: forecastDays });
+export const fetchPlatformMedicines = (days = 30) => api('/dashboard/medicines/', { days });
+
+// ── Simulator Control ─────────────────────────────────────────────────
+export const fetchSimulatorStatus = () => api('/simulator/toggle/');
+export const toggleSimulator = (action, interval = 30) => 
+  axios.post(`${BASE}/simulator/toggle/`, { action, interval });
 
 
 // ── CSV exports ───────────────────────────────────────────────────────

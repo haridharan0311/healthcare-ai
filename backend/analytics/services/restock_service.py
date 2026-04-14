@@ -184,35 +184,42 @@ class RestockService:
             # Adaptive buffer (Reuse if in context)
             if use_adaptive_buffer:
                 if 'buffer_info' in ctx:
-                    safety_buffer = ctx['buffer_info']['adaptive_buffer']
+                    safety_buffer = ctx['buffer_info'].get('adaptive_buffer', 0)
                 else:
                     buffer_info = self.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype)
-                    safety_buffer = buffer_info['adaptive_buffer']
+                    safety_buffer = buffer_info.get('adaptive_buffer', 0)
             else:
                 safety_buffer = BASE_SAFETY_BUFFER
 
             # ──── Step 2: Medicine usage patterns ────
-            # Performance Fix: Identify top medicines first to avoid scanning everything
-            top_medicines = ctx.get('top_medicines')
-            if not top_medicines:
-                # Get the top 100 most used drugs for the dashboard view to keep it snappy
-                top_medicines_qs = (
+            # Performance Fix: Identify top medicines first to leverage ID-based indexing
+            top_medicines_info = ctx.get('top_medicines_data')
+            if not top_medicines_info:
+                # 1. Fetch top drugs by ID for index hit
+                top_drugs_stats = (
                     PrescriptionLine.objects
                     .filter(prescription_date__range=(start_date, end_date))
-                    .values('drug__drug_name')
+                    .values('drug_id')
                     .annotate(total=Sum('quantity'))
                     .order_by('-total')[:100]
                 )
-                top_medicines = [m['drug__drug_name'] for m in top_medicines_qs]
+                top_ids = [d['drug_id'] for d in top_drugs_stats]
+                
+                # 2. Map IDs to Names/Stock in one go
+                top_drug_objs = DrugMaster.objects.filter(id__in=top_ids).values('id', 'drug_name')
+                top_medicines_info = {d['id']: d['drug_name'] for d in top_drug_objs}
 
+            top_ids = list(top_medicines_info.keys())
+            
+            # 3. Optimized ID-Based Query (Leverages Composite Index)
             qty_qs = (
                 PrescriptionLine.objects
                 .filter(
                     prescription_date__range=(start_date, end_date),
-                    drug__drug_name__in=top_medicines,
+                    drug_id__in=top_ids,
                     disease__isnull=False
                 )
-                .values('drug__drug_name', 'disease__name')
+                .values('drug_id', 'disease__name')
                 .annotate(total_qty=Sum('quantity'))
             )
             
@@ -224,7 +231,7 @@ class RestockService:
             disease_case_map = {dtype: sum(day_map.values()) for dtype, day_map in daily_by_dtype.items()}
 
             for row in qty_qs:
-                drug_name = row['drug__drug_name']
+                drug_name = top_medicines_info.get(row['drug_id'], "Unknown")
                 dtype = get_disease_type(row['disease__name'])
                 drug_qty_map[drug_name] += row['total_qty'] or 0
                 drug_cases_map[drug_name] += disease_case_map.get(dtype, 1)
@@ -244,11 +251,12 @@ class RestockService:
                     dtype_demand[dtype] = {'demand': demand, 'seasonal_weight': sw}
             
             # ──── Step 4: Calculate restock for selected drugs ────
-            stock_qs = DrugMaster.objects.filter(drug_name__in=top_medicines).values('drug_name').annotate(total_stock=Sum('current_stock'))
+            top_names = list(top_medicines_info.values())
+            stock_qs = DrugMaster.objects.filter(drug_name__in=top_names).values('drug_name').annotate(total_stock=Sum('current_stock'))
             stock_map = {r['drug_name']: r['total_stock'] for r in stock_qs}
             
             results = []
-            for drug_name in top_medicines:
+            for drug_name in top_names:
                 current_stock = stock_map.get(drug_name, 0) or 0
                 avg_usage = avg_usage_map.get(drug_name, 1.0)
                 contributing = list(drug_disease_map.get(drug_name, set()))

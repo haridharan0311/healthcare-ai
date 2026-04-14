@@ -59,11 +59,10 @@ class LiveDataGenerator:
         self.interval = getattr(settings, 'LIVE_DATA_INTERVAL', 60)
         self.enabled = getattr(settings, 'ENABLE_LIVE_DATA_GENERATOR', settings.DEBUG)
         
-    def start(self):
+    def start(self, interval=None):
         """Start the background data generation thread."""
-        if not self.enabled:
-            logger.info('Live data generator is disabled')
-            return
+        if interval:
+            self.interval = interval
             
         if self.running:
             logger.warning('Live data generator already running')
@@ -77,14 +76,21 @@ class LiveDataGenerator:
     def stop(self):
         """Stop the background thread."""
         self.running = False
-        if self.thread:
-            self.thread.join(timeout=5)
-        logger.info('Live data generator stopped')
+        # Don't join(timeout) here as it might block the main thread unnecessarily
+        logger.info('Live data generator stopping...')
     
+    def get_status(self):
+        """Return the current status of the generator."""
+        return {
+            'running': self.running and self.thread and self.thread.is_alive(),
+            'interval': self.interval,
+            'enabled': self.enabled
+        }
+
     def _run_loop(self):
-        """Main loop that generates data every N seconds."""
+        """Main loop that generates data every N seconds (dynamic interval)."""
         try:
-            time.sleep(5)  # Wait for Django to fully initialize
+            time.sleep(2)  # Short wait for startup
             
             while self.running:
                 try:
@@ -92,7 +98,12 @@ class LiveDataGenerator:
                 except Exception as e:
                     logger.error(f'Error generating live data: {e}', exc_info=True)
                 
-                time.sleep(self.interval)
+                # Sleep in small increments to respond faster to stop()
+                current_sleep = 0
+                while current_sleep < self.interval and self.running:
+                    time.sleep(1)
+                    current_sleep += 1
+                    
         except Exception as e:
             logger.error(f'Live data generator fatal error: {e}', exc_info=True)
             self.running = False

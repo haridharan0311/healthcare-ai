@@ -61,8 +61,8 @@ class InsightsService:
             'recommendations': self._generate_strategic_recommendations(outbreaks, growth_trends, stock_alerts, buffer_info),
             'metadata': {
                 'period_days': days,
-                'safety_buffer': buffer_info['adaptive_buffer'],
-                'risk_level': buffer_info['interpretation']
+                'safety_buffer': buffer_info.get('adaptive_buffer', 0),
+                'risk_level': buffer_info.get('interpretation', 'Unknown')
             }
         }
 

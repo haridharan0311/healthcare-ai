@@ -43,6 +43,13 @@ urlpatterns = [
     path('insights/platform-dashboard/', insight_views.AnalyticsPlatformDashboardView.as_view(), name='platform-dashboard'),
     path('insights/summary/',            insight_views.InsightsSummaryView.as_view(),            name='insights-summary'),
     path('insights/alerts/',             insight_views.UnifiedAlertView.as_view(),               name='insights-alerts'),
+    
+    # ── DECOUPLED DASHBOARD (Progressive Loading) ─────────────────────
+    path('dashboard/stats/',             views.dashboard_views.DashboardStatsView.as_view(),     name='dashboard-stats'),
+    path('dashboard/trends/',            views.dashboard_views.DashboardTrendsView.as_view(),    name='dashboard-trends'),
+    path('dashboard/medicines/',         views.dashboard_views.DashboardMedicinesView.as_view(), name='dashboard-medicines'),
+    
+    path('simulator/toggle/',            views.live_data_views.LiveDataToggleView.as_view(),    name='simulator-toggle'),
 
     # ── CRUD ───────────────────────────────────────────────────────────
     path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),

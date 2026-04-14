@@ -4,3 +4,5 @@ from .restock_views import RestockSuggestionView, DistrictRestockView, AdaptiveB
 from .spike_views import SpikeAlertView
 from .report_views import WeeklyReportView, MonthlyReportView, TodaySummaryView, WhatChangedTodayView
 from .export_views import ExportDiseaseTrendsView, ExportSpikeAlertsView, ExportRestockView, ExportReportView
+from . import live_data_views
+from . import dashboard_views

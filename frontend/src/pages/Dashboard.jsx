@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  fetchPlatformDashboard,
+  fetchPlatformStats,
+  fetchPlatformTrends,
+  fetchPlatformMedicines,
   getExportUrl,
   fetchSeasonality,
-  fetchDoctorTrends
+  fetchDoctorTrends,
+  fetchSimulatorStatus,
+  toggleSimulator
 } from '../api';
 
 import TrendChart       from '../components/TrendChart';
@@ -24,38 +28,54 @@ export default function Dashboard() {
   const [seasonality, setSeasonality]     = useState({});
   const [doctorTrends, setDoctorTrends]   = useState([]);
   const [doctorSummary, setDoctorSummary] = useState({});
+  const [simStatus, setSimStatus]         = useState({ running: false, interval: 30 });
+  const [medicinesLoaded, setMedicinesLoaded] = useState(false);
   const loadAllData = useCallback(() => {
-    fetchPlatformDashboard(30, 8)
-      .then(res => {
-        const payload = res.data?.data || {};
-        const health  = payload.health_analytics || {};
-        const topDiseases = payload.top_diseases || [];
-        const forecasts = payload.forecasts || [];
-        const decisions = payload.decisions || [];
-
-        setSummaryTrends(topDiseases.map(d => ({ ...d, total_cases: d.count })));
-        setSummarySpikes(forecasts);
-        setSummaryToday({
-           total_today: Math.round((health.total_appointments || 0) / 30),
-           by_disease: topDiseases.length > 0 ? [{ disease: topDiseases[0].name, count: topDiseases[0].count }] : [],
-           date: 'Daily Avg'
-        });
-        setLowStock({
-           critical: decisions.filter(d => d.priority === 'High').length,
-           out_of_stock: decisions.filter(d => d.current_stock === 0).length
-        });
-        setTopMedicines(decisions.map(d => ({
-           drug_name: d.drug,
-           generic_name: `Restock: ${d.recommended_restock} (${d.status})`,
-           total_quantity: d.current_stock
-        })));
-        
-        setSummaryLoaded(true);
-      })
-      .catch(err => {
-        console.error("Dashboard data load error:", err);
-        setSummaryLoaded(true);
+    // 1. Fetch Fast Stats
+    fetchPlatformStats(30).then(res => {
+      const health = res.data || {};
+      setSummaryToday({
+         total_today: Math.round((health.total_appointments || 0) / 30),
+         by_disease: [], // Filled by trends soon
+         date: 'Daily Avg'
       });
+      setSummaryLoaded(true);
+    }).catch(err => console.error(err));
+
+    // 2. Fetch Charts & Forecasts
+    fetchPlatformTrends(30, 8).then(res => {
+      const data = res.data || {};
+      const diseases = data.top_diseases || [];
+      setSummaryTrends(diseases.map(d => ({ ...d, total_cases: d.count })));
+      setSummarySpikes(data.forecasts || []);
+      
+      // Update today summary with top disease
+      if (diseases.length > 0) {
+        setSummaryToday(prev => ({
+          ...prev,
+          by_disease: [{ disease: diseases[0].name, count: diseases[0].count / 30 }]
+        }));
+      }
+    }).catch(err => console.error(err));
+
+    // 3. Fetch Heavy Medicines (Non-blocking)
+    setMedicinesLoaded(false);
+    fetchPlatformMedicines(30).then(res => {
+      const decisions = res.data || [];
+      setLowStock({
+         critical: decisions.filter(d => d.priority === 'High').length,
+         out_of_stock: decisions.filter(d => d.current_stock === 0).length
+      });
+      setTopMedicines(decisions.map(d => ({
+         drug_name: d.drug,
+         generic_name: `Restock: ${d.recommended_restock} (${d.status})`,
+         total_quantity: d.current_stock
+      })));
+      setMedicinesLoaded(true);
+    }).catch(err => {
+      console.error(err);
+      setMedicinesLoaded(true);
+    });
 
     fetchSeasonality(365).then(res => {
       setSeasonality({ seasons: res.data?.seasons || res.data?.seasonal_patterns || {} });
@@ -68,6 +88,10 @@ export default function Dashboard() {
         total_rows: data.length,
         min_cases: data.length > 0 ? data[data.length - 1].case_count : 0
       });
+    }).catch(err => console.error(err));
+
+    fetchSimulatorStatus().then(res => {
+      setSimStatus(res.data);
     }).catch(err => console.error(err));
 
   }, []);
@@ -93,6 +117,26 @@ export default function Dashboard() {
       return parts.map(c => c.replace(/^"|"$/g, '').trim());
     });
     setCsvModal({ type, rows, url });
+  };
+
+  const handleToggleSimulator = () => {
+    const action = simStatus.running ? 'stop' : 'start';
+    toggleSimulator(action, simStatus.interval).then(res => {
+      setSimStatus(res.data);
+      if (res.data.running) {
+         // Optionally refresh data soon after starting
+         setTimeout(loadAllData, 2000);
+      }
+    });
+  };
+
+  const handleIntervalChange = (newVal) => {
+    const val = parseInt(newVal);
+    if (simStatus.running) {
+        toggleSimulator('start', val).then(res => setSimStatus(res.data));
+    } else {
+        setSimStatus(prev => ({ ...prev, interval: val }));
+    }
   };
 
 
@@ -124,7 +168,56 @@ export default function Dashboard() {
           <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>Healthcare <span style={{ color: '#2563eb' }}>AI</span></span>
         </div>
 
-        <nav style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            {/* ── Simulator Control Center ── */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, 
+              background: '#f8fafc', padding: '6px 12px', borderRadius: 12,
+              border: '1px solid #e2e8f0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: simStatus.running ? '#22c55e' : '#94a3b8',
+                  boxShadow: simStatus.running ? '0 0 8px #22c55e' : 'none',
+                  animation: simStatus.running ? 'pulse 2s infinite' : 'none'
+                }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {simStatus.running ? 'Live Gen Active' : 'Simulator Off'}
+                </span>
+              </div>
+
+              <div style={{ height: 20, width: 1, background: '#e2e8f0' }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <select 
+                  value={simStatus.interval}
+                  onChange={(e) => handleIntervalChange(e.target.value)}
+                  style={{
+                    background: 'transparent', border: 'none', fontSize: 12, fontWeight: 600,
+                    color: '#1e293b', outline: 'none', cursor: 'pointer'
+                  }}
+                >
+                  <option value={30}>30s</option>
+                  <option value={60}>60s</option>
+                  <option value={90}>90s</option>
+                  <option value={120}>120s</option>
+                </select>
+                
+                <button 
+                  onClick={handleToggleSimulator}
+                  style={{
+                    background: simStatus.running ? '#ef4444' : '#2563eb',
+                    color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6,
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+                    textTransform: 'uppercase'
+                  }}
+                >
+                  {simStatus.running ? 'Stop' : 'Start'}
+                </button>
+              </div>
+            </div>
+
             <a href="/reports" style={{
               padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0',
               background: '#fff', fontSize: 13, fontWeight: 600, color: '#1e293b',
@@ -154,12 +247,17 @@ export default function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 32 }}>
           
           {/* Medicines */}
-          <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Top Medicines</div>
               <span style={{ fontSize: 20 }}>💊</span>
             </div>
-            {topMedicines.slice(0, 4).map((m, i) => (
+            {!medicinesLoaded ? (
+               <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13, flexDirection: 'column', gap: 12 }}>
+                 <div className="spinner" />
+                 Analyzing 2.8M rows...
+               </div>
+            ) : topMedicines.slice(0, 4).map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{m.drug_name}</div>
@@ -230,6 +328,22 @@ export default function Dashboard() {
         * { box-sizing: border-box; }
         body { margin: 0; }
         button:hover { opacity: 0.8; }
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.2); opacity: 0.7; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .spinner {
+          width: 24px;
+          height: 24px;
+          border: 3px solid #f1f5f9;
+          border-top-color: #2563eb;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
     </div>
   );

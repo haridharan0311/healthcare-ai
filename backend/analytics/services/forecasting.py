@@ -363,57 +363,61 @@ class ForecastingService:
     
     def forecast_all_diseases(
         self,
-        days_ahead: int = 7
+        days_ahead: int = 7,
+        precalculated_context: Optional[Dict] = None
     ) -> List[Dict]:
         """
         Generate forecasts for all active diseases.
-        Optimized: Uses a single bulk aggregation query to avoid N+1 issues.
+        Optimized: Uses preloaded context to bypass DB hits entirely.
         """
         try:
-            # 1. Identify top 20 diseases by volume in last 30 days
-            limit_date = date.today() - timedelta(days=30)
-            top_names_qs = (
-                Appointment.objects
-                .filter(
-                    appointment_datetime__date__gte=limit_date,
-                    disease__isnull=False,
-                    disease__is_active=True
-                )
-                .values('disease__name')
-                .annotate(total=Count('id'))
-                .order_by('-total')[:20]
-            )
+            ctx = precalculated_context or {}
             
-            top_names = [row['disease__name'] for row in top_names_qs]
-            if not top_names:
-                return []
-
-            # 2. Bulk fetch historical daily counts for these diseases
-            historical_qs = (
-                Appointment.objects
-                .filter(
-                    appointment_datetime__date__gte=limit_date,
-                    disease__name__in=top_names
+            # Use pre-aggregated data if available
+            if 'daily_by_dtype' in ctx:
+                disease_daily_map = ctx['daily_by_dtype']
+                limit_date = ctx.get('start_date') or (date.today() - timedelta(days=30))
+            else:
+                # 1. Identify top 20 diseases by volume in last 30 days
+                limit_date = date.today() - timedelta(days=30)
+                top_names_qs = (
+                    Appointment.objects
+                    .filter(
+                        appointment_datetime__date__gte=limit_date,
+                        disease__isnull=False,
+                        disease__is_active=True
+                    )
+                    .values('disease__name')
+                    .annotate(total=Count('id'))
+                    .order_by('-total')[:20]
                 )
-                .annotate(day=TruncDate('appointment_datetime'))
-                .values('day', 'disease__name')
-                .annotate(count=Count('id'))
-            )
+                
+                top_names = [row['disease__name'] for row in top_names_qs]
+                if not top_names:
+                    return []
 
-            # 3. Process in memory to avoid 20+ DB hits
-            # Map of { DiseaseType -> { Date -> Count } }
-            disease_daily_map = defaultdict(lambda: defaultdict(int))
-            disease_metadata = {} # Cache for season etc if needed, though get_disease_type is enough
-            
-            for row in historical_qs:
-                dtype = get_disease_type(row['disease__name'])
-                disease_daily_map[dtype][row['day']] += row['count']
+                # 2. Bulk fetch historical daily counts for these diseases
+                historical_qs = (
+                    Appointment.objects
+                    .filter(
+                        appointment_datetime__date__gte=limit_date,
+                        disease__name__in=top_names
+                    )
+                    .annotate(day=TruncDate('appointment_datetime'))
+                    .values('day', 'disease__name')
+                    .annotate(count=Count('id'))
+                )
+
+                # 3. Process in memory
+                disease_daily_map = defaultdict(lambda: defaultdict(int))
+                for row in historical_qs:
+                    dtype = get_disease_type(row['disease__name'])
+                    disease_daily_map[dtype][row['day']] += row['count']
 
             results = []
             for dtype, date_map in disease_daily_map.items():
-                # Build time series
+                # Build time series (limit to 30 days for forecasting)
                 counts = [date_map.get(limit_date + timedelta(days=i), 0) for i in range(31)]
-                total = sum(counts)
                 
                 # Prediction logic
                 forecast_val = moving_average_forecast(counts)
@@ -429,7 +433,12 @@ class ForecastingService:
                     'trend_score': round(trend_score, 2)
                 })
             
-            return sorted(results, key=lambda x: -x['total'])
+            # Return top 20 by volume
+            return sorted(results, key=lambda x: -x['total'])[:20]
+        
+        except Exception as e:
+            self.logger.error("Bulk disease forecasting failed", exception=e)
+            return []
         
         except Exception as e:
             self.logger.error("Bulk disease forecasting failed", exception=e)
