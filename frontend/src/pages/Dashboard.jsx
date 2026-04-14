@@ -223,11 +223,6 @@ export default function Dashboard() {
               background: '#fff', fontSize: 13, fontWeight: 600, color: '#1e293b',
               textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6
             }}>📊 Reports</a>
-            <a href="/admin-panel" style={{
-              padding: '8px 16px', borderRadius: 8, border: 'none',
-              background: '#1e293b', fontSize: 13, fontWeight: 600, color: '#fff',
-              textDecoration: 'none'
-            }}>Admin Portal</a>
           </nav>
       </header>
 
