@@ -1,0 +1,76 @@
+id,first_name,last_name,gender,qualification,clinic_id
+1,Ramya,Chettiar,F,"MBBS, MD",2
+2,Ramya,Mudaliar,F,MBBS,3
+3,Uthayan,Iyer,M,MBBS,4
+4,Uma,Iyer,F,MD,5
+5,Lakshmi,Mudaliar,F,"MBBS, MS",6
+6,Sandhiya,Pandian,F,"MBBS, MS",7
+7,Kausalya,Mudaliar,F,MD,8
+8,Thirumalai,Mudaliar,M,"MBBS, MD",9
+9,Naveen,Rajan,M,MD,10
+10,Divya,Raj,F,MD,11
+11,Keerthi,Kumar,F,MBBS,12
+12,Thivya,Kumar,F,MBBS,13
+13,Ishwarya,Pandian,F,MD,14
+14,Kavitha,Gounder,F,"MBBS, MD",15
+15,Balaji,Gounder,M,"MBBS, MS",16
+16,Harini,Moorthy,F,MD,17
+17,Dhanush,Sekar,M,"MBBS, MD",18
+18,Dhinesh,Gounder,M,"MBBS, MD",19
+19,Murugan,Balan,M,MD,20
+20,Yamini,Gounder,F,MD,21
+21,Ajith,Gunasekaran,M,"MBBS, MD",22
+22,Meena,Moorthy,F,"MBBS, MD",23
+23,Gayathri,Moorthy,F,"MBBS, MD",24
+24,Kausalya,Moorthy,F,MD,25
+25,Murugan,Mudaliar,M,"MBBS, MD",1
+26,Meena,Gounder,F,"MBBS, MS",2
+27,Thivya,Vel,F,MD,3
+28,Banu,Selvam,F,"MBBS, MS",4
+29,Chitra,Samy,F,"MBBS, MS",5
+30,Ishwarya,Pillai,F,"MBBS, MS",6
+31,Surya,Mani,M,"MBBS, MD",7
+32,Kavin,Perumal,M,"MBBS, MS",8
+33,Karthik,Raj,M,MBBS,9
+34,Logesh,Pandian,M,"MBBS, MD",10
+35,Prabhu,Gunasekaran,M,MBBS,11
+36,Pavithra,Perumal,F,"MBBS, MS",12
+37,Indhu,Gunasekaran,F,MD,13
+38,Vijay,Mani,M,MBBS,14
+39,Rajesh,Chettiar,M,MD,15
+40,Vijay,Chettiar,M,MBBS,16
+41,Logesh,Gounder,M,MBBS,17
+42,Ganesh,Perumal,M,"MBBS, MD",18
+43,Balaji,Gounder,M,"MBBS, MS",19
+44,Banu,Balan,F,"MBBS, MD",20
+45,Kausalya,Mudaliar,F,"MBBS, MS",21
+46,Chitra,Desigan,F,"MBBS, MS",22
+47,Dhanush,Gunasekaran,M,MD,23
+48,Janani,Desigan,F,MD,24
+49,Nivetha,Iyer,F,"MBBS, MD",25
+50,Ishwarya,Vel,F,MD,1
+51,Sangeetha,Nathan,F,"MBBS, MS",2
+52,Siva,Sekar,M,MBBS,3
+53,Prabhu,Nathan,M,MD,4
+54,Thivya,Mudaliar,F,MD,5
+55,Jegan,Mani,M,"MBBS, MD",6
+56,Suresh,Rajan,M,MBBS,7
+57,Dhinesh,Pandian,M,"MBBS, MS",8
+58,Divya,Iyer,F,MD,9
+59,Lakshmi,Samy,F,"MBBS, MS",10
+60,Uma,Selvam,F,MBBS,11
+61,Naveen,Iyer,M,"MBBS, MD",12
+62,Karthik,Rajan,M,MD,13
+63,Kausalya,Balan,F,MD,14
+64,Gayathri,Rajan,F,MD,15
+65,Siva,Moorthy,M,MBBS,16
+66,Uthayan,Mudaliar,M,"MBBS, MD",17
+67,Sona,Kumar,F,MD,18
+68,Pavithra,Mudaliar,F,"MBBS, MS",19
+69,Gayathri,Perumal,F,"MBBS, MS",20
+70,Senthil,Samy,M,MBBS,21
+71,Arul,Mani,M,"MBBS, MS",22
+72,Siva,Samy,M,MBBS,23
+73,Priya,Balan,F,MBBS,24
+74,Yogesh,Pillai,M,MD,25
+75,Dhinesh,Sekar,M,"MBBS, MS",1

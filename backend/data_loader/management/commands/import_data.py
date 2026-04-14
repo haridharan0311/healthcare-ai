@@ -1,4 +1,4 @@
-"""
+﻿"""
 IMPORT DATA COMMAND
 ===================
 Imports all database records from CSV files in the data/ folder.
@@ -49,7 +49,7 @@ EXAMPLE:
     Importing Clinics...
     Importing Diseases...
     ...
-    ✅ ALL DATA IMPORTED SUCCESSFULLY
+     ALL DATA IMPORTED SUCCESSFULLY
 
 TROUBLESHOOTING:
     Q: "Duplicate entry for key" error
@@ -85,11 +85,11 @@ class Command(BaseCommand):
     help = "Optimized CSV Import"
 
     def handle(self, *args, **kwargs):
-        base_path = "data/"
+        base_path = "../data/"
         
         # Check if data directory exists
         if not os.path.exists(base_path):
-            self.stdout.write(self.style.ERROR(f"❌ ERROR: {base_path} directory not found"))
+            self.stdout.write(self.style.ERROR(f" ERROR: {base_path} directory not found"))
             return
 
         try:
@@ -258,13 +258,14 @@ class Command(BaseCommand):
                         ))
                 PrescriptionLine.objects.bulk_create(lines, batch_size=1000)
 
-                self.stdout.write(self.style.SUCCESS("✅ ALL DATA IMPORTED SUCCESSFULLY"))
+                self.stdout.write(self.style.SUCCESS(" ALL DATA IMPORTED SUCCESSFULLY"))
 
         except FileNotFoundError as e:
-            self.stdout.write(self.style.ERROR(f"❌ ERROR: CSV file not found - {str(e)}"))
+            self.stdout.write(self.style.ERROR(f" ERROR: CSV file not found - {str(e)}"))
         except KeyError as e:
-            self.stdout.write(self.style.ERROR(f"❌ ERROR: Missing column in CSV - {str(e)}"))
+            self.stdout.write(self.style.ERROR(f" ERROR: Missing column in CSV - {str(e)}"))
         except ValueError as e:
-            self.stdout.write(self.style.ERROR(f"❌ ERROR: Invalid data format - {str(e)}"))
+            self.stdout.write(self.style.ERROR(f" ERROR: Invalid data format - {str(e)}"))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"❌ ERROR: {str(e)}"))
+            self.stdout.write(self.style.ERROR(f" ERROR: {str(e)}"))
+

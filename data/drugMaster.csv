@@ -1,0 +1,401 @@
+id,drug_name,generic_name,drug_strength,dosage_type,current_stock,clinic_id
+1,Ofloxacin Tablet 500mg,Ofloxacin,500mg,Tablet,961,2
+2,Diclofenac Gel 50g,Diclofenac,50g,Gel,348,3
+3,Furosemide Injection 2ml,Furosemide,2ml,Injection,697,4
+4,Clopidogrel Tablet 500mg,Clopidogrel,500mg,Tablet,842,5
+5,Furosemide Injection 5ml,Furosemide,5ml,Injection,980,6
+6,Atorvastatin Tablet 5mg,Atorvastatin,5mg,Tablet,743,7
+7,Montelukast Tablet 5mg,Montelukast,5mg,Tablet,858,8
+8,Iron & Folic Acid Tablet 5mg,Iron & Folic Acid,5mg,Tablet,769,9
+9,Montelukast Tablet 650mg,Montelukast,650mg,Tablet,521,10
+10,Amlodipine Tablet 10mg,Amlodipine,10mg,Tablet,799,11
+11,Azithromycin Tablet 100mg,Azithromycin,100mg,Tablet,487,12
+12,Salbutamol Syrup 200ml,Salbutamol,200ml,Syrup,153,13
+13,Metronidazole Injection 1gm,Metronidazole,1gm,Injection,104,14
+14,Montelukast Tablet 50mg,Montelukast,50mg,Tablet,953,15
+15,Cetzine Syrup 60ml,Cetirizine,60ml,Syrup,394,16
+16,Atorvastatin Tablet 500mg,Atorvastatin,500mg,Tablet,385,17
+17,Metronidazole Injection 1gm,Metronidazole,1gm,Injection,867,18
+18,Pantocid Tablet 500mg,Pantoprazole,500mg,Tablet,457,19
+19,Povidone-Iodine Ointment 20g,Povidone-Iodine,20g,Ointment,844,20
+20,Gliclazide Tablet 10mg,Gliclazide,10mg,Tablet,958,21
+21,Amlodipine Tablet 10mg,Amlodipine,10mg,Tablet,796,22
+22,Vitamin B-Complex Tablet 10mg,Vitamin B-Complex,10mg,Tablet,925,23
+23,Glycomet Tablet 10mg,Metformin,10mg,Tablet,846,24
+24,Mox Capsule 40mg,Amoxicillin,40mg,Capsule,711,25
+25,Pan Tablet 10mg,Pantoprazole,10mg,Tablet,217,1
+26,Levoceterizine Tablet 5mg,Levoceterizine,5mg,Tablet,213,2
+27,Ofloxacin Tablet 250mg,Ofloxacin,250mg,Tablet,125,3
+28,Glycomet Tablet 250mg,Metformin,250mg,Tablet,727,4
+29,Clopidogrel Tablet 10mg,Clopidogrel,10mg,Tablet,812,5
+30,Dextromethorphan Syrup 200ml,Dextromethorphan,200ml,Syrup,750,6
+31,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,494,7
+32,Atorvastatin Tablet 10mg,Atorvastatin,10mg,Tablet,599,8
+33,Atorvastatin Tablet 500mg,Atorvastatin,500mg,Tablet,570,9
+34,Salbutamol Syrup 5ml/500mg,Salbutamol,5ml/500mg,Syrup,534,10
+35,Crocin Syrup 60ml,Paracetamol,60ml,Syrup,937,11
+36,Clopidogrel Tablet 250mg,Clopidogrel,250mg,Tablet,624,12
+37,Dolo Syrup 200ml,Paracetamol,200ml,Syrup,281,13
+38,Prednisolone Drops 5ml,Prednisolone,5ml,Drops,783,14
+39,Ciprofloxacin Tablet 100mg,Ciprofloxacin,100mg,Tablet,310,15
+40,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,580,16
+41,Levoceterizine Syrup 60ml,Levoceterizine,60ml,Syrup,618,17
+42,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,825,18
+43,Crocin Drops 10ml,Paracetamol,10ml,Drops,832,19
+44,Montelukast Tablet 500mg,Montelukast,500mg,Tablet,999,20
+45,Glycomet Tablet 100mg,Metformin,100mg,Tablet,544,21
+46,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,485,22
+47,Glycomet Tablet 500mg,Metformin,500mg,Tablet,456,23
+48,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,117,24
+49,Omeprazole Capsule 250mg,Omeprazole,250mg,Capsule,333,25
+50,Losartan Tablet 10mg,Losartan,10mg,Tablet,759,1
+51,Clopidogrel Tablet 100mg,Clopidogrel,100mg,Tablet,385,2
+52,Ranitidine Tablet 650mg,Ranitidine,650mg,Tablet,131,3
+53,Gliclazide Tablet 5mg,Gliclazide,5mg,Tablet,363,4
+54,Montelukast Tablet 50mg,Montelukast,50mg,Tablet,946,5
+55,Iron & Folic Acid Tablet 100mg,Iron & Folic Acid,100mg,Tablet,160,6
+56,Prednisolone Drops 5ml,Prednisolone,5ml,Drops,223,7
+57,Diclofenac Injection 10ml,Diclofenac,10ml,Injection,450,8
+58,Vitamin B-Complex Injection 10ml,Vitamin B-Complex,10ml,Injection,918,9
+59,Vitamin B-Complex Capsule 500mg,Vitamin B-Complex,500mg,Capsule,121,10
+60,Cetzine Syrup 100ml,Cetirizine,100ml,Syrup,377,11
+61,Prednisolone Drops 10ml,Prednisolone,10ml,Drops,612,12
+62,Montelukast Tablet 5mg,Montelukast,5mg,Tablet,537,13
+63,Clopidogrel Tablet 500mg,Clopidogrel,500mg,Tablet,997,14
+64,Ranitidine Tablet 500mg,Ranitidine,500mg,Tablet,985,15
+65,Furosemide Injection 10ml,Furosemide,10ml,Injection,306,16
+66,Calcium & Vit D3 Tablet 500mg,Calcium & Vit D3,500mg,Tablet,526,17
+67,Ciprofloxacin Tablet 650mg,Ciprofloxacin,650mg,Tablet,682,18
+68,Amlodipine Tablet 650mg,Amlodipine,650mg,Tablet,996,19
+69,Ofloxacin Tablet 5mg,Ofloxacin,5mg,Tablet,131,20
+70,Montelukast Tablet 10mg,Montelukast,10mg,Tablet,355,21
+71,Prednisolone Tablet 650mg,Prednisolone,650mg,Tablet,252,22
+72,Atorvastatin Tablet 250mg,Atorvastatin,250mg,Tablet,261,23
+73,Ofloxacin Tablet 500mg,Ofloxacin,500mg,Tablet,591,24
+74,Furosemide Injection 10ml,Furosemide,10ml,Injection,243,25
+75,Salbutamol Syrup 60ml,Salbutamol,60ml,Syrup,972,1
+76,Amlodipine Tablet 50mg,Amlodipine,50mg,Tablet,478,2
+77,Okacet Syrup 100ml,Cetirizine,100ml,Syrup,565,3
+78,Montelukast Tablet 10mg,Montelukast,10mg,Tablet,550,4
+79,Salbutamol Inhaler 200 MDI,Salbutamol,200 MDI,Inhaler,416,5
+80,Salbutamol Syrup 200ml,Salbutamol,200ml,Syrup,409,6
+81,Pantocid Injection 2ml,Pantoprazole,2ml,Injection,180,7
+82,Insulin Injection 2ml,Insulin,2ml,Injection,189,8
+83,Diclofenac Gel 30g,Diclofenac,30g,Gel,869,9
+84,Diclofenac Gel 50g,Diclofenac,50g,Gel,384,10
+85,Dolo Tablet 5mg,Paracetamol,5mg,Tablet,609,11
+86,Pantocid Injection 5ml,Pantoprazole,5ml,Injection,917,12
+87,Ciprofloxacin Injection 1gm,Ciprofloxacin,1gm,Injection,841,13
+88,Levoceterizine Syrup 60ml,Levoceterizine,60ml,Syrup,278,14
+89,Calcium & Vit D3 Syrup 60ml,Calcium & Vit D3,60ml,Syrup,157,15
+90,Ranitidine Tablet 100mg,Ranitidine,100mg,Tablet,663,16
+91,Azithromycin Tablet 100mg,Azithromycin,100mg,Tablet,185,17
+92,Furosemide Tablet 20mg,Furosemide,20mg,Tablet,940,18
+93,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,172,19
+94,Furosemide Tablet 250mg,Furosemide,250mg,Tablet,937,20
+95,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,590,21
+96,Okacet Tablet 5mg,Cetirizine,5mg,Tablet,914,22
+97,Glycomet Tablet 10mg,Metformin,10mg,Tablet,102,23
+98,Telmisartan Tablet 5mg,Telmisartan,5mg,Tablet,377,24
+99,Glycomet Tablet 500mg,Metformin,500mg,Tablet,789,25
+100,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,651,1
+101,Metronidazole Syrup 60ml,Metronidazole,60ml,Syrup,862,2
+102,Prednisolone Drops 10ml,Prednisolone,10ml,Drops,636,3
+103,Prednisolone Tablet 500mg,Prednisolone,500mg,Tablet,248,4
+104,Diclofenac Injection 10ml,Diclofenac,10ml,Injection,989,5
+105,Furosemide Injection 5ml,Furosemide,5ml,Injection,570,6
+106,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,453,7
+107,Calcium & Vit D3 Tablet 20mg,Calcium & Vit D3,20mg,Tablet,254,8
+108,Furosemide Injection 1gm,Furosemide,1gm,Injection,310,9
+109,Dextromethorphan Syrup 60ml,Dextromethorphan,60ml,Syrup,641,10
+110,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,998,11
+111,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,376,12
+112,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,936,13
+113,Clopidogrel Tablet 650mg,Clopidogrel,650mg,Tablet,646,14
+114,Insulin Injection 2ml,Insulin,2ml,Injection,231,15
+115,Povidone-Iodine Ointment 20g,Povidone-Iodine,20g,Ointment,641,16
+116,Ofloxacin Tablet 10mg,Ofloxacin,10mg,Tablet,812,17
+117,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,576,18
+118,Gliclazide Tablet 250mg,Gliclazide,250mg,Tablet,970,19
+119,Augmentin Syrup 60ml,Amoxicillin,60ml,Syrup,119,20
+120,Pan Tablet 100mg,Pantoprazole,100mg,Tablet,599,21
+121,Clopidogrel Tablet 10mg,Clopidogrel,10mg,Tablet,719,22
+122,Diclofenac Gel 30g,Diclofenac,30g,Gel,691,23
+123,Augmentin Syrup 200ml,Amoxicillin,200ml,Syrup,267,24
+124,Gliclazide Tablet 250mg,Gliclazide,250mg,Tablet,216,25
+125,Losartan Tablet 10mg,Losartan,10mg,Tablet,845,1
+126,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,700,2
+127,Telmisartan Tablet 650mg,Telmisartan,650mg,Tablet,924,3
+128,Pan Tablet 100mg,Pantoprazole,100mg,Tablet,198,4
+129,Azithromycin Tablet 5mg,Azithromycin,5mg,Tablet,125,5
+130,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,839,6
+131,Salbutamol Syrup 5ml/500mg,Salbutamol,5ml/500mg,Syrup,782,7
+132,Salbutamol Syrup 60ml,Salbutamol,60ml,Syrup,485,8
+133,Okacet Tablet 20mg,Cetirizine,20mg,Tablet,579,9
+134,Augmentin Syrup 60ml,Amoxicillin,60ml,Syrup,694,10
+135,Insulin Injection 2ml,Insulin,2ml,Injection,819,11
+136,Gliclazide Tablet 10mg,Gliclazide,10mg,Tablet,919,12
+137,Amlodipine Tablet 500mg,Amlodipine,500mg,Tablet,126,13
+138,Vitamin B-Complex Capsule 500mg,Vitamin B-Complex,500mg,Capsule,227,14
+139,Iron & Folic Acid Syrup 60ml,Iron & Folic Acid,60ml,Syrup,766,15
+140,Telmisartan Tablet 100mg,Telmisartan,100mg,Tablet,828,16
+141,Diclofenac Injection 10ml,Diclofenac,10ml,Injection,740,17
+142,Pantocid Injection 5ml,Pantoprazole,5ml,Injection,891,18
+143,Montelukast Tablet 50mg,Montelukast,50mg,Tablet,175,19
+144,Amlodipine Tablet 250mg,Amlodipine,250mg,Tablet,269,20
+145,Clopidogrel Tablet 100mg,Clopidogrel,100mg,Tablet,457,21
+146,Atorvastatin Tablet 650mg,Atorvastatin,650mg,Tablet,442,22
+147,Furosemide Tablet 100mg,Furosemide,100mg,Tablet,830,23
+148,Montelukast Tablet 100mg,Montelukast,100mg,Tablet,220,24
+149,Prednisolone Drops 5ml,Prednisolone,5ml,Drops,161,25
+150,Insulin Injection 1gm,Insulin,1gm,Injection,713,1
+151,Calcium & Vit D3 Syrup 100ml,Calcium & Vit D3,100ml,Syrup,881,2
+152,Levoceterizine Syrup 200ml,Levoceterizine,200ml,Syrup,530,3
+153,Losartan Tablet 20mg,Losartan,20mg,Tablet,148,4
+154,Ciprofloxacin Tablet 500mg,Ciprofloxacin,500mg,Tablet,908,5
+155,Telmisartan Tablet 20mg,Telmisartan,20mg,Tablet,795,6
+156,Povidone-Iodine Drops 5ml,Povidone-Iodine,5ml,Drops,507,7
+157,Omeprazole Capsule 250mg,Omeprazole,250mg,Capsule,666,8
+158,Levoceterizine Syrup 100ml,Levoceterizine,100ml,Syrup,469,9
+159,Dolo Drops 5ml,Paracetamol,5ml,Drops,831,10
+160,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,559,11
+161,Cetzine Syrup 5ml/500mg,Cetirizine,5ml/500mg,Syrup,223,12
+162,Losartan Tablet 500mg,Losartan,500mg,Tablet,257,13
+163,Povidone-Iodine Drops 5ml,Povidone-Iodine,5ml,Drops,253,14
+164,Levoceterizine Syrup 200ml,Levoceterizine,200ml,Syrup,894,15
+165,Povidone-Iodine Drops 10ml,Povidone-Iodine,10ml,Drops,251,16
+166,Glycomet Tablet 650mg,Metformin,650mg,Tablet,341,17
+167,Salbutamol Syrup 200ml,Salbutamol,200ml,Syrup,376,18
+168,Calcium & Vit D3 Tablet 5mg,Calcium & Vit D3,5mg,Tablet,169,19
+169,Povidone-Iodine Drops 10ml,Povidone-Iodine,10ml,Drops,941,20
+170,Ranitidine Injection 10ml,Ranitidine,10ml,Injection,521,21
+171,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,964,22
+172,Levoceterizine Tablet 500mg,Levoceterizine,500mg,Tablet,177,23
+173,Amlodipine Tablet 500mg,Amlodipine,500mg,Tablet,348,24
+174,Insulin Injection 1gm,Insulin,1gm,Injection,815,25
+175,Diclofenac Tablet 100mg,Diclofenac,100mg,Tablet,565,1
+176,Azithromycin Syrup 100ml,Azithromycin,100ml,Syrup,429,2
+177,Salbutamol Syrup 60ml,Salbutamol,60ml,Syrup,583,3
+178,Metronidazole Injection 10ml,Metronidazole,10ml,Injection,969,4
+179,Omeprazole Capsule 500mg,Omeprazole,500mg,Capsule,168,5
+180,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,786,6
+181,Metronidazole Injection 10ml,Metronidazole,10ml,Injection,462,7
+182,Furosemide Injection 5ml,Furosemide,5ml,Injection,370,8
+183,Levoceterizine Syrup 5ml/500mg,Levoceterizine,5ml/500mg,Syrup,164,9
+184,Prednisolone Tablet 650mg,Prednisolone,650mg,Tablet,935,10
+185,Metronidazole Tablet 650mg,Metronidazole,650mg,Tablet,489,11
+186,Losartan Tablet 650mg,Losartan,650mg,Tablet,490,12
+187,Losartan Tablet 650mg,Losartan,650mg,Tablet,263,13
+188,Diclofenac Tablet 650mg,Diclofenac,650mg,Tablet,599,14
+189,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,930,15
+190,Amlodipine Tablet 50mg,Amlodipine,50mg,Tablet,174,16
+191,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,236,17
+192,Mox Syrup 5ml/500mg,Amoxicillin,5ml/500mg,Syrup,890,18
+193,Dextromethorphan Syrup 5ml/500mg,Dextromethorphan,5ml/500mg,Syrup,292,19
+194,Glycomet Tablet 10mg,Metformin,10mg,Tablet,500,20
+195,Vitamin B-Complex Injection 2ml,Vitamin B-Complex,2ml,Injection,460,21
+196,Amlodipine Tablet 250mg,Amlodipine,250mg,Tablet,311,22
+197,Mox Syrup 60ml,Amoxicillin,60ml,Syrup,520,23
+198,Levoceterizine Syrup 5ml/500mg,Levoceterizine,5ml/500mg,Syrup,390,24
+199,Metronidazole Tablet 100mg,Metronidazole,100mg,Tablet,584,25
+200,Metronidazole Syrup 200ml,Metronidazole,200ml,Syrup,577,1
+201,Levoceterizine Tablet 100mg,Levoceterizine,100mg,Tablet,256,2
+202,Vitamin B-Complex Injection 10ml,Vitamin B-Complex,10ml,Injection,505,3
+203,Ranitidine Tablet 650mg,Ranitidine,650mg,Tablet,792,4
+204,Cetzine Syrup 100ml,Cetirizine,100ml,Syrup,434,5
+205,Povidone-Iodine Ointment 20g,Povidone-Iodine,20g,Ointment,851,6
+206,Ranitidine Injection 2ml,Ranitidine,2ml,Injection,771,7
+207,Dextromethorphan Syrup 60ml,Dextromethorphan,60ml,Syrup,449,8
+208,Cetzine Tablet 10mg,Cetirizine,10mg,Tablet,669,9
+209,Levoceterizine Tablet 5mg,Levoceterizine,5mg,Tablet,329,10
+210,Vitamin B-Complex Tablet 20mg,Vitamin B-Complex,20mg,Tablet,806,11
+211,Ciprofloxacin Drops 5ml,Ciprofloxacin,5ml,Drops,155,12
+212,Atorvastatin Tablet 100mg,Atorvastatin,100mg,Tablet,925,13
+213,Iron & Folic Acid Syrup 200ml,Iron & Folic Acid,200ml,Syrup,687,14
+214,Dextromethorphan Syrup 100ml,Dextromethorphan,100ml,Syrup,708,15
+215,Losartan Tablet 100mg,Losartan,100mg,Tablet,482,16
+216,Prednisolone Tablet 650mg,Prednisolone,650mg,Tablet,374,17
+217,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,363,18
+218,Ofloxacin Tablet 500mg,Ofloxacin,500mg,Tablet,118,19
+219,Gliclazide Tablet 50mg,Gliclazide,50mg,Tablet,927,20
+220,Clopidogrel Tablet 250mg,Clopidogrel,250mg,Tablet,643,21
+221,Gliclazide Tablet 10mg,Gliclazide,10mg,Tablet,200,22
+222,Levoceterizine Syrup 200ml,Levoceterizine,200ml,Syrup,734,23
+223,Dextromethorphan Syrup 200ml,Dextromethorphan,200ml,Syrup,847,24
+224,Amlodipine Tablet 5mg,Amlodipine,5mg,Tablet,240,25
+225,Salbutamol Syrup 200ml,Salbutamol,200ml,Syrup,540,1
+226,Metronidazole Injection 1gm,Metronidazole,1gm,Injection,754,2
+227,Losartan Tablet 500mg,Losartan,500mg,Tablet,105,3
+228,Glycomet Tablet 100mg,Metformin,100mg,Tablet,102,4
+229,Ciprofloxacin Injection 1gm,Ciprofloxacin,1gm,Injection,224,5
+230,Telmisartan Tablet 500mg,Telmisartan,500mg,Tablet,851,6
+231,Metronidazole Injection 2ml,Metronidazole,2ml,Injection,491,7
+232,Diclofenac Tablet 10mg,Diclofenac,10mg,Tablet,854,8
+233,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,760,9
+234,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,164,10
+235,Augmentin Tablet 20mg,Amoxicillin,20mg,Tablet,741,11
+236,Prednisolone Tablet 5mg,Prednisolone,5mg,Tablet,319,12
+237,Gliclazide Tablet 50mg,Gliclazide,50mg,Tablet,597,13
+238,Vitamin B-Complex Capsule 40mg,Vitamin B-Complex,40mg,Capsule,695,14
+239,Furosemide Tablet 250mg,Furosemide,250mg,Tablet,678,15
+240,Prednisolone Tablet 5mg,Prednisolone,5mg,Tablet,275,16
+241,Povidone-Iodine Drops 10ml,Povidone-Iodine,10ml,Drops,970,17
+242,Telmisartan Tablet 100mg,Telmisartan,100mg,Tablet,569,18
+243,Iron & Folic Acid Syrup 100ml,Iron & Folic Acid,100ml,Syrup,678,19
+244,Metronidazole Injection 2ml,Metronidazole,2ml,Injection,154,20
+245,Furosemide Tablet 100mg,Furosemide,100mg,Tablet,443,21
+246,Pantocid Tablet 50mg,Pantoprazole,50mg,Tablet,886,22
+247,Calcium & Vit D3 Syrup 5ml/500mg,Calcium & Vit D3,5ml/500mg,Syrup,322,23
+248,Ciprofloxacin Drops 5ml,Ciprofloxacin,5ml,Drops,683,24
+249,Atorvastatin Tablet 500mg,Atorvastatin,500mg,Tablet,349,25
+250,Iron & Folic Acid Tablet 500mg,Iron & Folic Acid,500mg,Tablet,781,1
+251,Azithromycin Syrup 60ml,Azithromycin,60ml,Syrup,388,2
+252,Amlodipine Tablet 250mg,Amlodipine,250mg,Tablet,619,3
+253,Losartan Tablet 10mg,Losartan,10mg,Tablet,182,4
+254,Insulin Injection 1gm,Insulin,1gm,Injection,798,5
+255,Ciprofloxacin Drops 5ml,Ciprofloxacin,5ml,Drops,278,6
+256,Atorvastatin Tablet 5mg,Atorvastatin,5mg,Tablet,213,7
+257,Salbutamol Syrup 200ml,Salbutamol,200ml,Syrup,936,8
+258,Diclofenac Injection 2ml,Diclofenac,2ml,Injection,826,9
+259,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,943,10
+260,Clopidogrel Tablet 50mg,Clopidogrel,50mg,Tablet,367,11
+261,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,589,12
+262,Gliclazide Tablet 500mg,Gliclazide,500mg,Tablet,341,13
+263,Cetzine Tablet 650mg,Cetirizine,650mg,Tablet,429,14
+264,Ciprofloxacin Injection 1gm,Ciprofloxacin,1gm,Injection,657,15
+265,Metronidazole Injection 2ml,Metronidazole,2ml,Injection,319,16
+266,Clopidogrel Tablet 20mg,Clopidogrel,20mg,Tablet,933,17
+267,Glycomet Tablet 100mg,Metformin,100mg,Tablet,656,18
+268,Clopidogrel Tablet 20mg,Clopidogrel,20mg,Tablet,903,19
+269,Clopidogrel Tablet 5mg,Clopidogrel,5mg,Tablet,411,20
+270,Diclofenac Gel 30g,Diclofenac,30g,Gel,579,21
+271,Ofloxacin Tablet 5mg,Ofloxacin,5mg,Tablet,643,22
+272,Montelukast Tablet 50mg,Montelukast,50mg,Tablet,916,23
+273,Azithromycin Syrup 100ml,Azithromycin,100ml,Syrup,840,24
+274,Augmentin Capsule 500mg,Amoxicillin,500mg,Capsule,507,25
+275,Crocin Injection 1gm,Paracetamol,1gm,Injection,343,1
+276,Omeprazole Capsule 500mg,Omeprazole,500mg,Capsule,407,2
+277,Diclofenac Injection 1gm,Diclofenac,1gm,Injection,355,3
+278,Insulin Injection 2ml,Insulin,2ml,Injection,583,4
+279,Vitamin B-Complex Injection 10ml,Vitamin B-Complex,10ml,Injection,827,5
+280,Azithromycin Syrup 100ml,Azithromycin,100ml,Syrup,519,6
+281,Insulin Injection 2ml,Insulin,2ml,Injection,246,7
+282,Clopidogrel Tablet 500mg,Clopidogrel,500mg,Tablet,809,8
+283,Vitamin B-Complex Injection 10ml,Vitamin B-Complex,10ml,Injection,896,9
+284,Insulin Injection 5ml,Insulin,5ml,Injection,642,10
+285,Ranitidine Tablet 250mg,Ranitidine,250mg,Tablet,944,11
+286,Iron & Folic Acid Syrup 100ml,Iron & Folic Acid,100ml,Syrup,590,12
+287,Telmisartan Tablet 100mg,Telmisartan,100mg,Tablet,803,13
+288,Gliclazide Tablet 10mg,Gliclazide,10mg,Tablet,767,14
+289,Montelukast Tablet 50mg,Montelukast,50mg,Tablet,192,15
+290,Vitamin B-Complex Capsule 250mg,Vitamin B-Complex,250mg,Capsule,365,16
+291,Glycomet Tablet 500mg,Metformin,500mg,Tablet,574,17
+292,Gliclazide Tablet 250mg,Gliclazide,250mg,Tablet,271,18
+293,Azithromycin Tablet 5mg,Azithromycin,5mg,Tablet,741,19
+294,Okacet Syrup 60ml,Cetirizine,60ml,Syrup,509,20
+295,Pantocid Injection 10ml,Pantoprazole,10ml,Injection,909,21
+296,Prednisolone Drops 10ml,Prednisolone,10ml,Drops,982,22
+297,Losartan Tablet 500mg,Losartan,500mg,Tablet,887,23
+298,Oral Rehydration Salts Drops 5ml,Oral Rehydration Salts,5ml,Drops,305,24
+299,Augmentin Capsule 20mg,Amoxicillin,20mg,Capsule,221,25
+300,Augmentin Syrup 200ml,Amoxicillin,200ml,Syrup,595,1
+301,Omeprazole Capsule 20mg,Omeprazole,20mg,Capsule,991,2
+302,Amlodipine Tablet 250mg,Amlodipine,250mg,Tablet,528,3
+303,Azithromycin Tablet 500mg,Azithromycin,500mg,Tablet,626,4
+304,Amlodipine Tablet 650mg,Amlodipine,650mg,Tablet,296,5
+305,Gliclazide Tablet 10mg,Gliclazide,10mg,Tablet,538,6
+306,Azithromycin Tablet 250mg,Azithromycin,250mg,Tablet,701,7
+307,Montelukast Tablet 5mg,Montelukast,5mg,Tablet,875,8
+308,Telmisartan Tablet 100mg,Telmisartan,100mg,Tablet,928,9
+309,Omeprazole Capsule 250mg,Omeprazole,250mg,Capsule,101,10
+310,Prednisolone Drops 10ml,Prednisolone,10ml,Drops,519,11
+311,Montelukast Tablet 250mg,Montelukast,250mg,Tablet,911,12
+312,Amlodipine Tablet 650mg,Amlodipine,650mg,Tablet,724,13
+313,Pantocid Tablet 5mg,Pantoprazole,5mg,Tablet,530,14
+314,Ciprofloxacin Tablet 100mg,Ciprofloxacin,100mg,Tablet,353,15
+315,Azithromycin Syrup 100ml,Azithromycin,100ml,Syrup,920,16
+316,Ofloxacin Drops 10ml,Ofloxacin,10ml,Drops,339,17
+317,Ciprofloxacin Injection 1gm,Ciprofloxacin,1gm,Injection,578,18
+318,Salbutamol Syrup 5ml/500mg,Salbutamol,5ml/500mg,Syrup,266,19
+319,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,328,20
+320,Clopidogrel Tablet 650mg,Clopidogrel,650mg,Tablet,816,21
+321,Calcium & Vit D3 Syrup 100ml,Calcium & Vit D3,100ml,Syrup,378,22
+322,Augmentin Tablet 20mg,Amoxicillin,20mg,Tablet,406,23
+323,Dextromethorphan Syrup 5ml/500mg,Dextromethorphan,5ml/500mg,Syrup,539,24
+324,Azithromycin Tablet 250mg,Azithromycin,250mg,Tablet,205,25
+325,Telmisartan Tablet 500mg,Telmisartan,500mg,Tablet,694,1
+326,Amlodipine Tablet 10mg,Amlodipine,10mg,Tablet,828,2
+327,Atorvastatin Tablet 100mg,Atorvastatin,100mg,Tablet,819,3
+328,Amlodipine Tablet 50mg,Amlodipine,50mg,Tablet,902,4
+329,Clopidogrel Tablet 250mg,Clopidogrel,250mg,Tablet,955,5
+330,Clopidogrel Tablet 650mg,Clopidogrel,650mg,Tablet,948,6
+331,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,351,7
+332,Diclofenac Tablet 10mg,Diclofenac,10mg,Tablet,907,8
+333,Prednisolone Drops 10ml,Prednisolone,10ml,Drops,497,9
+334,Levoceterizine Syrup 200ml,Levoceterizine,200ml,Syrup,971,10
+335,Montelukast Tablet 250mg,Montelukast,250mg,Tablet,520,11
+336,Losartan Tablet 650mg,Losartan,650mg,Tablet,601,12
+337,Calpol Drops 10ml,Paracetamol,10ml,Drops,499,13
+338,Ofloxacin Drops 10ml,Ofloxacin,10ml,Drops,703,14
+339,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,652,15
+340,Metronidazole Injection 1gm,Metronidazole,1gm,Injection,332,16
+341,Furosemide Tablet 100mg,Furosemide,100mg,Tablet,883,17
+342,Povidone-Iodine Ointment 20g,Povidone-Iodine,20g,Ointment,718,18
+343,Cetzine Tablet 100mg,Cetirizine,100mg,Tablet,110,19
+344,Vitamin B-Complex Injection 2ml,Vitamin B-Complex,2ml,Injection,829,20
+345,Ranitidine Injection 2ml,Ranitidine,2ml,Injection,252,21
+346,Diclofenac Injection 10ml,Diclofenac,10ml,Injection,200,22
+347,Insulin Injection 10ml,Insulin,10ml,Injection,710,23
+348,Omeprazole Capsule 20mg,Omeprazole,20mg,Capsule,302,24
+349,Omeprazole Capsule 20mg,Omeprazole,20mg,Capsule,124,25
+350,Gliclazide Tablet 650mg,Gliclazide,650mg,Tablet,396,1
+351,Vitamin B-Complex Tablet 500mg,Vitamin B-Complex,500mg,Tablet,801,2
+352,Losartan Tablet 50mg,Losartan,50mg,Tablet,423,3
+353,Metronidazole Tablet 650mg,Metronidazole,650mg,Tablet,386,4
+354,Dextromethorphan Syrup 200ml,Dextromethorphan,200ml,Syrup,530,5
+355,Losartan Tablet 20mg,Losartan,20mg,Tablet,505,6
+356,Povidone-Iodine Drops 10ml,Povidone-Iodine,10ml,Drops,241,7
+357,Amlodipine Tablet 100mg,Amlodipine,100mg,Tablet,317,8
+358,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,903,9
+359,Iron & Folic Acid Tablet 5mg,Iron & Folic Acid,5mg,Tablet,983,10
+360,Furosemide Injection 5ml,Furosemide,5ml,Injection,937,11
+361,Salbutamol Inhaler 200 MDI,Salbutamol,200 MDI,Inhaler,394,12
+362,Povidone-Iodine Ointment 15g,Povidone-Iodine,15g,Ointment,420,13
+363,Glycomet Tablet 500mg,Metformin,500mg,Tablet,291,14
+364,Montelukast Tablet 100mg,Montelukast,100mg,Tablet,144,15
+365,Dextromethorphan Syrup 60ml,Dextromethorphan,60ml,Syrup,646,16
+366,Cetzine Syrup 200ml,Cetirizine,200ml,Syrup,932,17
+367,Calcium & Vit D3 Syrup 60ml,Calcium & Vit D3,60ml,Syrup,219,18
+368,Ranitidine Tablet 650mg,Ranitidine,650mg,Tablet,939,19
+369,Pantocid Tablet 5mg,Pantoprazole,5mg,Tablet,532,20
+370,Levoceterizine Tablet 10mg,Levoceterizine,10mg,Tablet,931,21
+371,Glycomet Tablet 20mg,Metformin,20mg,Tablet,533,22
+372,Calcium & Vit D3 Tablet 20mg,Calcium & Vit D3,20mg,Tablet,652,23
+373,Clopidogrel Tablet 100mg,Clopidogrel,100mg,Tablet,233,24
+374,Diclofenac Gel 50g,Diclofenac,50g,Gel,285,25
+375,Dextromethorphan Syrup 100ml,Dextromethorphan,100ml,Syrup,887,1
+376,Omeprazole Capsule 40mg,Omeprazole,40mg,Capsule,272,2
+377,Salbutamol Syrup 100ml,Salbutamol,100ml,Syrup,137,3
+378,Diclofenac Tablet 500mg,Diclofenac,500mg,Tablet,671,4
+379,Salbutamol Inhaler 100 MDI,Salbutamol,100 MDI,Inhaler,372,5
+380,Augmentin Capsule 20mg,Amoxicillin,20mg,Capsule,610,6
+381,Atorvastatin Tablet 250mg,Atorvastatin,250mg,Tablet,661,7
+382,Azithromycin Tablet 650mg,Azithromycin,650mg,Tablet,374,8
+383,Povidone-Iodine Drops 5ml,Povidone-Iodine,5ml,Drops,862,9
+384,Metronidazole Tablet 250mg,Metronidazole,250mg,Tablet,637,10
+385,Dolo Drops 10ml,Paracetamol,10ml,Drops,892,11
+386,Calcium & Vit D3 Tablet 100mg,Calcium & Vit D3,100mg,Tablet,556,12
+387,Vitamin B-Complex Injection 2ml,Vitamin B-Complex,2ml,Injection,478,13
+388,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,299,14
+389,Ranitidine Injection 1gm,Ranitidine,1gm,Injection,547,15
+390,Telmisartan Tablet 100mg,Telmisartan,100mg,Tablet,219,16
+391,Oral Rehydration Salts Drops 10ml,Oral Rehydration Salts,10ml,Drops,238,17
+392,Ranitidine Injection 2ml,Ranitidine,2ml,Injection,493,18
+393,Clopidogrel Tablet 50mg,Clopidogrel,50mg,Tablet,611,19
+394,Calpol Tablet 50mg,Paracetamol,50mg,Tablet,386,20
+395,Insulin Injection 10ml,Insulin,10ml,Injection,584,21
+396,Gliclazide Tablet 100mg,Gliclazide,100mg,Tablet,912,22
+397,Gliclazide Tablet 100mg,Gliclazide,100mg,Tablet,343,23
+398,Vitamin B-Complex Capsule 20mg,Vitamin B-Complex,20mg,Capsule,962,24
+399,Glycomet Tablet 5mg,Metformin,5mg,Tablet,165,25
+400,Prednisolone Drops 5ml,Prednisolone,5ml,Drops,984,1

@@ -1,4 +1,4 @@
-"""
+﻿"""
 EXPORT DATA COMMAND
 ===================
 Exports all database records to CSV files in the data/ folder.
@@ -31,7 +31,7 @@ EXAMPLE:
     Exporting Clinics...
     Exporting Diseases...
     ...
-    ✅ ALL DATA EXPORTED SUCCESSFULLY TO CSV FILES
+     ALL DATA EXPORTED SUCCESSFULLY TO CSV FILES
 
 INTEGRATION:
     Part of the backup/migration workflow with import_data command.
@@ -56,7 +56,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             '--path',
-            default='data/',
+            default='../data/',
             help='Directory to export CSV files to (default: data/)',
         )
 
@@ -192,7 +192,8 @@ class Command(BaseCommand):
                         "disease_id": line.disease_id if line.disease_id else ""
                     })
 
-            self.stdout.write(self.style.SUCCESS("✅ ALL DATA EXPORTED SUCCESSFULLY TO CSV FILES"))
+            self.stdout.write(self.style.SUCCESS(" ALL DATA EXPORTED SUCCESSFULLY TO CSV FILES"))
 
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"❌ ERROR DURING EXPORT: {str(e)}"))
+            self.stdout.write(self.style.ERROR(f" ERROR DURING EXPORT: {str(e)}"))
+

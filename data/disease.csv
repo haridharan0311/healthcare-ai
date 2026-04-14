@@ -1,0 +1,101 @@
+id,name,season,category,severity,is_active,created_at
+1,Dengue,Monsoon,Fever,3,True,2023-01-01T00:00:00
+2,Typhoid,Winter,Fever,2,True,2023-01-01T00:00:00
+3,Viral Fever,All-Season,Fever,4,True,2023-01-01T00:00:00
+4,Malaria,Monsoon,Fever,1,True,2023-01-01T00:00:00
+5,COVID-19,All-Season,Flu,4,True,2023-01-01T00:00:00
+6,Common Cold,All-Season,Flu,1,True,2023-01-01T00:00:00
+7,Influenza,Winter,Flu,4,True,2023-01-01T00:00:00
+8,Diabetes Type 2,Monsoon,Diabetes,4,True,2023-01-01T00:00:00
+9,Diabetes Type 1,Monsoon,Diabetes,2,True,2023-01-01T00:00:00
+10,Hypertension,Monsoon,Hypertension,1,True,2023-01-01T00:00:00
+11,Low Blood Pressure,All-Season,Hypertension,3,True,2023-01-01T00:00:00
+12,Gastritis,Monsoon,Gastritis,3,True,2023-01-01T00:00:00
+13,Peptic Ulcer,Monsoon,Gastritis,2,True,2023-01-01T00:00:00
+14,GERD,Summer,Gastritis,3,True,2023-01-01T00:00:00
+15,Pneumonia,Winter,Infection,2,True,2023-01-01T00:00:00
+16,Tuberculosis,All-Season,Infection,4,True,2023-01-01T00:00:00
+17,Urinary Tract Infection,Monsoon,Infection,2,True,2023-01-01T00:00:00
+18,Cholera,Monsoon,Infection,3,True,2023-01-01T00:00:00
+19,Body Pain,Winter,Pain,1,True,2023-01-01T00:00:00
+20,Migraine,Winter,Pain,2,True,2023-01-01T00:00:00
+21,Back Pain,Summer,Pain,1,True,2023-01-01T00:00:00
+22,Osteoarthritis,Summer,Pain,1,True,2023-01-01T00:00:00
+23,Asthma,Winter,Asthma,4,True,2023-01-01T00:00:00
+24,COPD,Summer,Asthma,4,True,2023-01-01T00:00:00
+25,Bronchitis,Summer,Asthma,1,True,2023-01-01T00:00:00
+26,Skin Rash,Summer,Skin Issues,4,True,2023-01-01T00:00:00
+27,Eczema,Summer,Skin Issues,4,True,2023-01-01T00:00:00
+28,Psoriasis,Monsoon,Skin Issues,1,True,2023-01-01T00:00:00
+29,Athlete's Foot,All-Season,Skin Issues,3,True,2023-01-01T00:00:00
+30,Anemia,Winter,General,3,True,2023-01-01T00:00:00
+31,Vitamin Deficiency,Monsoon,General,4,True,2023-01-01T00:00:00
+32,Gastroenteritis Variant 1,All-Season,Infection,4,True,2023-01-01T00:00:00
+33,Dengue Variant 1,Monsoon,Fever,2,True,2023-01-01T00:00:00
+34,Typhoid Variant 1,Summer,Fever,2,True,2023-01-01T00:00:00
+35,Viral Fever Variant 1,Winter,Fever,4,True,2023-01-01T00:00:00
+36,Malaria Variant 1,Monsoon,Fever,1,True,2023-01-01T00:00:00
+37,COVID-19 Variant 1,Summer,Flu,3,True,2023-01-01T00:00:00
+38,Common Cold Variant 1,Winter,Flu,1,True,2023-01-01T00:00:00
+39,Influenza Variant 1,Summer,Flu,3,True,2023-01-01T00:00:00
+40,Diabetes Type 2 Variant 1,All-Season,Diabetes,3,True,2023-01-01T00:00:00
+41,Diabetes Type 1 Variant 2,Summer,Diabetes,4,True,2023-01-01T00:00:00
+42,Hypertension Variant 2,Winter,Hypertension,2,True,2023-01-01T00:00:00
+43,Low Blood Pressure Variant 2,All-Season,Hypertension,3,True,2023-01-01T00:00:00
+44,Gastritis Variant 2,Winter,Gastritis,2,True,2023-01-01T00:00:00
+45,Peptic Ulcer Variant 2,Monsoon,Gastritis,3,True,2023-01-01T00:00:00
+46,GERD Variant 2,Winter,Gastritis,4,True,2023-01-01T00:00:00
+47,Pneumonia Variant 2,Monsoon,Infection,1,True,2023-01-01T00:00:00
+48,Tuberculosis Variant 2,All-Season,Infection,3,True,2023-01-01T00:00:00
+49,Urinary Tract Infection Variant 2,All-Season,Infection,4,True,2023-01-01T00:00:00
+50,Cholera Variant 2,Monsoon,Infection,2,True,2023-01-01T00:00:00
+51,Body Pain Variant 2,Monsoon,Pain,1,True,2023-01-01T00:00:00
+52,Migraine Variant 2,Summer,Pain,4,True,2023-01-01T00:00:00
+53,Back Pain Variant 2,All-Season,Pain,4,True,2023-01-01T00:00:00
+54,Osteoarthritis Variant 2,Monsoon,Pain,3,True,2023-01-01T00:00:00
+55,Asthma Variant 2,Summer,Asthma,4,True,2023-01-01T00:00:00
+56,COPD Variant 2,Summer,Asthma,4,True,2023-01-01T00:00:00
+57,Bronchitis Variant 2,Winter,Asthma,3,True,2023-01-01T00:00:00
+58,Skin Rash Variant 2,Monsoon,Skin Issues,1,True,2023-01-01T00:00:00
+59,Eczema Variant 2,Monsoon,Skin Issues,4,True,2023-01-01T00:00:00
+60,Psoriasis Variant 2,Monsoon,Skin Issues,1,True,2023-01-01T00:00:00
+61,Athlete's Foot Variant 3,Winter,Skin Issues,3,True,2023-01-01T00:00:00
+62,Anemia Variant 3,Summer,General,3,True,2023-01-01T00:00:00
+63,Vitamin Deficiency Variant 3,Summer,General,1,True,2023-01-01T00:00:00
+64,Gastroenteritis Variant 3,Winter,Infection,3,True,2023-01-01T00:00:00
+65,Dengue Variant 3,Monsoon,Fever,4,True,2023-01-01T00:00:00
+66,Typhoid Variant 3,Summer,Fever,2,True,2023-01-01T00:00:00
+67,Viral Fever Variant 3,Winter,Fever,3,True,2023-01-01T00:00:00
+68,Malaria Variant 3,Monsoon,Fever,1,True,2023-01-01T00:00:00
+69,COVID-19 Variant 3,Monsoon,Flu,4,True,2023-01-01T00:00:00
+70,Common Cold Variant 3,All-Season,Flu,1,True,2023-01-01T00:00:00
+71,Influenza Variant 3,All-Season,Flu,1,True,2023-01-01T00:00:00
+72,Diabetes Type 2 Variant 3,All-Season,Diabetes,4,True,2023-01-01T00:00:00
+73,Diabetes Type 1 Variant 3,Monsoon,Diabetes,3,True,2023-01-01T00:00:00
+74,Hypertension Variant 3,Summer,Hypertension,2,True,2023-01-01T00:00:00
+75,Low Blood Pressure Variant 3,Monsoon,Hypertension,2,True,2023-01-01T00:00:00
+76,Gastritis Variant 3,Summer,Gastritis,4,True,2023-01-01T00:00:00
+77,Peptic Ulcer Variant 3,Monsoon,Gastritis,1,True,2023-01-01T00:00:00
+78,GERD Variant 3,Summer,Gastritis,1,True,2023-01-01T00:00:00
+79,Pneumonia Variant 3,Winter,Infection,3,True,2023-01-01T00:00:00
+80,Tuberculosis Variant 3,Monsoon,Infection,1,True,2023-01-01T00:00:00
+81,Urinary Tract Infection Variant 4,Winter,Infection,4,True,2023-01-01T00:00:00
+82,Cholera Variant 4,Winter,Infection,1,True,2023-01-01T00:00:00
+83,Body Pain Variant 4,All-Season,Pain,3,True,2023-01-01T00:00:00
+84,Migraine Variant 4,Summer,Pain,3,True,2023-01-01T00:00:00
+85,Back Pain Variant 4,Summer,Pain,2,True,2023-01-01T00:00:00
+86,Osteoarthritis Variant 4,Summer,Pain,2,True,2023-01-01T00:00:00
+87,Asthma Variant 4,Monsoon,Asthma,2,True,2023-01-01T00:00:00
+88,COPD Variant 4,All-Season,Asthma,1,True,2023-01-01T00:00:00
+89,Bronchitis Variant 4,Monsoon,Asthma,4,True,2023-01-01T00:00:00
+90,Skin Rash Variant 4,Monsoon,Skin Issues,2,True,2023-01-01T00:00:00
+91,Eczema Variant 4,All-Season,Skin Issues,3,True,2023-01-01T00:00:00
+92,Psoriasis Variant 4,Winter,Skin Issues,4,True,2023-01-01T00:00:00
+93,Athlete's Foot Variant 4,Winter,Skin Issues,2,True,2023-01-01T00:00:00
+94,Anemia Variant 4,Summer,General,4,True,2023-01-01T00:00:00
+95,Vitamin Deficiency Variant 4,All-Season,General,1,True,2023-01-01T00:00:00
+96,Gastroenteritis Variant 4,Winter,Infection,4,True,2023-01-01T00:00:00
+97,Dengue Variant 4,Monsoon,Fever,3,True,2023-01-01T00:00:00
+98,Typhoid Variant 4,Monsoon,Fever,2,True,2023-01-01T00:00:00
+99,Viral Fever Variant 4,Monsoon,Fever,2,True,2023-01-01T00:00:00
+100,Malaria Variant 4,Monsoon,Fever,2,True,2023-01-01T00:00:00
