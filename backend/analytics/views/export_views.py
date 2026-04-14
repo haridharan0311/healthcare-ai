@@ -305,107 +305,66 @@ class ExportRestockView(APIView):
 
 
 class ExportReportView(APIView):
-    """GET /api/export-report/ — combined CSV (legacy, kept for compatibility)"""
+    """
+    GET /api/export-report/
+    
+    FEATURE 10: Intelligent Reporting System.
+    Generates a combined CSV report with:
+    1. Strategic Recommendations (Decision Layer)
+    2. Active Outbreaks & Spikes (Prediction Layer)
+    3. Forecasted Medicine Needs (Inventory Prediction)
+    """
     def get(self, request):
-        start, end    = _get_date_range(request)
-        current_month = date.today().month
-        mid           = end - timedelta(days=7)
-
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = (
-            f'attachment; filename="health_report_{end}.csv"'
-        )
-        writer = csv.writer(response)
-
-        # Section 1
-        writer.writerow([])
-        writer.writerow(['DISEASE TREND REPORT', f'Period: {start} to {end}'])
-        writer.writerow(['Disease', 'Season', 'Total Cases', 'Trend Score', 'Seasonal Weight', 'Status'])
-
-        recent_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(mid, end), disease__isnull=False)
-            .select_related('disease')
-            .values('disease__name', 'disease__season')
-            .annotate(cnt=Count('id'))
-        )
-        older_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(start, mid), disease__isnull=False)
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(cnt=Count('id'))
-        )
-        older_map = {get_disease_type(r['disease__name']): r['cnt'] for r in older_qs}
-        type_data = defaultdict(lambda: {'season': 'All', 'recent': 0, 'older': 0})
-
-        for row in recent_qs:
-            dtype = get_disease_type(row['disease__name'])
-            type_data[dtype]['season']  = row['disease__season']
-            type_data[dtype]['recent'] += row['cnt']
-            type_data[dtype]['older']  += older_map.get(dtype, 0)
-
-        rows = []
-        for dtype, data in type_data.items():
-            sw     = get_seasonal_weight(data['season'], current_month)
-            score  = round(weighted_trend_score(data['recent'], data['older']) * sw, 2)
-            total  = data['recent'] + data['older']
-            status = 'High' if score > 50 else 'Moderate' if score > 20 else 'Low'
-            rows.append((dtype, data['season'], total, score, sw, status))
-        for row in sorted(rows, key=lambda x: x[3], reverse=True):
-            writer.writerow(row)
-
-        # Section 2
-        writer.writerow([])
-        writer.writerow(['SPIKE ALERTS', f'As of: {end}'])
-        writer.writerow(['Disease', 'Today Count', 'Mean (7d)', 'Std Dev', 'Threshold', 'Spike?'])
-        # Optimized Spike Detection Section
-        spike_range_start = end - timedelta(days=8)
-        spike_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(spike_range_start, end),
-                disease__isnull=False
-            )
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name')
-            .annotate(cnt=Count('id'))
-        )
+        from ..services.insights_service import InsightsService
+        from ..services.forecasting import ForecastingService
         
-        spike_data_map = defaultdict(lambda: defaultdict(int))
-        for row in spike_qs:
-            dt = get_disease_type(row['disease__name'])
-            spike_data_map[dt][row['appt_date']] += row['cnt']
-
-        for dtype, data in type_data.items():
-            d_map = spike_data_map.get(dtype, {})
-            daily = _build_daily_list(spike_data_map, dtype, spike_range_start, end)
-            s = detect_spike(daily)
-            writer.writerow([dtype, s['today_count'], s['mean_last_7_days'],
-                             s['std_dev'], s['threshold'], 'YES' if s['is_spike'] else 'no'])
-
-        # Section 3
+        days = 30
+        service = InsightsService()
+        forecasting = ForecastingService()
+        insights = service.get_actionable_insights(days=days)
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="intelligent_health_report_{date.today()}.csv"'
+        writer = csv.writer(response)
+        
+        # Section 1: Strategic Summary & Inferred Actions
+        writer.writerow(['DECISION SUPPORT SUMMARY'])
+        writer.writerow(['Risk Level', insights['metadata']['risk_level'], 'Buffer', insights['metadata']['safety_buffer']])
         writer.writerow([])
-        writer.writerow(['RESTOCK SUGGESTIONS'])
-        writer.writerow(['Drug', 'Generic Name', 'Current Stock', 'Predicted Demand', 'Suggested Restock', 'Status'])
-        # Filter Section 3 to only include active or low stock items
-        usage_drugs = {r['drug__drug_name'] for r in qty_qs}
-        stock_map = {
-            r['drug_name']: r['total']
-            for r in DrugMaster.objects
-            .filter(Q(drug_name__in=usage_drugs) | Q(current_stock__lt=10))
-            .values('drug_name')
-            .annotate(total=Sum('current_stock'))
-        }
-        count = 0
-        for drug_name, stock in sorted(stock_map.items()):
-            status = 'critical' if stock == 0 else 'sufficient'
-            writer.writerow([drug_name, _get_generic(drug_name), stock, '—', '—', status])
-            count += 1
-            if count >= 1000: # Legacy report cap
-                break
-
+        writer.writerow(['STRATEGIC RECOMMENDATIONS'])
+        for rec in insights['recommendations']:
+            writer.writerow([rec])
+        writer.writerow([])
+        
+        # Section 2: Active Alerts & Outbreaks
+        writer.writerow(['ACTIVE ALERTS (Outbreaks & Spikes)'])
+        writer.writerow(['Disease', 'Severity', 'Current Cases', 'Expected Normal', 'Status'])
+        for o in insights['outbreaks']:
+            writer.writerow([o['disease'], o['severity'], o['current_cases'], o['expected_normal'], 'Critical' if o['severity'] == 'Critical' else 'Warning'])
+        writer.writerow([])
+        
+        # Section 3: Rising Trends (Growth Rates)
+        writer.writerow(['RISING THREATS (Growth Analysis)'])
+        writer.writerow(['Disease', 'Growth Rate (%)', 'Recent Cases', 'Status'])
+        for t in insights['rising_trends']:
+            writer.writerow([t['disease'], t.get('growth_rate', 0), t.get('recent_cases', 0), 'High Growth' if t.get('growth_rate', 0) > 20 else 'Stable'])
+        writer.writerow([])
+        
+        # Section 4: Critical Resource & Stock Depletion
+        writer.writerow(['CRITICAL RESOURCE & DEPLETION FORECAST'])
+        writer.writerow(['Drug Name', 'Current Stock', 'Days until Depletion', 'Expected Date', 'Recommendation'])
+        for s in insights['critical_stock']:
+            # Enrich with depletion forecast
+            depletion = forecasting.forecast_stock_depletion(s['drug_name'])
+            writer.writerow([
+                s['drug_name'], s['current_stock'], 
+                depletion.get('days_until_depletion', 'N/A'),
+                depletion.get('depletion_date', 'N/A'),
+                depletion.get('recommendation', 'N/A')
+            ])
+            
         return response
+
     
 
 

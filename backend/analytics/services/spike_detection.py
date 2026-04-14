@@ -60,6 +60,14 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
     
     threshold = mean + (2 * std_dev)
     is_spike = today > threshold
+    
+    # Impact Intelligence: Level thresholds
+    severity = "normal"
+    if is_spike:
+        impact_ratio = today / threshold if threshold > 0 else 2.0
+        if impact_ratio > 2.0: severity = "critical"
+        elif impact_ratio > 1.2: severity = "warning"
+        else: severity = "mild"
 
     return {
         "today_count": today,
@@ -67,7 +75,8 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
         "std_dev": round(std_dev, 2),
         "threshold": round(threshold, 2),
         "is_spike": is_spike,
-        "confidence": confidence
+        "confidence": confidence,
+        "impact_severity": severity
     }
 
 
@@ -128,16 +137,21 @@ class SpikeDetectionService:
             # Check for consecutive growth in the last N days
             recent = counts[-min_days:]
             if all(recent[i] < recent[i+1] for i in range(len(recent)-1)) and recent[-1] >= min_cases:
+                # Scoring logic for Feature 2
                 growth_multiplier = recent[-1] / recent[0] if recent[0] > 0 else 1.0
+                score = (growth_multiplier * 50) + (len(recent) * 10)
+                
                 outbreaks.append({
                     'disease_name': dtype,
                     'trend_days': min_days,
                     'start_count': recent[0],
                     'end_count': recent[-1],
                     'growth_multiplier': round(growth_multiplier, 2),
-                    'severity': 'critical' if growth_multiplier > 2.0 else 'warning',
-                    'message': f"Consistent upward trend detected for {dtype} over {min_days} days."
+                    'impact_score': round(score, 1),
+                    'severity': 'critical' if score > 100 else 'warning',
+                    'message': f"Feature 2 Alert: Consistent growth detected for {dtype} ({round(growth_multiplier*100-100, 1)}% increase)."
                 })
+        return sorted(outbreaks, key=lambda x: x['impact_score'], reverse=True)
     def generate_spike_alerts(self) -> List[Dict]:
         """Convenience method for getting latest spike alerts (Fixed 8-day window)."""
         return self.detect_disease_spikes(days=8)

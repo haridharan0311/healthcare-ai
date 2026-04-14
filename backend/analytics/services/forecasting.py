@@ -443,7 +443,16 @@ class ForecastingService:
                 'days_until_depletion': round(days_left, 1),
                 'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
                 'status': status,
-                'analysis_period_days': days
+                'analysis_period_days': days,
+                'recommendation': self._get_depletion_recommendation(status, days_left)
             }
         except Exception as e:
             return {'error': str(e)}
+
+    def _get_depletion_recommendation(self, status: str, days_left: float) -> str:
+        """Helper to generate actions for Feature 4."""
+        if status == 'critical':
+            return f"Action Required: Stockout expected in {round(days_left, 1)} days. Place emergency order today."
+        elif status == 'low':
+            return f"Order Soon: Stock will be depleted in approximately {round(days_left, 1)} days."
+        return "Stock levels are currently sufficient for the projected usage."

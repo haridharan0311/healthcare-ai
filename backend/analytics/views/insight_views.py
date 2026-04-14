@@ -52,11 +52,12 @@ class AnalyticsPlatformDashboardView(APIView):
                     'top_diseases': dashboard_data['top_diseases'],
                     'forecasts': dashboard_data['forecasts'],
                     'decisions': dashboard_data['decisions'],
+                    'insights': dashboard_data.get('insights', {})
                 },
                 'metadata': {
                     'platform': 'Healthcare AI Platform',
-                    'version': '4.0 (Optimized Simple Flow)',
-                    'architecture': 'Single Service Pass',
+                    'version': '4.1 (Tiered Architecture)',
+                    'architecture': 'Multi-Layer Service coordination',
                     'generated_at': date.today().isoformat(),
                     'historical_period': f'Last {days} days',
                     'forecast_horizon': f'Next {forecast_days} days'
@@ -69,3 +70,53 @@ class AnalyticsPlatformDashboardView(APIView):
                 'success': False,
                 'error': "Internal server error during dashboard generation."
             }, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class InsightsSummaryView(APIView):
+    """
+    GET /api/insights/summary/
+    
+    FEATURE 9: Multi-Level Insights.
+    Returns high-level decisions, outbreaks, and strategic recommendations.
+    """
+    
+    @cache_api_response(timeout=600)
+    def get(self, request):
+        try:
+            from ..services.insights_service import InsightsService
+            days = int(request.query_params.get('days', 30))
+            
+            service = InsightsService()
+            insights = service.get_actionable_insights(days=days)
+            
+            return Response({
+                'success': True,
+                'insights': insights
+            })
+        except Exception as e:
+            logger.error(f"Insights error: {str(e)}")
+            return Response({'error': str(e)}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class UnifiedAlertView(APIView):
+    """
+    GET /api/insights/alerts/
+    
+    FEATURE 8: Unified Real-Time Alert System.
+    Combines outbreaks, statistical spikes, and critical shortages.
+    """
+    
+    @cache_api_response(timeout=60) # 1 minute cache for "near real-time" feel
+    def get(self, request):
+        try:
+            from ..services.insights_service import InsightsService
+            service = InsightsService()
+            alerts = service.get_unified_alert_stream()
+            
+            return Response({
+                'success': True,
+                'count': len(alerts),
+                'alerts': alerts,
+                'status': 'Critical' if any(a['priority'] == 'Critical' for a in alerts) else 'Stable'
+            })
+        except Exception as e:
+            logger.error(f"Alerts error: {str(e)}")
+            return Response({'error': str(e)}, status=drf_status.HTTP_500_INTERNAL_SERVER_ERROR)

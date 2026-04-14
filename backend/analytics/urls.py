@@ -41,6 +41,8 @@ urlpatterns = [
 
     # ── UNIFIED SIMPLE FLOW API ───────────────────────────────────────
     path('insights/platform-dashboard/', insight_views.AnalyticsPlatformDashboardView.as_view(), name='platform-dashboard'),
+    path('insights/summary/',            insight_views.InsightsSummaryView.as_view(),            name='insights-summary'),
+    path('insights/alerts/',             insight_views.UnifiedAlertView.as_view(),               name='insights-alerts'),
 
     # ── CRUD ───────────────────────────────────────────────────────────
     path('crud/dropdowns/',            dropdown_options,                       name='dropdown-options'),
