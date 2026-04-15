@@ -1,4 +1,4 @@
-﻿"""
+"""
 EXPORT DATA COMMAND
 ===================
 Exports all database records to CSV files in the data/ folder.
@@ -73,10 +73,27 @@ class Command(BaseCommand):
                 writer = csv.DictWriter(f, fieldnames=["id", "clinic_name", "clinic_address_1"])
                 writer.writeheader()
                 for clinic in Clinic.objects.all():
+                    })
+
+            # ================== USERS ==================
+            self.stdout.write("Exporting Users & Profiles...")
+            from django.contrib.auth.models import User
+            from core.models import UserProfile
+
+            with open(os.path.join(base_path, "users.csv"), "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=["id", "username", "email", "password", "role", "clinic_id", "date_joined", "last_login"])
+                writer.writeheader()
+                profiles = UserProfile.objects.select_related('user', 'clinic').all()
+                for p in profiles:
                     writer.writerow({
-                        "id": clinic.id,
-                        "clinic_name": clinic.clinic_name,
-                        "clinic_address_1": clinic.clinic_address_1
+                        "id": p.user.id,
+                        "username": p.user.username,
+                        "email": p.user.email,
+                        "password": p.user.password,
+                        "role": p.role,
+                        "clinic_id": p.clinic_id if p.clinic_id else "",
+                        "date_joined": p.user.date_joined,
+                        "last_login": p.user.last_login if p.user.last_login else ""
                     })
 
             # ================== DISEASE ==================

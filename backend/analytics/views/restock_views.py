@@ -35,7 +35,7 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # restock_views.py extracted classes
@@ -61,17 +61,15 @@ class RestockSuggestionView(APIView):
         mid           = end - timedelta(days=7)
 
         # ── 1.1 Disease case counts — ORM Count ──────────────────────
-        appt_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name', 'disease__season')
-            .annotate(day_count=Count('id'))
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
         )
+        appt_qs = apply_clinic_filter(appt_qs_base, request) \
+            .select_related('disease') \
+            .annotate(appt_date=TruncDate('appointment_datetime')) \
+            .values('appt_date', 'disease__name', 'disease__season') \
+            .annotate(day_count=Count('id'))
 
         daily_by_dtype = defaultdict(lambda: defaultdict(int))
         dtype_season   = {}
@@ -82,22 +80,21 @@ class RestockSuggestionView(APIView):
             daily_by_dtype[dtype][row['appt_date']] += row['day_count']
 
         # ── 1.3 Medicine usage: avg_usage = Sum(qty)/Count(cases) ────
-        # Total cases per disease type
         disease_case_map = defaultdict(int)
         for dtype, day_map in daily_by_dtype.items():
             disease_case_map[dtype] = sum(day_map.values())
 
         # Sum(quantity) per drug — ORM Sum, no loops
-        qty_qs = (
-            PrescriptionLine.objects
-            .filter(
-                prescription_date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('drug', 'disease')
-            .values('drug__drug_name', 'disease__name')
-            .annotate(total_qty=Sum('quantity'))
+        qty_qs_base = PrescriptionLine.objects.filter(
+            prescription_date__range=(start, end),
+            disease__isnull=False,
         )
+        # Note: PrescriptionLine has a ForeignKey to Prescription, which has clinic.
+        # But we can also use 'prescription__clinic' if clinic is on prescription.
+        qty_qs = apply_clinic_filter(qty_qs_base, request, clinic_field='prescription__clinic') \
+            .select_related('drug', 'disease') \
+            .values('drug__drug_name', 'disease__name') \
+            .annotate(total_qty=Sum('quantity'))
 
         drug_qty_map   = defaultdict(int)
         drug_cases_map = defaultdict(int)
@@ -208,8 +205,14 @@ class DistrictRestockView(APIView):
         clinic_ids = []
 
         if not district_filter:
-            # We list all Clinics now, not Districts
-            all_clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
+            # Multi-tenant logic: Clinic users only see THEIR clinic
+            user = request.user
+            profile = getattr(user, 'profile', None)
+            
+            if profile and profile.role == 'CLINIC_USER' and profile.clinic:
+                all_clinics = [profile.clinic.clinic_name]
+            else:
+                all_clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
 
             return Response({
                 'districts': sorted(all_clinics),

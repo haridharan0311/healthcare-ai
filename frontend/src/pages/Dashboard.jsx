@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../AuthContext';
 import {
   fetchPlatformStats,
   fetchPlatformTrends,
@@ -17,6 +18,7 @@ import SummaryCards     from '../components/SummaryCards';
 import CsvPreviewModal  from '../components/CsvPreviewModal';
 
 export default function Dashboard() {
+  const { user, logout } = useAuth();
   const [csvModal, setCsvModal]       = useState(null);
 
   const [summaryTrends, setSummaryTrends] = useState([]);
@@ -62,10 +64,11 @@ export default function Dashboard() {
     // 3. Fetch Heavy Medicines (Non-blocking)
     setMedicinesLoaded(false);
     fetchPlatformMedicines(30).then(res => {
-      const decisions = res.data || [];
+      const allDecisions = res.data || [];
+      const decisions = allDecisions.slice(0, 3);
       setLowStock({
-         critical: decisions.filter(d => d.priority === 'High').length,
-         out_of_stock: decisions.filter(d => d.current_stock === 0).length
+         critical: allDecisions.filter(d => d.priority === 'High').length,
+         out_of_stock: allDecisions.filter(d => d.current_stock === 0).length
       });
       setTopMedicines(decisions.map(d => ({
          drug_name: d.drug,
@@ -120,6 +123,7 @@ export default function Dashboard() {
     setCsvModal({ type, rows, url });
   };
 
+  /*
   const handleToggleSimulator = () => {
     const action = simStatus.running ? 'stop' : 'start';
     toggleSimulator(action, simStatus.interval).then(res => {
@@ -139,6 +143,7 @@ export default function Dashboard() {
         setSimStatus(prev => ({ ...prev, interval: val }));
     }
   };
+  */
 
 
   return (
@@ -167,6 +172,27 @@ export default function Dashboard() {
             fontWeight: 800, fontSize: 16
           }}>H</div>
           <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>Healthcare <span style={{ color: '#2563eb' }}>AI</span></span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          {/* User Profile */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingRight: 24, borderRight: '1px solid #e2e8f0' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{user.username}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>{user.role}</div>
+            </div>
+            <div style={{ 
+              width: 36, height: 36, background: '#f1f5f9', borderRadius: '50%', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18
+            }}>👤</div>
+            <button 
+              onClick={logout}
+              style={{
+                background: 'transparent', border: 'none', color: '#dc2626', fontSize: 12, 
+                fontWeight: 700, cursor: 'pointer', padding: '4px 8px'
+              }}
+            >Log Out</button>
+          </div>
         </div>
 
         <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -230,8 +256,12 @@ export default function Dashboard() {
         
         {/* Welcome Section */}
         <div style={{ marginBottom: 40 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.75px', color: '#0f172a' }}>Analytics Dashboard</h1>
-          <p style={{ margin: 0, color: '#64748b', fontSize: 16, fontWeight: 500 }}>Real-time epidemiological monitoring & inventory analysis</p>
+          <h1 style={{ fontSize: 32, fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.75px', color: '#0f172a' }}>
+            {user.role === 'ADMIN' ? 'Analytics Dashboard' : `${user.clinic_name} Analytics`}
+          </h1>
+          <p style={{ margin: 0, color: '#64748b', fontSize: 16, fontWeight: 500 }}>
+            {user.role === 'ADMIN' ? 'Global epidemiological monitoring & inventory analysis' : `Local monitoring dashboard for ${user.clinic_name}`}
+          </p>
         </div>
 
         {/* Top 5 metrics */}

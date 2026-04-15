@@ -110,6 +110,39 @@ class Command(BaseCommand):
 
                 clinic_map = {c.id: c for c in Clinic.objects.all()}
 
+                # ---------------- USERS ----------------
+                self.stdout.write("Importing Users & Profiles...")
+                from django.contrib.auth.models import User
+                from core.models import UserProfile
+                
+                with open(base_path + "users.csv") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # Create or get user
+                        user, created = User.objects.get_or_create(
+                            username=row["username"],
+                            defaults={
+                                "email": row["email"],
+                                "date_joined": make_aware(parse_datetime(row["date_joined"])) if row["date_joined"] else date.today(),
+                                "last_login": make_aware(parse_datetime(row["last_login"])) if row["last_login"] else None,
+                            }
+                        )
+                        # Set hashed password directly
+                        user.password = row["password"]
+                        user.save()
+                        
+                        # Create/Update profile
+                        clinic_id = row.get("clinic_id")
+                        clinic_obj = clinic_map.get(int(clinic_id)) if clinic_id and clinic_id.strip() else None
+                        
+                        UserProfile.objects.update_or_create(
+                            user=user,
+                            defaults={
+                                "clinic": clinic_obj,
+                                "role": row["role"]
+                            }
+                        )
+
                 # ---------------- DISEASE ----------------
                 self.stdout.write("Importing Diseases...")
                 diseases = []

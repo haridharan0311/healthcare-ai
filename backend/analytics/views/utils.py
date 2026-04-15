@@ -94,3 +94,31 @@ def _get_date_range(request):
         days = 30
     return _get_db_date_range(days)
 
+def apply_clinic_filter(queryset, request, clinic_field='clinic'):
+    """
+    Filters a queryset based on the logged-in user's role and assigned clinic.
+    - Super admins: No filter applied.
+    - Clinic users: Filtered by user.profile.clinic.
+    """
+    user = request.user
+    if not user.is_authenticated:
+        return queryset.none()
+    
+    # Try to get UserProfile
+    try:
+        profile = user.profile
+    except Exception:
+        # Fallback if profile doesn't exist (e.g. system admin)
+        if user.is_superuser:
+            return queryset
+        return queryset.none()
+
+    if profile.role == 'ADMIN':
+        return queryset
+    
+    if profile.role == 'CLINIC_USER' and profile.clinic:
+        filter_kwargs = {clinic_field: profile.clinic}
+        return queryset.filter(**filter_kwargs)
+    
+    return queryset.none()
+

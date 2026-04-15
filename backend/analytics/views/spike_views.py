@@ -34,7 +34,7 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # spike_views.py extracted classes
@@ -61,17 +61,15 @@ class SpikeAlertView(APIView):
         start = end - timedelta(days=days)
 
         # ORM aggregation — group by date and disease type
-        qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name', 'disease__season')
-            .annotate(day_count=Count('id'))
+        qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
         )
+        qs = apply_clinic_filter(qs_base, request) \
+            .select_related('disease') \
+            .annotate(appt_date=TruncDate('appointment_datetime')) \
+            .values('appt_date', 'disease__name', 'disease__season') \
+            .annotate(day_count=Count('id'))
 
         daily_by_dtype = defaultdict(lambda: defaultdict(int))
         type_season    = {}

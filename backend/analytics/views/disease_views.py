@@ -34,7 +34,7 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # disease_views.py extracted classes
@@ -312,12 +312,12 @@ class DoctorWiseTrendsView(APIView):
             limit     = 3
 
         # Pure ORM aggregation — group by doctor + disease
+        qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
+        )
         qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
+            apply_clinic_filter(qs_base, request)
             .select_related('doctor', 'disease')
             .values(
                 'doctor__id',

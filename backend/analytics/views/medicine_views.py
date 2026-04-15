@@ -37,7 +37,7 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # medicine_views.py extracted classes
@@ -57,16 +57,14 @@ class MedicineUsageView(APIView):
         start, end = _get_date_range(request)
 
         # Step 1: Count total cases per disease type — ORM Count
-        appt_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(total_cases=Count('id'))
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
         )
+        appt_qs = apply_clinic_filter(appt_qs_base, request) \
+            .select_related('disease') \
+            .values('disease__name') \
+            .annotate(total_cases=Count('id'))
 
         disease_case_map = defaultdict(int)
         for row in appt_qs:
@@ -77,25 +75,23 @@ class MedicineUsageView(APIView):
             return Response([])
 
         # Step 2: Sum(quantity) grouped by drug + disease — ORM Sum
-        usage_qs = (
-            PrescriptionLine.objects
-            .filter(
-                prescription_date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('drug', 'disease')
+        usage_qs_base = PrescriptionLine.objects.filter(
+            prescription_date__range=(start, end),
+            disease__isnull=False,
+        )
+        usage_qs = apply_clinic_filter(usage_qs_base, request, clinic_field='prescription__clinic') \
+            .select_related('drug', 'disease') \
             .values(
                 'drug__drug_name',
                 'drug__generic_name',
                 'disease__name',
                 'disease__season',
-            )
+            ) \
             .annotate(
                 total_quantity=Sum('quantity'),
                 prescription_count=Count('id'),
-            )
+            ) \
             .order_by('drug__drug_name', 'disease__name')
-        )
 
         # Step 3: Aggregate by disease type, compute avg_usage per DB formula
         type_usage = defaultdict(lambda: defaultdict(lambda: {
@@ -161,20 +157,18 @@ class TopMedicinesView(APIView):
         limit = min(max(limit, 1), 50)
 
         # Find top medicines by usage in one aggregated query.
-        usage_qs = (
-            PrescriptionLine.objects
-            .filter(prescription_date__range=(start, end))
+        usage_qs_base = PrescriptionLine.objects.filter(prescription_date__range=(start, end))
+        usage_qs = apply_clinic_filter(usage_qs_base, request, clinic_field='prescription__clinic') \
             .values(
                 'drug__id', 'drug__drug_name', 'drug__generic_name', 'drug__dosage_type'
-            )
+            ) \
             .annotate(
                 current_stock=Sum('drug__current_stock'),
                 variant_count=Count('drug', distinct=True),
                 prescription_count=Count('id'),
                 total_quantity=Sum('quantity'),
-            )
+            ) \
             .order_by('-total_quantity', '-prescription_count')
-        )
 
         total_drugs = usage_qs.count()
         top_rows = list(usage_qs[:limit])
@@ -219,17 +213,16 @@ class LowStockAlertView(APIView):
         from django.db.models import Avg as DAvg, Count as DCount
 
         # Average stock per clinic per drug — meaningful comparison
-        stock_qs = (
-            DrugMaster.objects
-            .values('drug_name', 'generic_name')
+        stock_qs_base = DrugMaster.objects.all()
+        stock_qs = apply_clinic_filter(stock_qs_base, request) \
+            .values('drug_name', 'generic_name') \
             .annotate(
                 avg_stock=DAvg('current_stock'),
                 total_stock=Sum('current_stock'),
                 clinic_count=DCount('clinic', distinct=True),
-            )
-            .filter(avg_stock__isnull=False)  # Avoid null values
+            ) \
+            .filter(avg_stock__isnull=False) \
             .order_by('avg_stock')
-        )
 
         results = []
         out_of_stock = critical = low = warning = 0

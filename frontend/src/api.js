@@ -3,8 +3,27 @@ import axios from 'axios';
 const BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 const CRUD = `${BASE}/crud`;
 
+const apiInstance = axios.create({
+  baseURL: BASE,
+  timeout: 120000,
+});
+
+apiInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 const api = (url, params = {}) =>
-  axios.get(`${BASE}${url}`, { params, timeout: 120000 });
+  apiInstance.get(url, { params });
+
+// ── Authentication ────────────────────────────────────────────────────
+export const login = (username, password) => 
+  axios.post(`${BASE}/token/`, { username, password });
+
+export const fetchMe = () => api('/me/');
 
 // ── Core analytics ────────────────────────────────────────────────────
 export const fetchTrends       = (days = 30)  => api('/disease-trends/', { days });

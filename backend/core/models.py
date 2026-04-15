@@ -1,5 +1,5 @@
 from django.db import models
-
+from django.contrib.auth.models import User
 
 class Clinic(models.Model):
     clinic_name = models.CharField(max_length=255)
@@ -7,6 +7,18 @@ class Clinic(models.Model):
 
     def __str__(self):
         return self.clinic_name
+
+class UserProfile(models.Model):
+    ROLE_CHOICES = (
+        ('ADMIN', 'Super Admin'),
+        ('CLINIC_USER', 'Clinic User'),
+    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    clinic = models.ForeignKey(Clinic, on_delete=models.SET_NULL, null=True, blank=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.role}"
 
 
 class Doctor(models.Model):

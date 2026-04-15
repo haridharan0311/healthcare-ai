@@ -3,6 +3,7 @@ from datetime import date, timedelta, datetime, time
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from analytics.models import Appointment
+from .utils import apply_clinic_filter
 from ..services.dashboard_service import DashboardService
 
 class DashboardStatsView(APIView):
@@ -14,18 +15,20 @@ class DashboardStatsView(APIView):
         today_dt_start = datetime.combine(today, time.min)
         today_dt_end = datetime.combine(today, time.max)
         
-        total_today = Appointment.objects.filter(
+        total_today_qs = Appointment.objects.filter(
             appointment_datetime__range=(today_dt_start, today_dt_end),
             disease__isnull=False
-        ).count()
+        )
+        total_today = apply_clinic_filter(total_today_qs, request).count()
 
         # 2. Total Last 30 Days
         start_date = today - timedelta(days=days)
         start_dt = datetime.combine(start_date, time.min)
-        total_30d = Appointment.objects.filter(
+        total_30d_qs = Appointment.objects.filter(
             appointment_datetime__range=(start_dt, today_dt_end),
             disease__isnull=False
-        ).count()
+        )
+        total_30d = apply_clinic_filter(total_30d_qs, request).count()
 
         return Response({
             'total_today': total_today,
