@@ -35,71 +35,56 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # export_views.py extracted classes
 
 class ExportDiseaseTrendsView(APIView):
-    """GET /api/export/disease-trends/ — CSV download"""
+    """GET /api/export/disease-trends/ — Comparison-based CSV"""
     def get(self, request):
         start, end    = _get_date_range(request)
+        days = (end - start).days + 1
         current_month = date.today().month
-        mid           = end - timedelta(days=7)
+        
+        # Period 1 (Current): start to end
+        # Period 2 (Prior): same length before start
+        p1_start, p1_end = start, end
+        p2_start, p2_end = p1_start - timedelta(days=days), p1_start - timedelta(days=1)
 
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = (
-            f'attachment; filename="disease_trends_{end}.csv"'
-        )
+        response['Content-Disposition'] = f'attachment; filename="disease_trends_{end}.csv"'
         writer = csv.writer(response)
+        
         writer.writerow([
             'Disease', 'Season', 'Category', 'Severity',
-            'Total Cases', 'Recent Cases (7d)', 'Older Cases',
-            'Trend Score', 'Seasonal Weight', 'Status',
-            'Period Start', 'Period End'
+            f'Cases ({days}d Current)', f'Cases ({days}d Previous)', 'Growth %',
+            'Trend Status', 'Seasonal Weight', 'Start Date', 'End Date'
         ])
 
-        recent_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(mid, end), disease__isnull=False)
-            .select_related('disease')
-            .values('disease__name', 'disease__season',
-                    'disease__category', 'disease__severity')
-            .annotate(cnt=Count('id'))
-        )
-        older_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(start, mid), disease__isnull=False)
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(cnt=Count('id'))
-        )
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
 
-        older_map = {get_disease_type(r['disease__name']): r['cnt'] for r in older_qs}
-        type_data = defaultdict(lambda: {'season': 'All', 'category': '', 'severity': 1, 'recent': 0, 'older': 0})
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request).exclude(var_filter)
 
-        for row in recent_qs:
-            dtype = get_disease_type(row['disease__name'])
-            type_data[dtype].update({
-                'season': row['disease__season'],
-                'category': row['disease__category'] or '',
-                'severity': row['disease__severity'],
-            })
-            type_data[dtype]['recent'] += row['cnt']
-            type_data[dtype]['older']  += older_map.get(dtype, 0)
+        results = compare_disease_trends(p2_start, p2_end, p1_start, p1_end, queryset=appt_qs)
 
-        rows = []
-        for dtype, data in type_data.items():
-            sw     = get_seasonal_weight(data['season'], current_month)
-            score  = round(weighted_trend_score(data['recent'], data['older']) * sw, 2)
-            total  = data['recent'] + data['older']
-            status = 'High' if score > 50 else 'Moderate' if score > 20 else 'Low'
-            rows.append((dtype, data['season'], data['category'], data['severity'],
-                         total, data['recent'], data['older'], score, sw, status, start, end))
+        for r in results:
+            # Fetch extra metadata for the row
+            d_name = r['disease_name']
+            d_obj = Disease.objects.filter(name__icontains=d_name).first()
+            season = d_obj.season if d_obj else 'All'
+            cat    = d_obj.category if d_obj else ''
+            sev    = d_obj.severity if d_obj else 1
+            sw     = get_seasonal_weight(season, current_month)
 
-        rows.sort(key=lambda x: x[7], reverse=True)
-        for row in rows:
-            writer.writerow(row)
+            writer.writerow([
+                d_name, season, cat, sev,
+                r['period1_count'], r['period2_count'], f"{r['growth_rate']}%",
+                r['direction'].upper(), sw, p1_start, p1_end
+            ])
+            
         return response
 
 
@@ -127,14 +112,14 @@ class ExportSpikeAlertsView(APIView):
             'Is Spike', 'Severity', 'Baseline Days', 'As Of Date'
         ])
 
-        qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(start, end), disease__isnull=False)
-            .select_related('disease')
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name', 'disease__season', 'disease__severity')
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        qs_base = Appointment.objects.filter(appointment_datetime__date__range=(start, end), disease__isnull=False).exclude(var_filter)
+        qs = apply_clinic_filter(qs_base, request) \
+            .select_related('disease') \
+            .annotate(appt_date=TruncDate('appointment_datetime')) \
+            .values('appt_date', 'disease__name', 'disease__season', 'disease__severity') \
             .annotate(day_count=Count('id'))
-        )
 
         daily_by_dtype = defaultdict(lambda: defaultdict(int))
         type_season    = {}
@@ -186,15 +171,15 @@ class ExportRestockView(APIView):
             'Contributing Diseases', 'Period'
         ])
 
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
         # Demand computation (ORM only)
-        appt_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__date__range=(start, end), disease__isnull=False)
-            .select_related('disease')
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name', 'disease__season')
+        appt_qs_base = Appointment.objects.filter(appointment_datetime__date__range=(start, end), disease__isnull=False).exclude(var_filter)
+        appt_qs = apply_clinic_filter(appt_qs_base, request) \
+            .select_related('disease') \
+            .annotate(appt_date=TruncDate('appointment_datetime')) \
+            .values('appt_date', 'disease__name', 'disease__season') \
             .annotate(day_count=Count('id'))
-        )
 
         daily_by_dtype = defaultdict(lambda: defaultdict(int))
         dtype_season   = {}
@@ -205,13 +190,11 @@ class ExportRestockView(APIView):
 
         disease_case_map = {dtype: sum(dm.values()) for dtype, dm in daily_by_dtype.items()}
 
-        qty_qs = (
-            PrescriptionLine.objects
-            .filter(prescription_date__range=(start, end), disease__isnull=False)
-            .select_related('drug', 'disease')
-            .values('drug__drug_name', 'disease__name')
+        qty_qs_base = PrescriptionLine.objects.filter(prescription_date__range=(start, end), disease__isnull=False).exclude(var_filter | Q(drug__drug_name__icontains='Vari') | Q(drug__drug_name__endswith=' V'))
+        qty_qs = apply_clinic_filter(qty_qs_base, request, clinic_field='prescription__clinic') \
+            .select_related('drug', 'disease') \
+            .values('drug__drug_name', 'disease__name') \
             .annotate(total_qty=Sum('quantity'))
-        )
 
         drug_qty_map     = defaultdict(int)
         drug_cases_map   = defaultdict(int)
@@ -243,9 +226,9 @@ class ExportRestockView(APIView):
         active_drugs = set(avg_usage_map.keys())
         district_filter = request.query_params.get('district') # This is actually the Clinic Name now
         
-        grouped_qs = DrugMaster.objects.select_related('clinic').filter(
+        grouped_qs = apply_clinic_filter(DrugMaster.objects.select_related('clinic').filter(
             Q(drug_name__in=active_drugs) | Q(current_stock__lt=10)
-        )
+        ), request)
         
         if district_filter:
             grouped_qs = grouped_qs.filter(clinic__clinic_name__icontains=district_filter.strip())
@@ -308,74 +291,128 @@ class ExportRestockView(APIView):
             writer.writerow(row)
         return response
 
-
-
-
 class ExportReportView(APIView):
     """
     GET /api/export-report/
-    
-    FEATURE 10: Intelligent Reporting System.
-    Generates a combined CSV report with:
-    1. Strategic Recommendations (Decision Layer)
-    2. Active Outbreaks & Spikes (Prediction Layer)
-    3. Forecasted Medicine Needs (Inventory Prediction)
+    Standardized to honor selected range.
     """
     def get(self, request):
         from ..services.insights_service import InsightsService
         from ..services.forecasting import ForecastingService
         
-        days = 30
+        start, end = _get_date_range(request)
+        days = (end - start).days
+        
         service = InsightsService()
         forecasting = ForecastingService()
-        insights = service.get_actionable_insights(days=days)
+        insights = service.get_actionable_insights(days=days, request=request)
         
         response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="intelligent_health_report_{date.today()}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="intelligent_health_report_{end}.csv"'
         writer = csv.writer(response)
         
-        # Section 1: Strategic Summary & Inferred Actions
         writer.writerow(['DECISION SUPPORT SUMMARY'])
+        writer.writerow(['Period', f'{start} to {end}'])
         writer.writerow(['Risk Level', insights['metadata']['risk_level'], 'Buffer', insights['metadata']['safety_buffer']])
         writer.writerow([])
         writer.writerow(['STRATEGIC RECOMMENDATIONS'])
-        for rec in insights['recommendations']:
-            writer.writerow([rec])
+        for rec in insights['recommendations']: writer.writerow([rec])
         writer.writerow([])
-        
-        # Section 2: Active Alerts & Outbreaks
         writer.writerow(['ACTIVE ALERTS (Outbreaks & Spikes)'])
         writer.writerow(['Disease', 'Severity', 'Current Cases', 'Expected Normal', 'Status'])
         for o in insights['outbreaks']:
             writer.writerow([o['disease'], o['severity'], o['current_cases'], o['expected_normal'], 'Critical' if o['severity'] == 'Critical' else 'Warning'])
         writer.writerow([])
-        
-        # Section 3: Rising Trends (Growth Rates)
-        writer.writerow(['RISING THREATS (Growth Analysis)'])
-        writer.writerow(['Disease', 'Growth Rate (%)', 'Recent Cases', 'Status'])
-        for t in insights['rising_trends']:
-            writer.writerow([t['disease_name'], t.get('growth_rate', 0), t.get('recent_cases', 0), 'High Growth' if t.get('growth_rate', 0) > 20 else 'Stable'])
-        writer.writerow([])
-        
-        # Section 4: Critical Resource & Stock Depletion
-        writer.writerow(['CRITICAL RESOURCE & DEPLETION FORECAST'])
-        writer.writerow(['Drug Name', 'Current Stock', 'Days until Depletion', 'Expected Date', 'Recommendation'])
+        writer.writerow(['CRITICAL RESOURCE DEPLETION'])
+        writer.writerow(['Drug Name', 'Current Stock', 'Days until Depletion', 'Expected Date'])
         for s in insights['critical_stock']:
-            # Enrich with depletion forecast
-            depletion = forecasting.forecast_stock_depletion(s['drug_name'])
-            writer.writerow([
-                s['drug_name'], s['current_stock'], 
-                depletion.get('days_until_depletion', 'N/A'),
-                depletion.get('depletion_date', 'N/A'),
-                depletion.get('recommendation', 'N/A')
-            ])
-            
+            depletion = forecasting.forecast_stock_depletion(s['drug_name'], request=request)
+            writer.writerow([s['drug_name'], s['current_stock'], depletion.get('days_until_depletion', 'N/A'), depletion.get('depletion_date', 'N/A')])
         return response
 
-    
+
+class ExportMedicineUsageView(APIView):
+    """GET /api/export/medicine-usage/ — CSV download"""
+    def get(self, request):
+        start, end = _get_date_range(request)
+        disease_name = request.query_params.get('disease', 'All')
+        from ..services.usage import UsageIntelligence
+        service = UsageIntelligence()
+        # Exclude Variants
+        var_filter = Q(drug__drug_name__icontains='Vari') | Q(drug__drug_name__endswith=' V')
+        rx_qs_base = PrescriptionLine.objects.all()
+        rx_qs = apply_clinic_filter(rx_qs_base, request, clinic_field='prescription__clinic').exclude(var_filter)
+        data = service.get_medicine_usage_per_disease(
+            disease_name=disease_name,
+            days=(end - start).days,
+            rx_queryset=rx_qs
+        )
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="medicine_usage_{end}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Medicine Usage Report', f'Disease: {disease_name}', f'Period: {start} to {end}'])
+        writer.writerow([])
+        writer.writerow(['Drug Name', 'Generic Name', 'Total Quantity Used', 'Prescription Count'])
+        for med in data.get('top_medicines', []):
+            writer.writerow([med['drug_name'], med['generic_name'], med['total_quantity'], med['prescription_count']])
+        return response
 
 
-# ── New Feature 1: Disease Trend Comparison ───────────────────────────────────
+class ExportDoctorTrendsView(APIView):
+    """GET /api/export/doctor-trends/ — CSV download"""
+    def get(self, request):
+        start, end = _get_date_range(request)
+        from ..services.usage import UsageIntelligence
+        service = UsageIntelligence()
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request).exclude(var_filter)
+        data = service.get_doctor_patterns(days=(end - start).days, appt_queryset=appt_qs)
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="doctor_trends_{end}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Doctor Activity Report', f'Period: {start} to {end}'])
+        writer.writerow([])
+        writer.writerow(['Doctor Name', 'Primary Disease Type', 'Total Consultations'])
+        for doc in data:
+            writer.writerow([doc['doctor_name'], doc['disease'], doc['cases']])
+        return response
 
 
+class ExportWeeklyReportView(APIView):
+    """GET /api/export/reports/weekly/ — Simplified WTD/Range CSV"""
+    def get(self, request):
+        start, end = _get_date_range(request)
+        from .report_views import WeeklyReportView
+        # Exclude Variants in the underlying view search
+        report_data = WeeklyReportView().get(request).data
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="weekly_report_{end}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Weekly Disease Case Report', f'Period: {start} to {end}'])
+        writer.writerow([])
+        writer.writerow(['Week Label', 'Start', 'End', 'Total Cases', 'Disease Breakdown'])
+        for w in report_data.get('weeks', []):
+            diseases = "; ".join([f"{d['disease_name']}: {d['case_count']} ({d['percentage']}%)" for d in w['diseases']])
+            writer.writerow([w['week_label'], w['week_start'], w['week_end'], w['total_cases'], diseases])
+        return response
 
+
+class ExportMonthlyReportView(APIView):
+    """GET /api/export/reports/monthly/ — Simplified MTD/Range CSV"""
+    def get(self, request):
+        start, end = _get_date_range(request)
+        from .report_views import MonthlyReportView
+        # Exclude Variants in the underlying view search
+        report_data = MonthlyReportView().get(request).data
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="monthly_report_{end}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Monthly Disease Case Report', f'Period: {start} to {end}'])
+        writer.writerow([])
+        writer.writerow(['Month', 'Total Cases', 'Disease Breakdown'])
+        for m in report_data.get('months', []):
+            diseases = "; ".join([f"{d['disease_name']}: {d['case_count']} ({d['percentage']}%)" for d in m['diseases']])
+            writer.writerow([m['month_label'], m['total_cases'], diseases])
+        return response

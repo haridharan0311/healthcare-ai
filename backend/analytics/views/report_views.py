@@ -34,7 +34,7 @@ from ..services.aggregation import (
 
 from .utils import (
     cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list
+    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
 )
 
 # report_views.py extracted classes
@@ -53,18 +53,18 @@ class WeeklyReportView(APIView):
         start, end = _get_date_range(request)
 
         # ORM: TruncWeek groups by week start date
-        qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .annotate(week_start=TruncWeek('appointment_datetime'))
-            .values('week_start', 'disease__name')
-            .annotate(case_count=Count('id'))
-            .order_by('week_start', '-case_count')
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
         )
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        qs = apply_clinic_filter(appt_qs_base, request).exclude(var_filter) \
+            .select_related('disease') \
+            .annotate(week_start=TruncWeek('appointment_datetime')) \
+            .values('week_start', 'disease__name') \
+            .annotate(case_count=Count('id')) \
+            .order_by('week_start', '-case_count')
 
         # Group by week
         week_map = defaultdict(lambda: defaultdict(int))
@@ -127,18 +127,18 @@ class MonthlyReportView(APIView):
     def get(self, request):
         start, end = _get_date_range(request)
 
-        qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .annotate(month_start=TruncMonth('appointment_datetime'))
-            .values('month_start', 'disease__name')
-            .annotate(case_count=Count('id'))
-            .order_by('month_start', '-case_count')
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
         )
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        qs = apply_clinic_filter(appt_qs_base, request).exclude(var_filter) \
+            .select_related('disease') \
+            .annotate(month_start=TruncMonth('appointment_datetime')) \
+            .values('month_start', 'disease__name') \
+            .annotate(case_count=Count('id')) \
+            .order_by('month_start', '-case_count')
 
         month_map = defaultdict(lambda: defaultdict(int))
         for row in qs:
@@ -213,16 +213,16 @@ class TodaySummaryView(APIView):
 
         # Per disease today — ORM Count, no loops
         # Only count appointments with a disease assigned for consistency with other views
-        disease_today = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date=today,
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(cnt=Count('id'))
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__date=today,
+            disease__isnull=False,
         )
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        disease_today = apply_clinic_filter(appt_qs_base, request).exclude(var_filter) \
+            .select_related('disease') \
+            .values('disease__name') \
+            .annotate(cnt=Count('id'))
 
         # Total appointments today (with disease assigned)
         today_count = sum(row['cnt'] for row in disease_today)
@@ -258,16 +258,16 @@ class WhatChangedTodayView(APIView):
         today = latest.date() if latest else date.today()
 
         # Today counts by disease type
-        today_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date=today,
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(cnt=Count('id'))
+        today_qs_base = Appointment.objects.filter(
+            appointment_datetime__date=today,
+            disease__isnull=False,
         )
+        # Exclude Variants
+        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+        today_qs = apply_clinic_filter(today_qs_base, request).exclude(var_filter) \
+            .select_related('disease') \
+            .values('disease__name') \
+            .annotate(cnt=Count('id'))
 
         today_by_disease = defaultdict(int)
         for row in today_qs:
@@ -275,18 +275,16 @@ class WhatChangedTodayView(APIView):
 
         today_count = sum(today_by_disease.values())
         history_start = today - timedelta(days=8)
-        spike_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(history_start, today),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name')
-            .annotate(case_count=Count('id'))
-            .order_by('disease__name', 'appt_date')
+        spike_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(history_start, today),
+            disease__isnull=False,
         )
+        spike_qs = apply_clinic_filter(spike_qs_base, request) \
+            .select_related('disease') \
+            .annotate(appt_date=TruncDate('appointment_datetime')) \
+            .values('appt_date', 'disease__name') \
+            .annotate(case_count=Count('id')) \
+            .order_by('disease__name', 'appt_date')
 
         daily_by_disease = defaultdict(lambda: defaultdict(int))
         for row in spike_qs:
@@ -314,15 +312,13 @@ class WhatChangedTodayView(APIView):
             key=lambda x: (not x['is_spike'], -x['today_count'])
         )[:8]
 
-        critical_stock = DrugMaster.objects.filter(current_stock__lte=10).count()
-        out_of_stock = DrugMaster.objects.filter(current_stock=0).count()
-        low_stock_qs = (
-            DrugMaster.objects
-            .filter(current_stock__lte=50)
-            .values('drug_name', 'generic_name')
-            .annotate(total_stock=Sum('current_stock'))
+        critical_stock = apply_clinic_filter(DrugMaster.objects.filter(current_stock__lte=10), request).count()
+        out_of_stock = apply_clinic_filter(DrugMaster.objects.filter(current_stock=0), request).count()
+        low_stock_qs_base = DrugMaster.objects.filter(current_stock__lte=50)
+        low_stock_qs = apply_clinic_filter(low_stock_qs_base, request) \
+            .values('drug_name', 'generic_name') \
+            .annotate(total_stock=Sum('current_stock')) \
             .order_by('total_stock')[:5]
-        )
         low_stock_top = [
             {
                 'drug_name':    row['drug_name'],
@@ -336,26 +332,23 @@ class WhatChangedTodayView(APIView):
         older_start = today - timedelta(days=14)
         older_end = today - timedelta(days=7)
 
-        recent_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(recent_start, today),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .values('disease__name')
-            .annotate(cnt=Count('id'))
+        recent_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(recent_start, today),
+            disease__isnull=False,
         )
-        older_qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(older_start, older_end),
-                disease__isnull=False,
-            )
-            .select_related('disease')
-            .values('disease__name')
+        recent_qs = apply_clinic_filter(recent_qs_base, request) \
+            .select_related('disease') \
+            .values('disease__name') \
             .annotate(cnt=Count('id'))
+
+        older_qs_base = Appointment.objects.filter(
+            appointment_datetime__date__range=(older_start, older_end),
+            disease__isnull=False,
         )
+        older_qs = apply_clinic_filter(older_qs_base, request) \
+            .select_related('disease') \
+            .values('disease__name') \
+            .annotate(cnt=Count('id'))
 
         recent_map = defaultdict(int)
         older_map = defaultdict(int)

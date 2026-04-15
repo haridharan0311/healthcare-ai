@@ -50,6 +50,7 @@ from .restock_calculator import (
 )
 from .timeseries import get_seasonal_weight
 from .spike_detection import detect_spike_logic as detect_spike
+from ..views.utils import apply_clinic_filter
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 
@@ -77,7 +78,8 @@ class RestockService:
         self,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
-        daily_by_disease: Optional[Dict] = None
+        daily_by_disease: Optional[Dict] = None,
+        request = None
     ) -> Dict:
         """
         FEATURE 5: Calculate adaptive safety buffer based on current spike situation.
@@ -89,16 +91,14 @@ class RestockService:
                     start_date, end_date = validate_date_range()
                 
                 # Optimized query: avoids select_related, uses values() directly
-                qs = (
-                    Appointment.objects
-                    .filter(
-                        appointment_datetime__date__range=(start_date, end_date),
-                        disease__isnull=False
-                    )
-                    .annotate(appt_date=TruncDate('appointment_datetime'))
-                    .values('appt_date', 'disease__name')
-                    .annotate(day_count=Count('id'))
+                qs_base = Appointment.objects.filter(
+                    appointment_datetime__date__range=(start_date, end_date),
+                    disease__isnull=False
                 )
+                qs = apply_clinic_filter(qs_base, request) \
+                    .annotate(appt_date=TruncDate('appointment_datetime')) \
+                    .values('appt_date', 'disease__name') \
+                    .annotate(day_count=Count('id'))
                 
                 daily_by_disease = defaultdict(lambda: defaultdict(int))
                 for row in qs:
@@ -150,7 +150,8 @@ class RestockService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         use_adaptive_buffer: bool = True,
-        precalculated_context: Optional[Dict] = None
+        precalculated_context: Optional[Dict] = None,
+        request = None
     ) -> List[Dict]:
         """
         FEATURE 4 + 10: Optimized restock suggestions.
@@ -168,12 +169,13 @@ class RestockService:
                 daily_by_dtype = ctx['daily_by_dtype']
                 dtype_season = ctx.get('dtype_season', {})
             else:
-                appt_qs = (
-                    Appointment.objects
-                    .filter(appointment_datetime__date__range=(start_date, end_date), disease__isnull=False)
-                    .values('appointment_datetime__date', 'disease__name', 'disease__season')
-                    .annotate(day_count=Count('id'))
+                appt_qs_base = Appointment.objects.filter(
+                    appointment_datetime__date__range=(start_date, end_date), 
+                    disease__isnull=False
                 )
+                appt_qs = apply_clinic_filter(appt_qs_base, request) \
+                    .values('appointment_datetime__date', 'disease__name', 'disease__season') \
+                    .annotate(day_count=Count('id'))
                 daily_by_dtype = defaultdict(lambda: defaultdict(int))
                 dtype_season = {}
                 for row in appt_qs:
@@ -186,7 +188,7 @@ class RestockService:
                 if 'buffer_info' in ctx:
                     safety_buffer = ctx['buffer_info'].get('adaptive_buffer', 0)
                 else:
-                    buffer_info = self.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype)
+                    buffer_info = self.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype, request=request)
                     safety_buffer = buffer_info.get('adaptive_buffer', 0)
             else:
                 safety_buffer = BASE_SAFETY_BUFFER
@@ -196,32 +198,29 @@ class RestockService:
             top_medicines_info = ctx.get('top_medicines_data')
             if not top_medicines_info:
                 # 1. Fetch top drugs by ID for index hit
-                top_drugs_stats = (
-                    PrescriptionLine.objects
-                    .filter(prescription_date__range=(start_date, end_date))
-                    .values('drug_id')
-                    .annotate(total=Sum('quantity'))
+                top_rx_qs_base = PrescriptionLine.objects.filter(prescription_date__range=(start_date, end_date))
+                top_drugs_stats = apply_clinic_filter(top_rx_qs_base, request, clinic_field='prescription__clinic') \
+                    .values('drug_id') \
+                    .annotate(total=Sum('quantity')) \
                     .order_by('-total')[:100]
-                )
                 top_ids = [d['drug_id'] for d in top_drugs_stats]
                 
                 # 2. Map IDs to Names/Stock in one go
-                top_drug_objs = DrugMaster.objects.filter(id__in=top_ids).values('id', 'drug_name')
+                dm_qs_base = DrugMaster.objects.filter(id__in=top_ids)
+                top_drug_objs = apply_clinic_filter(dm_qs_base, request).values('id', 'drug_name')
                 top_medicines_info = {d['id']: d['drug_name'] for d in top_drug_objs}
 
             top_ids = list(top_medicines_info.keys())
             
             # 3. Optimized ID-Based Query (Leverages Composite Index)
-            qty_qs = (
-                PrescriptionLine.objects
-                .filter(
-                    prescription_date__range=(start_date, end_date),
-                    drug_id__in=top_ids,
-                    disease__isnull=False
-                )
-                .values('drug_id', 'disease__name')
-                .annotate(total_qty=Sum('quantity'))
+            qty_qs_base = PrescriptionLine.objects.filter(
+                prescription_date__range=(start_date, end_date),
+                drug_id__in=top_ids,
+                disease__isnull=False
             )
+            qty_qs = apply_clinic_filter(qty_qs_base, request, clinic_field='prescription__clinic') \
+                .values('drug_id', 'disease__name') \
+                .annotate(total_qty=Sum('quantity'))
             
             drug_qty_map = defaultdict(int)
             drug_cases_map = defaultdict(int)
@@ -252,7 +251,10 @@ class RestockService:
             
             # ──── Step 4: Calculate restock for selected drugs ────
             top_names = list(top_medicines_info.values())
-            stock_qs = DrugMaster.objects.filter(drug_name__in=top_names).values('drug_name').annotate(total_stock=Sum('current_stock'))
+            stock_qs_base = DrugMaster.objects.filter(drug_name__in=top_names)
+            stock_qs = apply_clinic_filter(stock_qs_base, request) \
+                .values('drug_name') \
+                .annotate(total_stock=Sum('current_stock'))
             stock_map = {r['drug_name']: r['total_stock'] for r in stock_qs}
             
             results = []

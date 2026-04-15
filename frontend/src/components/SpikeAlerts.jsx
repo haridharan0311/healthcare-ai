@@ -65,13 +65,6 @@ export default function SpikeAlerts({ onExport }) {
         </div>
       </div>
 
-      <div style={{
-        fontSize: 11, color: '#64748b', marginBottom: 16,
-        padding: '8px 16px', background: '#f8fafc', borderRadius: 8, fontFamily: 'monospace',
-        border: '1px solid #f1f5f9'
-      }}>
-        Formula: <span style={{ color: '#2563eb' }}>spike</span> if <span style={{ fontWeight: 700 }}>today_count</span> &gt; mean(last 7 days) + 2 × std_dev
-      </div>
 
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Analyzing baseline...</div>

@@ -31,10 +31,14 @@ urlpatterns = [
     path('adaptive-buffer/',           views.AdaptiveBufferView.as_view(),    name='adaptive-buffer'),
 
     # ── CSV Exports ───────────────────────────────────────────────────
-    path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(),  name='export-trends'),
-    path('export/spike-alerts/',       views.ExportSpikeAlertsView.as_view(),    name='export-spikes'),
-    path('export/restock/',            views.ExportRestockView.as_view(),         name='export-restock'),
-    path('export-report/',             views.ExportReportView.as_view(),          name='export-report'),
+    path('export/disease-trends/',     views.ExportDiseaseTrendsView.as_view(),   name='export-trends'),
+    path('export/spike-alerts/',       views.ExportSpikeAlertsView.as_view(),     name='export-spikes'),
+    path('export/restock/',            views.ExportRestockView.as_view(),          name='export-restock'),
+    path('export/medicine-usage/',     views.ExportMedicineUsageView.as_view(),    name='export-medicine-usage'),
+    path('export/doctor-trends/',      views.ExportDoctorTrendsView.as_view(),     name='export-doctor-trends'),
+    path('export/reports/weekly/',     views.ExportWeeklyReportView.as_view(),     name='export-weekly'),
+    path('export/reports/monthly/',    views.ExportMonthlyReportView.as_view(),    name='export-monthly'),
+    path('export-report/',             views.ExportReportView.as_view(),           name='export-report'),
 
     # ── UNIFIED SIMPLE FLOW API ───────────────────────────────────────
     path('insights/platform-dashboard/', insight_views.AnalyticsPlatformDashboardView.as_view(), name='platform-dashboard'),

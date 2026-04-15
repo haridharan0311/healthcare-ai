@@ -27,7 +27,7 @@ class InsightsService:
         self.restock = RestockService()
         self.usage_intel = UsageIntelligence()
 
-    def get_actionable_insights(self, days: int = 30, precalculated_context: Optional[Dict] = None) -> Dict[str, Any]:
+    def get_actionable_insights(self, days: int = 30, precalculated_context: Optional[Dict] = None, request=None) -> Dict[str, Any]:
         """
         FEATURE 9, 10: Generate structured actionable insights.
         Optimized: Uses precalculated context to avoid 3x redundant scans.
@@ -40,19 +40,19 @@ class InsightsService:
         if 'outbreaks' in ctx:
             outbreaks = ctx['outbreaks']
         else:
-            outbreaks = self._detect_active_outbreaks(start_date, end_date, context=ctx)
+            outbreaks = self._detect_active_outbreaks(start_date, end_date, context=ctx, request=request)
 
         # 2. Rising Threats (Feature 1: Growth Rate)
-        growth_trends = self._calculate_growth_rates(days)
+        growth_trends = self._calculate_growth_rates(days, request=request)
 
         # 3. Critical Resource Decisions (Feature 4, 5, 8)
-        stock_alerts = self.usage_intel.get_stock_alerts()
+        stock_alerts = self.usage_intel.get_stock_alerts(request=request)
         
         if 'buffer_info' in ctx:
             buffer_info = ctx['buffer_info']
         else:
             daily_by_dtype = ctx.get('daily_by_dtype')
-            buffer_info = self.restock.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype)
+            buffer_info = self.restock.calculate_adaptive_buffer(start_date, end_date, daily_by_disease=daily_by_dtype, request=request)
 
         return {
             'outbreaks': outbreaks,
@@ -66,7 +66,7 @@ class InsightsService:
             }
         }
 
-    def get_unified_alert_stream(self, days: int = 14) -> List[Dict[str, Any]]:
+    def get_unified_alert_stream(self, days: int = 14, request=None) -> List[Dict[str, Any]]:
         """
         FEATURE 8: Unified Real-Time Alert System.
         Aggregates all critical events into a prioritize stream.
@@ -76,7 +76,7 @@ class InsightsService:
         alerts = []
 
         # 1. Outbreak Alerts (High Priority)
-        outbreaks = self._detect_active_outbreaks(start_date, end_date)
+        outbreaks = self._detect_active_outbreaks(start_date, end_date, request=request)
         for o in outbreaks:
             alerts.append({
                 'type': 'outbreak',
@@ -88,7 +88,7 @@ class InsightsService:
             })
 
         # 2. Stock Shortage Alerts (Direct Inventory Risk)
-        stock_alerts = self.usage_intel.get_stock_alerts(critical_threshold=20)
+        stock_alerts = self.usage_intel.get_stock_alerts(critical_threshold=20, request=request)
         for s in stock_alerts:
             if s['status'] == 'critical':
                 alerts.append({
@@ -102,9 +102,9 @@ class InsightsService:
 
         # 3. Forecast Depletion Warnings (Predictive Risk)
         # Check top 10 used drugs for depletion
-        top_drugs = self.usage_intel.get_stock_alerts(low_threshold=500)[:10]
+        top_drugs = self.usage_intel.get_stock_alerts(low_threshold=500, request=request)[:10]
         for drug in top_drugs:
-            depletion = self.forecasting.forecast_stock_depletion(drug['drug_name'])
+            depletion = self.forecasting.forecast_stock_depletion(drug['drug_name'], request=request)
             if depletion.get('status') == 'critical':
                 alerts.append({
                     'type': 'depletion',
@@ -119,13 +119,16 @@ class InsightsService:
         PRIO_MAP = {'Critical': 0, 'High': 1, 'Warning': 2, 'normal': 3}
         return sorted(alerts, key=lambda x: PRIO_MAP.get(x['priority'], 9))
 
-    def _detect_active_outbreaks(self, start: date, end: date, context: Optional[Dict] = None) -> List[Dict]:
+    def _detect_active_outbreaks(self, start: date, end: date, context: Optional[Dict] = None, request=None) -> List[Dict]:
         """Detect diseases shows continuous upward trends or significant spikes."""
         ctx = context or {}
         if 'daily_by_dtype' in ctx:
             daily_map = ctx['daily_by_dtype']
         else:
-            daily_map = aggregate_daily_counts(start, end)
+            from ..views.utils import apply_clinic_filter
+            from analytics.models import Appointment
+            appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
+            daily_map = aggregate_daily_counts(start, end, queryset=appt_qs)
         
         outbreaks = []
         for dtype, data in daily_map.items():
@@ -147,9 +150,12 @@ class InsightsService:
         
         return sorted(outbreaks, key=lambda x: x['current_cases'], reverse=True)
 
-    def _calculate_growth_rates(self, days: int) -> List[Dict]:
+    def _calculate_growth_rates(self, days: int, request=None) -> List[Dict]:
         """Feature 1: Calculate % change in case volume across windows."""
-        return self.usage_intel.get_all_disease_trends(days=days)
+        from analytics.models import Appointment
+        from ..views.utils import apply_clinic_filter
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
+        return self.usage_intel.get_all_disease_trends(days=days, appt_queryset=appt_qs)
 
     def _generate_strategic_recommendations(self, outbreaks, trends, stock, buffer) -> List[str]:
         """

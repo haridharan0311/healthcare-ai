@@ -3,7 +3,7 @@ import axios from 'axios';
 const BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 const CRUD = `${BASE}/crud`;
 
-const apiInstance = axios.create({
+export const apiInstance = axios.create({
   baseURL: BASE,
   timeout: 120000,
 });
@@ -46,8 +46,8 @@ export const fetchLowStockAlerts   = (threshold = 50) =>
 export const fetchSeasonality      = (days = 365)  => api('/seasonality/', { days });
 export const fetchDoctorTrends     = (days = 30, limit = 20) =>
   api('/doctor-trends/', { days, limit });
-export const fetchWeeklyReport     = (days = 90)   => api('/reports/weekly/', { days });
-export const fetchMonthlyReport    = (days = 365)  => api('/reports/monthly/', { days });
+export const fetchWeeklyReport     = (days = 90, period = null)   => api('/reports/weekly/', { days, ...(period ? { period } : {}) });
+export const fetchMonthlyReport    = (days = 365, period = null)  => api('/reports/monthly/', { days, ...(period ? { period } : {}) });
 export const fetchTodaySummary = () => api('/today-summary/');
 export const fetchMedicineDependency = (disease = null, days = 30, min_usage = 0) =>
   api('/medicine-dependency/', {
@@ -77,6 +77,18 @@ export const toggleSimulator = (action, interval = 30) =>
 export const getExportUrl = (type, params = {}) => {
   const qstr = new URLSearchParams(params).toString();
   return `${BASE}/export/${type}/${qstr ? '?' + qstr : ''}`;
+};
+
+export const downloadFile = async (type, params = {}, filename = 'export.csv') => {
+  const url = getExportUrl(type, params);
+  const response = await apiInstance.get(url, { responseType: 'blob' });
+  const downloadUrl = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 };
 
 // ── CRUD ──────────────────────────────────────────────────────────────

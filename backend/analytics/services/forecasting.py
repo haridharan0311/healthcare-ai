@@ -46,6 +46,7 @@ from .ml_engine import (
 )
 from .timeseries import get_seasonal_weight
 from .spike_detection import detect_spike_logic as detect_spike
+from ..views.utils import apply_clinic_filter, _get_generic
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 
@@ -68,7 +69,8 @@ class ForecastingService:
         self,
         disease_name: str,
         days_ahead: int = 7,
-        confidence: float = 0.95
+        confidence: float = 0.95,
+        appt_queryset = None
     ) -> Dict:
         """
         Forecast disease cases for next N days.
@@ -97,8 +99,11 @@ class ForecastingService:
             end_date = date.today()
             start_date = end_date - timedelta(days=30)
             
+            if appt_queryset is None:
+                appt_queryset = Appointment.objects.all()
+
             qs = (
-                Appointment.objects
+                appt_queryset
                 .filter(
                     appointment_datetime__date__range=(start_date, end_date),
                     disease__name__icontains=disease_name,
@@ -186,7 +191,8 @@ class ForecastingService:
         disease_name: Optional[str] = None,
         recent_cases: Optional[int] = None,
         older_cases: Optional[int] = None,
-        days_back: int = 30
+        days_back: int = 30,
+        appt_queryset = None
     ) -> Dict:
         """
         Calculate weighted trend score for disease.
@@ -213,8 +219,11 @@ class ForecastingService:
                 start_date = end_date - timedelta(days=days_back)
                 mid_date = start_date + (end_date - start_date) // 2
                 
+                if appt_queryset is None:
+                    appt_queryset = Appointment.objects.all()
+
                 recent_qs = (
-                    Appointment.objects
+                    appt_queryset
                     .filter(
                         appointment_datetime__date__range=(mid_date, end_date),
                         disease__name__icontains=disease_name,
@@ -224,7 +233,7 @@ class ForecastingService:
                 )
                 
                 older_qs = (
-                    Appointment.objects
+                    appt_queryset
                     .filter(
                         appointment_datetime__date__range=(start_date, mid_date),
                         disease__name__icontains=disease_name,
@@ -288,7 +297,8 @@ class ForecastingService:
     def forecast_medicine_demand(
         self,
         drug_name: str,
-        days_ahead: int = 30
+        days_ahead: int = 30,
+        rx_queryset = None
     ) -> Dict:
         """
         Forecast medicine demand for next N days.
@@ -308,8 +318,11 @@ class ForecastingService:
             end_date = date.today()
             start_date = end_date - timedelta(days=30)
             
+            if rx_queryset is None:
+                rx_queryset = PrescriptionLine.objects.all()
+
             qs = (
-                PrescriptionLine.objects
+                rx_queryset
                 .filter(
                     prescription_date__range=(start_date, end_date),
                     drug__drug_name=drug_name
@@ -444,15 +457,19 @@ class ForecastingService:
             self.logger.error("Bulk disease forecasting failed", exception=e)
             return []
 
-    def forecast_stock_depletion(self, drug_name: str, days: int = 14) -> Dict:
+    def forecast_stock_depletion(self, drug_name: str, days: int = 14, rx_queryset=None, request=None) -> Dict:
         """
         FEATURE 4: Stock Depletion Forecast.
         Forecasts when medicine stock will hit 0 based on current usage trends.
         Aggregates across all clinics for a professional system-wide view.
         """
         try:
-            # Aggregate current stock across clinics
-            stock_data = DrugMaster.objects.filter(drug_name=drug_name).aggregate(
+            if rx_queryset is None:
+                rx_queryset = PrescriptionLine.objects.all()
+            
+            # Aggregate current stock across clinics (Filtered by user access)
+            dm_qs_base = DrugMaster.objects.filter(drug_name=drug_name)
+            stock_data = apply_clinic_filter(dm_qs_base, request).aggregate(
                 total_stock=Sum('current_stock')
             )
             current_stock = stock_data['total_stock'] or 0
@@ -461,7 +478,7 @@ class ForecastingService:
             end_date = date.today()
             start_date = end_date - timedelta(days=days)
             
-            usage_sum = PrescriptionLine.objects.filter(
+            usage_sum = rx_queryset.filter(
                 prescription_date__range=(start_date, end_date),
                 drug__drug_name=drug_name
             ).aggregate(total=Sum('quantity'))['total'] or 0
@@ -477,12 +494,16 @@ class ForecastingService:
                 
             return {
                 'drug_name': drug_name,
+                'generic_name': _get_generic(drug_name),
                 'current_stock': current_stock,
                 'avg_daily_usage': round(avg_daily_usage, 2),
                 'days_until_depletion': round(days_left, 1),
                 'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
                 'status': status,
+                'urgency': status,
+                'analysis_period': f"Last {days} days",
                 'analysis_period_days': days,
+                'recommended_reorder': round(avg_daily_usage * 30 * 1.5, 0), # 30 days stock with 50% buffer
                 'recommendation': self._get_depletion_recommendation(status, days_left)
             }
         except Exception as e:

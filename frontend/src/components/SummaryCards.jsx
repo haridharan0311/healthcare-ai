@@ -22,7 +22,7 @@ const SkeletonCard = ({ color }) => (
 );
 
 export default function SummaryCards({ days, summary = {} }) {
-  const { loaded, trends, spikes, todaySummary, stockAlerts } = summary;
+  const { loaded, spikes, todaySummary } = summary;
 
   if (!loaded) {
     return (
@@ -32,45 +32,46 @@ export default function SummaryCards({ days, summary = {} }) {
     );
   }
 
-  const totalPeriod = todaySummary?.total_last_30_days || trends?.reduce((s, t) => s + (t.total_cases || 0), 0) || 0;
-  const spikeCount  = spikes?.length || 0;
-  const topDis      = todaySummary?.by_disease?.[0] || { disease: '—', count: 0 };
+  const totalWtd = todaySummary?.total_wtd || 0;
+  const totalMtd = todaySummary?.total_mtd || 0;
+  const spikeCount = spikes?.length || 0;
+  const topDis = todaySummary?.by_disease?.[0] || { disease: '—', count: 0 };
 
   const cards = [
     {
       label: 'Daily Admissions',
       value: (todaySummary?.total_today || 0).toLocaleString(),
-      sub:   'New patients today',
+      sub: 'New appointments today',
       color: COLORS.cases,
       icon: '📈'
     },
     {
-      label: `Operational Throughput`,
-      value: totalPeriod.toLocaleString(),
-      sub:   `Last ${days} days`,
+      label: 'Weekly Throughput',
+      value: totalWtd.toLocaleString(),
+      sub: 'This week',
       color: COLORS.period,
+      icon: '🗓️'
+    },
+    {
+      label: 'Monthly Throughput',
+      value: totalMtd.toLocaleString(),
+      sub: 'This month',
+      color: COLORS.inventory,
       icon: '📊'
     },
     {
       label: 'Active Outbreaks',
       value: spikeCount,
-      sub:   'Security alerts detected',
+      sub: 'Security alerts detected',
       color: COLORS.spikes,
       icon: '🚨'
     },
     {
       label: 'Dominant Pathology',
       value: topDis.disease,
-      sub:   `Highest prevalence currently`,
+      sub: 'Highest prevalence currently',
       color: COLORS.disease,
       icon: '🦠'
-    },
-    {
-      label: 'Pharmacy Resource Risks',
-      value: ( (stockAlerts?.critical || 0) + (stockAlerts?.out_of_stock || 0) ).toLocaleString(),
-      sub:   `${stockAlerts?.critical || 0} items at high risk`,
-      color: COLORS.inventory,
-      icon: '📦'
     },
   ];
 
@@ -97,7 +98,7 @@ export default function SummaryCards({ days, summary = {} }) {
           <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>
             {card.label}
           </div>
-          <div style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', lineHeight: 1.1, marginBottom: 4 }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1.1, marginBottom: 4 }}>
             {card.value}
           </div>
           <div style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>{card.sub}</div>

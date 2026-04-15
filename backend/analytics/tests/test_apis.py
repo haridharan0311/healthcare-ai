@@ -12,6 +12,8 @@ from core.models import Clinic, Doctor, Patient
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from analytics.models import Disease, Appointment
 from django.utils import timezone
+from django.contrib.auth.models import User
+
 
 
 class DiseaseAnalyticsAPITestCase(TestCase):
@@ -63,10 +65,14 @@ class DiseaseAnalyticsAPITestCase(TestCase):
             patient=cls.patient,
             op_number="OP000001"
         )
+        
+        # Create user for authentication
+        cls.user = User.objects.create_user(username='testuser', password='password123')
     
     def setUp(self):
         """Set up for each test."""
         self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
     
     def test_disease_trends_endpoint(self):
         """Test that disease trends endpoint returns data."""
@@ -122,10 +128,14 @@ class RestockAnalyticsAPITestCase(TestCase):
             clinic=cls.clinic,
             current_stock=100
         )
+        
+        # Create user for authentication
+        cls.user = User.objects.create_user(username='testuser_restock', password='password123')
     
     def setUp(self):
         """Set up for each test."""
         self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
     
     def test_low_stock_alerts_endpoint(self):
         """Test that low stock alerts endpoint returns data."""
@@ -154,9 +164,13 @@ class AnalyticsCoverageAPITestCase(TestCase):
         cls.drug = DrugMaster.objects.create(drug_name='Paracetamol', generic_name='Acetaminophen', drug_strength='500mg', dosage_type='Tablet', clinic=cls.clinic, current_stock=30)
         cls.prescription = Prescription.objects.create(prescription_date=timezone.now().date(), appointment=cls.appointment, clinic=cls.clinic, doctor=cls.doctor, patient=cls.patient)
         PrescriptionLine.objects.create(duration='5 days', instructions='Twice daily', prescription=cls.prescription, disease=cls.disease, quantity=20, drug=cls.drug)
+        
+        # Create user for authentication - make superuser to bypass clinic filtering
+        cls.user = User.objects.create_superuser(username='testuser_coverage', password='password123', email='test@example.com')
 
     def setUp(self):
         self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
 
     def test_top_medicines_endpoint(self):
         response = self.client.get('/api/top-medicines/?days=30&limit=5')

@@ -131,9 +131,10 @@ class RestockSuggestionView(APIView):
             dtype_demand[dtype] = {'demand': demand, 'seasonal_weight': sw}
 
         # ── Stock map — Sum per drug name ─────────────────────────────
+        stock_qs_base = DrugMaster.objects.all()
         stock_map = {
             r['drug_name']: r['total_stock']
-            for r in DrugMaster.objects
+            for r in apply_clinic_filter(stock_qs_base, request)
             .values('drug_name')
             .annotate(total_stock=Sum('current_stock'))
         }
@@ -467,7 +468,7 @@ class AdaptiveBufferView(APIView):
         start, end = _get_db_date_range(days)
 
         service = RestockService()
-        result = service.calculate_adaptive_buffer(start_date=start, end_date=end)
+        result = service.calculate_adaptive_buffer(start_date=start, end_date=end, request=request)
         return Response(result)
 
 

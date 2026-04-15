@@ -23,18 +23,25 @@ def get_disease_type(name: str) -> str:
 
 # ── 1.1 Disease case counts (ORM Count) ──────────────────────────────────────
 
-def aggregate_disease_counts(start: date, end: date) -> dict:
+def aggregate_disease_counts(start: date, end: date, queryset: Appointment = None) -> dict:
     """
     Count appointments per disease type in date range.
     Returns {disease_type: count}
     Uses ORM Count — no Python loops for aggregation.
     """
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
+    # Global filter for variants: 'Vari' or ends with ' V'
+    var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
         )
+        .exclude(var_filter)
         .select_related('disease')
         .values('disease__name', 'disease__season',
                 'disease__category', 'disease__severity')
@@ -58,14 +65,18 @@ def aggregate_disease_counts(start: date, end: date) -> dict:
 # ── 1.2 Time-series: daily counts using TruncDate ────────────────────────────
 
 def aggregate_daily_counts(start: date, end: date,
-                           disease_filter: str = None) -> dict:
+                           disease_filter: str = None,
+                           queryset: Appointment = None) -> dict:
     """
     Group appointment counts by date and disease type.
     Uses TruncDate for date grouping — pure ORM.
     Returns {disease_type: {date: count}}
     """
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
@@ -102,14 +113,19 @@ def build_daily_list(daily_map: dict, start: date, end: date) -> list:
 
 # ── 1.3 Medicine usage: Sum(quantity) grouped by disease + medicine ───────────
 
-def aggregate_medicine_usage(start: date, end: date) -> list:
+def aggregate_medicine_usage(start: date, end: date,
+                             rx_queryset: PrescriptionLine = None,
+                             appt_queryset: Appointment = None) -> list:
     """
     Sum(quantity) grouped by drug + disease.
     Optimized: 2-step process to handle 1.6M+ rows.
     """
+    if rx_queryset is None: rx_queryset = PrescriptionLine.objects.all()
+    if appt_queryset is None: appt_queryset = Appointment.objects.all()
+
     # 1. Identify top 50 medicines first (faster grouping)
     top_drugs_qs = (
-        PrescriptionLine.objects
+        rx_queryset
         .filter(prescription_date__range=(start, end))
         .values('drug_id')
         .annotate(total_qty=Sum('quantity'))
@@ -122,7 +138,7 @@ def aggregate_medicine_usage(start: date, end: date) -> list:
 
     # 2. Case counts per disease type
     case_qs = (
-        Appointment.objects
+        appt_queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
@@ -137,7 +153,7 @@ def aggregate_medicine_usage(start: date, end: date) -> list:
 
     # 3. Group by medicine + disease ONLY for the top drugs
     usage_qs = (
-        PrescriptionLine.objects
+        rx_queryset
         .filter(
             prescription_date__range=(start, end),
             drug_id__in=top_drug_ids,
@@ -204,14 +220,15 @@ def aggregate_medicine_usage(start: date, end: date) -> list:
 # ── New Feature 1: Trend Comparison ──────────────────────────────────────────
 
 def compare_disease_trends(period1_start: date, period1_end: date,
-                           period2_start: date, period2_end: date) -> list:
+                           period2_start: date, period2_end: date,
+                           queryset: Appointment = None) -> list:
     """
     Compare disease case counts between two date ranges.
     Returns increase/decrease percentage per disease.
     No hardcoding — all diseases from DB.
     """
-    p1 = aggregate_disease_counts(period1_start, period1_end)
-    p2 = aggregate_disease_counts(period2_start, period2_end)
+    p1 = aggregate_disease_counts(period1_start, period1_end, queryset=queryset)
+    p2 = aggregate_disease_counts(period2_start, period2_end, queryset=queryset)
 
     all_diseases = set(p1.keys()) | set(p2.keys())
     results = []
@@ -246,14 +263,18 @@ def compare_disease_trends(period1_start: date, period1_end: date,
 
 # ── New Feature 2: Top Medicines ──────────────────────────────────────────────
 
-def aggregate_top_medicines(start: date, end: date, limit: int = 10) -> list:
+def aggregate_top_medicines(start: date, end: date, limit: int = 10,
+                            queryset: PrescriptionLine = None) -> list:
     """
     Top medicines by total usage using ORM Sum.
     Groups by drug_name, calculates total prescriptions and total quantity.
     No hardcoding.
     """
+    if queryset is None:
+        queryset = PrescriptionLine.objects.all()
+
     qs = (
-        PrescriptionLine.objects
+        queryset
         .filter(prescription_date__range=(start, end))
         .select_related('drug')
         .values('drug__drug_name', 'drug__generic_name', 'drug__dosage_type')
@@ -280,14 +301,17 @@ def aggregate_top_medicines(start: date, end: date, limit: int = 10) -> list:
 
 # ── New Feature 4: Disease Seasonality Insights ───────────────────────────────
 
-def aggregate_seasonality(start: date, end: date) -> dict:
+def aggregate_seasonality(start: date, end: date, queryset: Appointment = None) -> dict:
     """
     Analyse disease occurrence by season from Disease model.
     No hardcoded season-disease mapping — all from DB.
     Returns most common disease per season + full breakdown.
     """
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
@@ -330,14 +354,17 @@ def aggregate_seasonality(start: date, end: date) -> dict:
 
 # ── New Feature 5: Doctor-wise Disease Trends ─────────────────────────────────
 
-def aggregate_doctor_wise(start: date, end: date) -> list:
+def aggregate_doctor_wise(start: date, end: date, queryset: Appointment = None) -> list:
     """
     Group disease data by doctor.
     Shows which doctor handles most cases of specific diseases.
     Pure ORM — no Python loops for aggregation.
     """
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
@@ -368,10 +395,13 @@ def aggregate_doctor_wise(start: date, end: date) -> list:
 
 # ── New Feature 6: Weekly / Monthly aggregation ───────────────────────────────
 
-def aggregate_weekly(start: date, end: date) -> list:
+def aggregate_weekly(start: date, end: date, queryset: Appointment = None) -> list:
     """Group appointment counts by week using TruncWeek."""
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
@@ -393,10 +423,13 @@ def aggregate_weekly(start: date, end: date) -> list:
     return results
 
 
-def aggregate_monthly(start: date, end: date) -> list:
+def aggregate_monthly(start: date, end: date, queryset: Appointment = None) -> list:
     """Group appointment counts by month using TruncMonth."""
+    if queryset is None:
+        queryset = Appointment.objects.all()
+
     qs = (
-        Appointment.objects
+        queryset
         .filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,

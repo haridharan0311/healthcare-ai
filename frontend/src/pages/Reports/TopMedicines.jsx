@@ -17,7 +17,7 @@ export default function TopMedicines({ data, days }) {
         <table className={styles.dataTable}>
           <thead>
             <tr>
-              {['#', 'Drug name', 'Generic name', 'Dosage type', 'Current stock', 'Prescriptions', 'Variants'].map(h => (
+              {['#', 'Drug name', 'Generic name', 'Dosage type', 'Current stock', 'Prescriptions'].map(h => (
                 <th key={h}>{h}</th>
               ))}
             </tr>
@@ -39,11 +39,7 @@ export default function TopMedicines({ data, days }) {
                   <span style={{ fontWeight: 600 }}>
                     {(row.prescription_count || 0).toLocaleString()}
                   </span>
-                  <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px' }}>
-                    last {days}d
-                  </span>
                 </td>
-                <td style={{ color: '#6b7280' }}>{row.variant_count}</td>
               </tr>
             ))}
           </tbody>

@@ -24,7 +24,6 @@ from ..serializers.serializers import (
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
 from ..services.usage import UsageIntelligence
-from ..services.forecasting import ForecastingService
 from ..services.restock_service import RestockService
 from ..utils.validators import validate_positive_int
 
@@ -156,34 +155,48 @@ class TopMedicinesView(APIView):
             limit = 10
         limit = min(max(limit, 1), 50)
 
-        # Find top medicines by usage in one aggregated query.
-        usage_qs_base = PrescriptionLine.objects.filter(prescription_date__range=(start, end))
+        # Step 1: Find top medicines by usage in the period
+        usage_qs_base = PrescriptionLine.objects.filter(
+            prescription_date__range=(start, end)
+        ).exclude(Q(drug__drug_name__icontains='Vari') | Q(drug__drug_name__endswith=' V'))
+        
         usage_qs = apply_clinic_filter(usage_qs_base, request, clinic_field='prescription__clinic') \
-            .values(
-                'drug__id', 'drug__drug_name', 'drug__generic_name', 'drug__dosage_type'
-            ) \
+            .values('drug__drug_name') \
             .annotate(
-                current_stock=Sum('drug__current_stock'),
-                variant_count=Count('drug', distinct=True),
-                prescription_count=Count('id'),
                 total_quantity=Sum('quantity'),
+                prescription_count=Count('id'),
             ) \
             .order_by('-total_quantity', '-prescription_count')
 
         total_drugs = usage_qs.count()
         top_rows = list(usage_qs[:limit])
+        if not top_rows:
+            return Response({'period': f'{start} to {end}', 'total_drugs': 0, 'top_medicines': []})
+
+        top_names = [r['drug__drug_name'] for r in top_rows]
+
+        # Step 2: Fetch current stock and details from DrugMaster for these specific drugs
+        # We aggregate stock by drug_name to handle cases where same drug exists across clinics
+        stock_qs_base = DrugMaster.objects.filter(drug_name__in=top_names)
+        stock_qs = apply_clinic_filter(stock_qs_base, request) \
+            .values('drug_name', 'generic_name', 'dosage_type') \
+            .annotate(total_stock=Sum('current_stock'))
+        
+        stock_map = {r['drug_name']: r for r in stock_qs}
 
         results = []
         for row in top_rows:
+            name = row['drug__drug_name']
+            details = stock_map.get(name, {})
+            
             results.append({
-                'drug_name':          row['drug__drug_name'],
-                'generic_name':       row['drug__generic_name'] or '',
-                'dosage_type':        row['drug__dosage_type'] or '',
-                'current_stock':      row['current_stock'] or 0,
+                'drug_name':          name,
+                'generic_name':       details.get('generic_name') or '',
+                'dosage_type':        details.get('dosage_type') or '',
+                'current_stock':      details.get('total_stock') or 0,
                 'prescription_count': row['prescription_count'] or 0,
                 'total_quantity':     row['total_quantity'] or 0,
-                'variant_count':      row['variant_count'] or 0,
-                'note':              'Top medicines are sorted by usage, not stock',
+                'note':              'Current stock is accurate and live system-wide (or clinic-wide)',
             })
 
         return Response({
@@ -280,18 +293,25 @@ class MedicineDependencyView(APIView):
 
     Returns which medicines are most commonly used for each disease.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=300)  # Cache for 30s
     def get(self, request):
         days = validate_positive_int(request.query_params.get('days'), 'days', default=30, min_value=1, max_value=365)
-        min_usage = validate_positive_int(request.query_params.get('min_usage'), 'min_usage', default=0, min_value=0)
         disease_name = request.query_params.get('disease')
-        start, end = _get_db_date_range(days)
 
         service = UsageIntelligence()
-        result = service.get_medicine_usage_per_disease(
-            disease_name=disease_name or "All",
-            days=days
-        )
+        rx_qs_base = PrescriptionLine.objects.all()
+        rx_qs = apply_clinic_filter(rx_qs_base, request, clinic_field='prescription__clinic')
+
+        if not disease_name or disease_name.lower() == 'all':
+            # Aggregated view for all diseases
+            result = service.get_all_medicine_dependencies(days=days, rx_queryset=rx_qs)
+        else:
+            # Single disease focus
+            result = service.get_medicine_usage_per_disease(
+                disease_name=disease_name,
+                days=days,
+                rx_queryset=rx_qs
+            )
         return Response(result)
 
 
@@ -324,13 +344,14 @@ class StockDepletionForecastView(APIView):
             except DrugMaster.DoesNotExist:
                 return Response({'error': 'Drug ID not found'}, status=drf_status.HTTP_404_NOT_FOUND)
 
+        rx_qs_base = PrescriptionLine.objects.all()
+        rx_qs = apply_clinic_filter(rx_qs_base, request, clinic_field='prescription__clinic')
+        
+        from ..services.forecasting import ForecastingService
         service = ForecastingService()
-        result = service.forecast_stock_depletion(drug_name=target_name, days=days)
+        result = service.forecast_stock_depletion(drug_name=target_name, days=days, rx_queryset=rx_qs, request=request)
 
         if result.get('error'):
             return Response(result, status=drf_status.HTTP_400_BAD_REQUEST)
         return Response(result)
-
-
-
 

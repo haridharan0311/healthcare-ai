@@ -88,20 +88,41 @@ def _get_db_date_range(days: int = 30):
     return start, end
 
 def _get_date_range(request):
+    """
+    Returns (start, end) dates.
+    Supports ?days=N or ?period=MTD|WTD.
+    """
     try:
         days = int(request.query_params.get('days', 30))
     except ValueError:
         days = 30
-    return _get_db_date_range(days)
+    
+    start, end = _get_db_date_range(days)
+    
+    period = request.query_params.get('period', '').upper()
+    if period == 'MTD':
+        # Month-to-Date: from 1st of current (latest) month
+        start = end.replace(day=1)
+    elif period == 'WTD':
+        # Week-to-Date: from start of current week (assume Monday)
+        start = end - timedelta(days=end.weekday())
+        
+    return start, end
 
-def apply_clinic_filter(queryset, request, clinic_field='clinic'):
+def apply_clinic_filter(queryset, request_or_user, clinic_field='clinic'):
     """
     Filters a queryset based on the logged-in user's role and assigned clinic.
-    - Super admins: No filter applied.
+    - Super admins / Role ADMIN: No filter applied.
     - Clinic users: Filtered by user.profile.clinic.
     """
-    user = request.user
-    if not user.is_authenticated:
+    from django.contrib.auth.models import AnonymousUser
+    
+    if hasattr(request_or_user, 'user'):
+        user = request_or_user.user
+    else:
+        user = request_or_user
+
+    if not user or isinstance(user, AnonymousUser) or not user.is_authenticated:
         return queryset.none()
     
     # Try to get UserProfile
@@ -113,7 +134,7 @@ def apply_clinic_filter(queryset, request, clinic_field='clinic'):
             return queryset
         return queryset.none()
 
-    if profile.role == 'ADMIN':
+    if profile.role == 'ADMIN' or user.is_superuser:
         return queryset
     
     if profile.role == 'CLINIC_USER' and profile.clinic:

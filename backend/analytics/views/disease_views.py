@@ -49,51 +49,37 @@ class DiseaseTrendView(APIView):
     """
     @cache_api_response(timeout=300)
     def get(self, request):
-        start, end    = _get_date_range(request)
+        start, end = _get_date_range(request)
         current_month = date.today().month
-        mid           = end - timedelta(days=7)
+        mid = end - timedelta(days=7)
 
-        # 1. ORM aggregation for both periods
-        # We can actually do this in one query using Case/When but
-        # two optimized QuerySets are often more readable and performant with indices.
-        
-        def get_aggregates(date_start, date_end, label):
-            return (
-                Appointment.objects
-                .filter(
-                    appointment_datetime__date__range=(date_start, date_end),
-                    disease__isnull=False,
-                    disease__is_active=True,
-                )
-                .values('disease__name', 'disease__season', 'disease__category', 'disease__severity')
-                .annotate(count=Count('id'))
-            )
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request)
 
-        recent_qs = get_aggregates(mid, end, 'recent')
-        older_qs = get_aggregates(start, mid, 'older')
+        def get_filtered_aggregates(date_start, date_end):
+            return aggregate_disease_counts(date_start, date_end, queryset=appt_qs)
 
-        # 2. Build combined map
-        # Use a single pass merge
+        recent = get_filtered_aggregates(mid, end)
+        older = get_filtered_aggregates(start, mid)
+
         combined = defaultdict(lambda: {
             'recent': 0, 'older': 0, 'season': 'All', 'category': '', 'severity': 1
         })
 
-        for row in recent_qs:
-            dtype = get_disease_type(row['disease__name'])
-            d = combined[dtype]
-            d['recent'] += row['count']
-            d['season'] = row['disease__season']
-            d['category'] = row['disease__category'] or ''
-            d['severity'] = row['disease__severity']
+        for dtype, data in recent.items():
+            combined[dtype].update({
+                'recent': data['count'],
+                'season': data['season'],
+                'category': data['category'],
+                'severity': data['severity']
+            })
 
-        for row in older_qs:
-            dtype = get_disease_type(row['disease__name'])
-            combined[dtype]['older'] += row['count']
+        for dtype, data in older.items():
+            combined[dtype]['older'] = data['count']
 
         if not combined:
             return Response([])
 
-        # 3. Final Score Calculation
         results = []
         for dtype, data in combined.items():
             sw = get_seasonal_weight(data['season'], current_month)
@@ -124,50 +110,26 @@ class TimeSeriesView(APIView):
     """
     @cache_api_response(timeout=300)
     def get(self, request):
-        start, end     = _get_date_range(request)
-        disease_filter = request.query_params.get('disease', None)
+        start, end = _get_date_range(request)
+        disease_filter = request.query_params.get('disease')
 
-        # 1. ORM Grouping by date and name
-        # We don't need select_related('disease') if we only need disease__name
-        qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-            )
-            .annotate(appt_date=TruncDate('appointment_datetime'))
-            .values('appt_date', 'disease__name')
-            .annotate(case_count=Count('id'))
-            .order_by('appt_date')
-        )
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request)
 
-        if disease_filter:
-            qs = qs.filter(disease__name__icontains=disease_filter)
+        # 1. Daily counts per disease (ORM TruncDate) using aggregated service
+        daily_map_by_type = aggregate_daily_counts(start, end, disease_filter=disease_filter, queryset=appt_qs)
 
-        # 2. Tight Python grouping for disease type normalization
-        # We combine "Flu 1", "Flu 2" -> "Flu"
-        counts = defaultdict(int)
-        for row in qs:
-            dtype = get_disease_type(row['disease__name'])
-            counts[(row['appt_date'], dtype)] += row['case_count']
+        results = []
+        for dtype, data in daily_map_by_type.items():
+            daily = data.get('daily', {})
+            for d, count in daily.items():
+                results.append({
+                    'date': d.isoformat() if hasattr(d, 'isoformat') else str(d),
+                    'disease_name': dtype,
+                    'case_count': count,
+                })
 
-        if not counts:
-            return Response([])
-
-        # 3. Efficient result construction
-        # Sorting at the end is usually faster than constant dict re-ordering
-        sorted_keys = sorted(counts.keys())
-        
-        results = [
-            {
-                'date': d.isoformat() if hasattr(d, 'isoformat') else str(d),
-                'disease_name': name,
-                'case_count': count,
-            }
-            for (d, name) in sorted_keys
-            if (count := counts[(d, name)])
-        ]
-
+        results.sort(key=lambda x: (x['date'], x['disease_name']))
         return Response(results)
 
 
@@ -190,16 +152,24 @@ class TrendComparisonView(APIView):
         except ValueError:
             days = 7
 
-        _, end      = _get_db_date_range(days)
-        p2_end      = end
-        p2_start    = end - timedelta(days=days)
-        p1_end      = p2_start - timedelta(days=1)
-        p1_start    = p1_end - timedelta(days=days)
+        p1_start, p1_end = _get_db_date_range(days)
+        p2_start, p2_end = _get_db_date_range(days * 2) # Overlap as per logic
+        # Overwriting for precise comparison logic
+        p2_start = p2_end - timedelta(days=days*2)
+        p2_end   = p1_start - timedelta(days=1)
 
-        results = compare_disease_trends(p1_start, p1_end, p2_start, p2_end)
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request)
+
+        results = compare_disease_trends(p2_start, p2_end, p1_start, p1_end, queryset=appt_qs)
 
         if not results:
-            return Response([])
+            return Response({
+                'period1': f'{p1_start} to {p1_end}',
+                'period2': f'{p2_start} to {p2_end}',
+                'results': [],
+                'summary': {'increasing': 0, 'decreasing': 0, 'stable': 0, 'new': 0}
+            })
 
         return Response({
             'period1':  f'{p1_start} to {p1_end}',
@@ -232,53 +202,41 @@ class SeasonalityView(APIView):
     @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         start, end = _get_date_range(request)
+        
+        appt_qs_base = Appointment.objects.all()
+        appt_qs = apply_clinic_filter(appt_qs_base, request)
 
-        # Pure ORM — count per disease per season
-        qs = (
-            Appointment.objects
-            .filter(
-                appointment_datetime__date__range=(start, end),
-                disease__isnull=False,
-                disease__is_active=True,
-            )
-            .select_related('disease')
-            .values('disease__name', 'disease__season')
-            .annotate(case_count=Count('id'))
-            .order_by('disease__season', '-case_count')
-        )
+        # Use new refactored service for seasonality
+        data = aggregate_seasonality(start, end, queryset=appt_qs)
 
-        # Group by season, aggregate by disease type
-        season_map = defaultdict(lambda: defaultdict(int))
-
-        for row in qs:
-            dtype  = get_disease_type(row['disease__name'])
-            season = row['disease__season'] or 'Unknown'
-            season_map[season][dtype] += row['case_count']
-
-        # Build response per season
-        seasons_out = {}
-        for season, type_counts in season_map.items():
-            total = sum(type_counts.values())
-            sorted_diseases = sorted(type_counts.items(), key=lambda x: -x[1])
-            seasons_out[season] = {
-                'top_disease':       sorted_diseases[0][0] if sorted_diseases else None,
-                'top_disease_count': sorted_diseases[0][1] if sorted_diseases else 0,
-                'total_cases':       total,
-                'diseases': [
-                    {
-                        'disease_name': d,
-                        'case_count':   c,
-                        'percentage':   round(c / total * 100, 1) if total > 0 else 0,
-                    }
-                    for d, c in sorted_diseases
-                ],
-            }
-
-        # Overall total = sum of all appointments in range (not sum of seasons)
-        overall_total = Appointment.objects.filter(
+        # Overall total = sum of all appointments in range (already filtered)
+        overall_total = appt_qs.filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
         ).count()
+
+        # Adapt service output to legacy view format
+        seasons_out = {
+            'Monsoon': {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
+            'Summer':  {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
+            'Winter':  {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
+            'All':     {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
+        }
+        for season, sdata in data.items():
+            total = sdata['total_cases']
+            seasons_out[season] = {
+                'top_disease':       sdata['top_disease'],
+                'top_disease_count': sdata['top_disease_count'],
+                'total_cases':       total,
+                'diseases': [
+                    {
+                        'disease_name': d['disease_name'],
+                        'case_count':   d['case_count'],
+                        'percentage':   round(d['case_count'] / total * 100, 1) if total > 0 else 0,
+                    }
+                    for d in sdata['diseases']
+                ],
+            }
 
         return Response({
             'period':        f'{start} to {end}',

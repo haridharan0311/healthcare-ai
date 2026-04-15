@@ -8,7 +8,7 @@ import {
   fetchSeasonality,
   fetchDoctorTrends,
   fetchSimulatorStatus,
-  toggleSimulator
+  apiInstance
 } from '../api';
 
 import TrendChart       from '../components/TrendChart';
@@ -32,13 +32,40 @@ export default function Dashboard() {
   const [doctorSummary, setDoctorSummary] = useState({});
   const [simStatus, setSimStatus]         = useState({ running: false, interval: 30 });
   const [medicinesLoaded, setMedicinesLoaded] = useState(false);
+
+  const handleCsvPreview = async (type, params = {}) => {
+    try {
+      const url = getExportUrl(type, { ...params });
+      const res = await apiInstance.get(url);
+      const text = res.data;
+      
+      const rows = text.trim().split('\n').map(r => {
+        const parts = [];
+        let current = '';
+        let inQuotes = false;
+        for (let char of r) {
+          if (char === '"') inQuotes = !inQuotes;
+          else if (char === ',' && !inQuotes) { parts.push(current); current = ''; }
+          else current += char;
+        }
+        parts.push(current);
+        return parts.map(c => c.replace(/^"|"$/g, '').trim());
+      });
+
+      setCsvModal({ type, rows, url });
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
   const loadAllData = useCallback(() => {
     // 1. Fetch Fast Stats
     fetchPlatformStats(30).then(res => {
       const health = res.data || {};
       setSummaryToday({
          total_today: health.total_today || 0,
-         total_last_30_days: health.total_last_30_days || 0,
+         total_wtd:   health.total_wtd || 0,
+         total_mtd:   health.total_mtd || 0,
          by_disease: [],
          date: 'As of Today'
       });
@@ -85,7 +112,7 @@ export default function Dashboard() {
       setSeasonality({ seasons: res.data?.seasons || res.data?.seasonal_patterns || {} });
     }).catch(err => console.error(err));
 
-    fetchDoctorTrends(30, 3).then(res => {
+    fetchDoctorTrends(0, 5).then(res => {
       const data = res.data?.data || res.data || [];
       setDoctorTrends(data);
       setDoctorSummary({
@@ -104,24 +131,6 @@ export default function Dashboard() {
     loadAllData();
   }, [loadAllData]);
 
-  const handleCsvPreview = async (type, params = {}) => {
-    const url = getExportUrl(type, { ...params });
-    const res = await fetch(url);
-    const text = await res.text();
-    const rows = text.trim().split('\n').map(r => {
-      const parts = [];
-      let current = '';
-      let inQuotes = false;
-      for (let char of r) {
-        if (char === '"') inQuotes = !inQuotes;
-        else if (char === ',' && !inQuotes) { parts.push(current); current = ''; }
-        else current += char;
-      }
-      parts.push(current);
-      return parts.map(c => c.replace(/^"|"$/g, '').trim());
-    });
-    setCsvModal({ type, rows, url });
-  };
 
   /*
   const handleToggleSimulator = () => {
@@ -166,18 +175,19 @@ export default function Dashboard() {
         boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* Logo */}
           <div style={{ 
             width: 32, height: 32, background: 'linear-gradient(135deg, #0f172a 0%, #2563eb 100%)',
             borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
             fontWeight: 800, fontSize: 16
           }}>H</div>
-          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px' }}>Healthcare <span style={{ color: '#2563eb' }}>AI</span></span>
-        </div>
+          <span style={{ fontWeight: 800, fontSize: 20, letterSpacing: '-0.5px', marginRight: 24 }}>Healthcare <span style={{ color: '#2563eb' }}>AI</span></span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          {/* User Profile */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingRight: 24, borderRight: '1px solid #e2e8f0' }}>
-            <div style={{ textAlign: 'right' }}>
+          <div style={{ height: 32, width: 1, background: '#e2e8f0', marginRight: 24 }} />
+
+          {/* User Profile & Logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ textAlign: 'left' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{user.username}</div>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>{user.role}</div>
             </div>
@@ -273,7 +283,7 @@ export default function Dashboard() {
           {/* Medicines */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Priority Pharmacy Stock</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Pharmacy Inventory & Daily Usage</div>
               <span style={{ fontSize: 20 }}>💊</span>
             </div>
             {!medicinesLoaded ? (
@@ -293,12 +303,26 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+            
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 12 }}>Priority Pharmacy Stock</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: '#fff1f2', padding: '12px', borderRadius: 10, border: '1px solid #fecaca' }}>
+                  <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>Critical Stock</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#991b1b' }}>{lowStock.critical || 0}</div>
+                </div>
+                <div style={{ background: '#fef2f2', padding: '12px', borderRadius: 10, border: '1px solid #fee2e2' }}>
+                  <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600 }}>Out of Stock</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#b91c1c' }}>{lowStock.out_of_stock || 0}</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Doctor Activity */}
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Specialist Utility Map</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Top Doctors (Daily Consultations)</div>
               <span style={{ fontSize: 20 }}>👨‍⚕️</span>
             </div>
             {doctorTrends.slice(0, 3).map((d, i) => (
@@ -323,15 +347,19 @@ export default function Dashboard() {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Regional Wellness Patterns <span style={{fontSize: 10, opacity: 0.7}}>(Last 30 Days)</span></div>
               <span style={{ fontSize: 20 }}>🌍</span>
             </div>
-            {Object.entries(seasonality.seasons || {}).slice(0, 3).map(([k, v]) => (
-              <div key={k} style={{ marginBottom: 12, padding: '12px', background: '#f8fafc', borderRadius: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, fontSize: 13 }}>{k}</span>
-                  <span style={{ color: '#7c3aed', fontWeight: 800 }}>{(v?.total_cases || 0).toLocaleString()}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {Object.entries(seasonality.seasons || {}).slice(0, 4).map(([k, v]) => (
+                <div key={k} style={{ padding: '8px', background: '#f8fafc', borderRadius: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 700, fontSize: 12 }}>{k}</span>
+                    <span style={{ color: '#7c3aed', fontWeight: 800, fontSize: 12 }}>{(v?.total_cases || 0).toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    Top: <span style={{ fontWeight: 600 }}>{v.top_disease}</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Top: <span style={{ fontWeight: 600 }}>{v.top_disease}</span></div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
 

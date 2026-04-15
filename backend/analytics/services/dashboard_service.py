@@ -10,6 +10,7 @@ from analytics.models import Appointment
 from django.db.models import Count, Sum
 from ..utils.logger import get_logger
 from ..services.aggregation import get_disease_type
+from ..views.utils import apply_clinic_filter
 
 logger = get_logger(__name__)
 
@@ -17,18 +18,19 @@ class DashboardService:
     """Consolidated service with isolated logic for dashboard fragments."""
 
     @staticmethod
-    def _get_appt_context(days: int):
+    def _get_appt_context(days: int, request=None):
         """Shared helper to get isolated appointment data context."""
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
         start_dt = datetime.combine(start_date, time.min)
         end_dt = datetime.combine(end_date, time.max)
         
-        appt_qs = (
-            Appointment.objects
-            .filter(appointment_datetime__range=(start_dt, end_dt), disease__isnull=False)
-            .values('appointment_datetime', 'disease__name', 'disease__season')
+        appt_qs_base = Appointment.objects.filter(
+            appointment_datetime__range=(start_dt, end_dt), 
+            disease__isnull=False
         )
+        appt_qs = apply_clinic_filter(appt_qs_base, request) \
+            .values('appointment_datetime', 'disease__name', 'disease__season')
         
         daily_by_dtype = defaultdict(lambda: defaultdict(int))
         dtype_season = {}
@@ -46,9 +48,9 @@ class DashboardService:
         }
 
     @classmethod
-    def get_stats_fragment(cls, days: int = 30) -> Dict:
+    def get_stats_fragment(cls, days: int = 30, request=None) -> Dict:
         """LIGHTWEIGHT: Only returns top-level counters."""
-        ctx = cls._get_appt_context(days)
+        ctx = cls._get_appt_context(days, request)
         total = sum(sum(day_map.values()) for day_map in ctx['daily_by_dtype'].values())
         return {
             'total_appointments': total,
@@ -58,9 +60,9 @@ class DashboardService:
         }
 
     @classmethod
-    def get_trends_fragment(cls, days: int = 30, forecast_days: int = 8) -> Dict:
+    def get_trends_fragment(cls, days: int = 30, forecast_days: int = 8, request=None) -> Dict:
         """MODERATE: Only returns forecasting and strategic insights."""
-        ctx = cls._get_appt_context(days)
+        ctx = cls._get_appt_context(days, request)
         forecasting = ForecastingService()
         insights_service = InsightsService()
         
@@ -94,29 +96,32 @@ class DashboardService:
         }
 
     @classmethod
-    def get_medicines_fragment(cls, days: int = 30) -> List[Dict]:
+    def get_medicines_fragment(cls, days: int = 30, request=None) -> List[Dict]:
         """HEAVY: Isolated 2.8M row prescription analytics."""
-        ctx = cls._get_appt_context(days)
+        ctx = cls._get_appt_context(days, request)
         restock_service = RestockService()
         end_date = date.today()
         decide_start_date = end_date - timedelta(days=7) # Sample window
 
-        top_ids_qs = (
-            PrescriptionLine.objects
-            .filter(prescription_date__range=(decide_start_date, end_date))
-            .values('drug_id')
-            .annotate(total=Sum('quantity'))
-            .order_by('-total')[:50] # Reduced limit for dashboard
+        top_rx_qs_base = PrescriptionLine.objects.filter(
+            prescription_date__range=(decide_start_date, end_date)
         )
+        top_ids_qs = apply_clinic_filter(top_rx_qs_base, request, clinic_field='prescription__clinic') \
+            .values('drug_id') \
+            .annotate(total=Sum('quantity')) \
+            .order_by('-total')[:50] 
+        
         top_ids = [d['drug_id'] for d in top_ids_qs]
-        drug_names_map = {d.id: d.drug_name for d in DrugMaster.objects.filter(id__in=top_ids)}
+        
+        dm_qs_base = DrugMaster.objects.filter(id__in=top_ids)
+        drug_names_map = {d.id: d.drug_name for d in apply_clinic_filter(dm_qs_base, request)}
         
         ctx['top_medicines_data'] = drug_names_map
         ctx['decision_window_start'] = decide_start_date
         ctx['buffer_info'] = {'adaptive_buffer': 0}
 
         restock_suggestions = restock_service.calculate_restock_suggestions(
-            decide_start_date, end_date, precalculated_context=ctx
+            decide_start_date, end_date, precalculated_context=ctx, request=request
         )
         
         return [{
@@ -127,3 +132,18 @@ class DashboardService:
             'priority': 'High' if s['status'] == 'critical' else 'Normal',
             'recommended_restock': s['suggested_restock']
         } for s in restock_suggestions[:5]]
+
+    @classmethod
+    def get_unified_dashboard(cls, days: int = 30, forecast_days: int = 8, request=None) -> Dict:
+        """COMPREHENSIVE: Orchestrates a single source of truth for the platform."""
+        stats = cls.get_stats_fragment(days, request)
+        trends = cls.get_trends_fragment(days, forecast_days, request)
+        medicines = cls.get_medicines_fragment(days, request)
+        
+        return {
+            'analytics': stats,
+            'top_diseases': trends['top_diseases'],
+            'forecasts': trends['forecasts'],
+            'insights': trends['insights'],
+            'decisions': medicines
+        }

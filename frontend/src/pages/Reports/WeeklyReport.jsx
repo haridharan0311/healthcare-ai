@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import styles from './Reports.module.css';
 
 function ProgressBar({ pct, color }) {
@@ -9,55 +9,92 @@ function ProgressBar({ pct, color }) {
   );
 }
 
-function DiseaseList({ diseases, color }) {
-  if (!diseases || diseases.length === 0) return null;
+function ReportTable({ diseases, color }) {
+  if (!diseases || diseases.length === 0) return <div style={{ padding: 20, textAlign: 'center', color: '#9ca3af' }}>No disease data for this period.</div>;
+  
   return (
-    <>
-      {diseases.map((d, i) => (
-        <div key={i} style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: 2 }}>
-            <span style={{ color: '#374151' }}>
-              <span style={{ color: '#9ca3af', marginRight: 4 }}>#{i + 1}</span>
-              {d.disease_name}
-            </span>
-            <span style={{ fontWeight: 600 }}>
-              {(d.case_count || 0).toLocaleString()}
-              <span style={{ color: '#9ca3af', fontWeight: 400, marginLeft: 4 }}>({d.percentage || 0}%)</span>
-            </span>
-          </div>
-          <ProgressBar pct={d.percentage || 0} color={color} />
-        </div>
-      ))}
-    </>
+    <div className={styles.tableContainer} style={{ marginTop: 20 }}>
+      <table className={styles.dataTable}>
+        <thead>
+          <tr>
+            <th style={{ width: 60 }}>#</th>
+            <th>Disease name</th>
+            <th style={{ textAlign: 'right' }}>Case count</th>
+            <th style={{ width: '40%' }}>Distribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          {diseases.map((d, i) => (
+            <tr key={i}>
+              <td style={{ fontWeight: 700, color: '#9ca3af' }}>{i + 1}</td>
+              <td style={{ fontWeight: 600 }}>{d.disease_name}</td>
+              <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                {d.case_count.toLocaleString()}
+                <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400, marginLeft: 6 }}>({d.percentage}%)</span>
+              </td>
+              <td>
+                <ProgressBar pct={d.percentage} color={color} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 export function WeeklyReport({ data }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  const weeks = data?.weeks || [];
+  
+  useEffect(() => {
+    if (weeks.length > 0) setSelectedIndex(0);
+  }, [data, weeks.length]);
+
   if (!data) return null;
+
+  const selectedWeek = weeks[selectedIndex];
+
   return (
     <div>
-      <h3 className={styles.panelTitle}>Weekly disease case report</h3>
-      <p className={styles.panelSubtitle}>
-        {data.period}&nbsp;·&nbsp;{data.total_weeks} week{data.total_weeks !== 1 ? 's' : ''}
-      </p>
-      {(data.weeks || []).length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>No data for selected range</div>
-      ) : (
-        <div className={styles.gridContainer}>
-          {data.weeks.map(week => (
-            <div key={week.week_start} className={styles.card} style={{ borderTop: '4px solid #2563eb' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: '#1e40af' }}>Week {week.week_number}</div>
-                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{week.week_start} – {week.week_end}</div>
-                </div>
-                <div style={{ background: '#eff6ff', color: '#2563eb', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: 14 }}>
-                  {(week.total_cases || 0).toLocaleString()}
-                </div>
-              </div>
-              <DiseaseList diseases={week.diseases} color="#2563eb" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h3 className={styles.panelTitle}>Weekly disease case report</h3>
+          <p className={styles.panelSubtitle}>{data.period} &middot; {weeks.length} weeks</p>
+        </div>
+        
+        {weeks.length > 0 && (
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase' }}>Select week</div>
+            <select 
+              value={selectedIndex} 
+              onChange={e => setSelectedIndex(Number(e.target.value))}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', minWidth: 280, fontSize: 13, fontWeight: 600 }}
+            >
+              {weeks.map((w, i) => (
+                <option key={i} value={i}>{w.week_label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {weeks.length === 0 ? (
+        <div style={{ padding: 60, textAlign: 'center', color: '#9ca3af', border: '2px dashed #e2e8f0', borderRadius: 16 }}>No data for selected range</div>
+      ) : selectedWeek && (
+        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: '#eff6ff', borderRadius: 12, borderLeft: '4px solid #2563eb' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: '#1e40af' }}>{selectedWeek.week_label}</div>
+              <div style={{ fontSize: 12, color: '#60a5fa', marginTop: 2 }}>{selectedWeek.week_start} to {selectedWeek.week_end}</div>
             </div>
-          ))}
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#2563eb' }}>{selectedWeek.total_cases.toLocaleString()}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase' }}>Total cases</div>
+            </div>
+          </div>
+          <ReportTable diseases={selectedWeek.diseases} color="#2563eb" />
         </div>
       )}
     </div>
@@ -65,28 +102,54 @@ export function WeeklyReport({ data }) {
 }
 
 export function MonthlyReport({ data }) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  const months = data?.months || [];
+  
+  useEffect(() => {
+    if (months.length > 0) setSelectedIndex(0);
+  }, [data, months.length]);
+
   if (!data) return null;
+
+  const selectedMonth = months[selectedIndex];
+
   return (
     <div>
-      <h3 className={styles.panelTitle}>Monthly disease case report</h3>
-      <p className={styles.panelSubtitle}>
-        {data.period}&nbsp;·&nbsp;{data.total_months} month{data.total_months !== 1 ? 's' : ''}
-      </p>
-      {(data.months || []).length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>No data for selected range</div>
-      ) : (
-        <div className={styles.gridContainer}>
-          {data.months.map(month => (
-            <div key={month.month_key} className={styles.card} style={{ borderTop: '4px solid #7c3aed' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#5b21b6' }}>{month.month_label}</div>
-                <div style={{ background: '#f5f3ff', color: '#7c3aed', padding: '4px 10px', borderRadius: 8, fontWeight: 700, fontSize: 14 }}>
-                  {(month.total_cases || 0).toLocaleString()}
-                </div>
-              </div>
-              <DiseaseList diseases={month.diseases} color="#7c3aed" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h3 className={styles.panelTitle}>Monthly disease case report</h3>
+          <p className={styles.panelSubtitle}>{data.period} &middot; {months.length} months</p>
+        </div>
+        
+        {months.length > 0 && (
+          <div style={{ background: '#f8fafc', padding: 12, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6, textTransform: 'uppercase' }}>Select month</div>
+            <select 
+              value={selectedIndex} 
+              onChange={e => setSelectedIndex(Number(e.target.value))}
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', minWidth: 280, fontSize: 13, fontWeight: 600 }}
+            >
+              {months.map((m, i) => (
+                <option key={i} value={i}>{m.month_label}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {months.length === 0 ? (
+        <div style={{ padding: 60, textAlign: 'center', color: '#9ca3af', border: '2px dashed #e2e8f0', borderRadius: 16 }}>No data for selected range</div>
+      ) : selectedMonth && (
+        <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', background: '#f5f3ff', borderRadius: 12, borderLeft: '4px solid #7c3aed' }}>
+            <div style={{ fontWeight: 800, fontSize: 18, color: '#5b21b6' }}>{selectedMonth.month_label}</div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#7c3aed' }}>{selectedMonth.total_cases.toLocaleString()}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase' }}>Total cases</div>
             </div>
-          ))}
+          </div>
+          <ReportTable diseases={selectedMonth.diseases} color="#7c3aed" />
         </div>
       )}
     </div>

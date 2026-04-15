@@ -45,7 +45,8 @@ class TimeSeriesAnalysis:
     def calculate_growth_rate(
         self,
         disease_name: str,
-        days: int = 7
+        days: int = 7,
+        appt_queryset = None
     ) -> Dict:
         """
         FEATURE 1: Disease Growth Rate Indicator.
@@ -57,8 +58,11 @@ class TimeSeriesAnalysis:
             prev_end = recent_start - timedelta(days=1)
             prev_start = prev_end - timedelta(days=days)
 
+            if appt_queryset is None:
+                appt_queryset = Appointment.objects.all()
+
             recent_count = (
-                Appointment.objects
+                appt_queryset
                 .filter(
                     appointment_datetime__date__range=(recent_start, end_date),
                     disease__name__icontains=disease_name,
@@ -68,7 +72,7 @@ class TimeSeriesAnalysis:
             )
 
             previous_count = (
-                Appointment.objects
+                appt_queryset
                 .filter(
                     appointment_datetime__date__range=(prev_start, prev_end),
                     disease__name__icontains=disease_name,
@@ -94,15 +98,17 @@ class TimeSeriesAnalysis:
             self.logger.error(f"Growth rate calculation failed: {str(e)}")
             return {'error': str(e)}
 
-    def get_seasonal_patterns(self, disease_name: str) -> Dict:
+    def get_seasonal_patterns(self, disease_name: str, appt_queryset=None) -> Dict:
         """
         FEATURE 6: Seasonal Intelligence Engine.
         Analyzes disease trends based on seasons automatically.
         """
+        if appt_queryset is None:
+            appt_queryset = Appointment.objects.all()
         try:
             # Query disease records for seasonal mapping
             qs = (
-                Appointment.objects
+                appt_queryset
                 .filter(disease__name__icontains=disease_name, disease__isnull=False)
                 .select_related('disease')
                 .values('disease__season')
@@ -122,11 +128,13 @@ class TimeSeriesAnalysis:
             self.logger.error(f"Seasonal analysis failed: {str(e)}")
             return {'error': str(e)}
 
-    def get_daily_trends(self, disease_name: str, days: int = 30) -> List[Dict]:
+    def get_daily_trends(self, disease_name: str, days: int = 30, appt_queryset=None) -> List[Dict]:
         """Expose daily time-series data."""
+        if appt_queryset is None:
+            appt_queryset = Appointment.objects.all()
         start_date = date.today() - timedelta(days=days)
         qs = (
-            Appointment.objects
+            appt_queryset
             .filter(
                 appointment_datetime__date__gte=start_date,
                 disease__name__icontains=disease_name,

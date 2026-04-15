@@ -9,6 +9,8 @@ import {
   fetchMedicineDependency,
   fetchStockDepletionForecast,
   fetchAdaptiveBuffer,
+  getExportUrl,
+  apiInstance
 } from '../api';
 import TopMedicines        from './Reports/TopMedicines';
 import LowStockAlerts      from './Reports/LowStockAlerts';
@@ -17,6 +19,7 @@ import DoctorTrends        from './Reports/DoctorTrends';
 import { WeeklyReport, MonthlyReport } from './Reports/WeeklyReport';
 import MedicineDependency  from './Reports/MedicineDependency';
 import { StockDepletionForecast, AdaptiveBuffers } from './Reports/StockForecast';
+import CsvPreviewModal     from '../components/CsvPreviewModal';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -26,12 +29,24 @@ const TABS = [
   'Medicine Dependencies', 'Stock Depletion Forecast', 'Adaptive Buffers',
 ];
 
-const WEEKLY_RANGES  = [30, 60, 90, 120, 180, 270, 365, 730].map(d => ({ label: d >= 365 ? `${d/365}Y` : `${d/30}M`, days: d }));
-const MONTHLY_RANGES = [90, 180, 365, 730, 1095, 1460, 1825].map(d => ({ label: d >= 365 ? `${(d/365).toFixed(0)}Y` : `${d/30}M`, days: d }));
+const WEEKLY_RANGES  = [
+  { label: 'WTD', days: 7, period: 'WTD' },
+  { label: 'MTD', days: 30, period: 'MTD' },
+  { label: '3M', days: 90 },
+  { label: '6M', days: 180 },
+  { label: '1Y', days: 365 },
+];
+const MONTHLY_RANGES = [
+  { label: 'MTD', days: 30, period: 'MTD' },
+  { label: '3M', days: 90 },
+  { label: '6M', days: 180 },
+  { label: '1Y', days: 365 },
+  { label: '2Y', days: 730 },
+];
 const GENERAL_RANGES = [7, 14, 30, 90, 180, 365];
 const DEFAULT_DAYS   = {
   'Top Medicines': 30, 'Low Stock Alerts': 30, 'Seasonality': 365,
-  'Doctor Trends': 30, 'Weekly': 60, 'Monthly': 365,
+  'Doctor Trends': 30, 'Weekly': 30, 'Monthly': 30,
   'Medicine Dependencies': 30, 'Stock Depletion Forecast': 90, 'Adaptive Buffers': 30,
 };
 
@@ -43,12 +58,14 @@ export default function ReportsPage() {
   const [loading,           setLoading]           = useState(false);
   const [error,             setError]             = useState(null);
   const [days,              setDays]              = useState(DEFAULT_DAYS['Top Medicines']);
+  const [period,            setPeriod]            = useState(null);
   const [threshold,         setThreshold]         = useState(50);
   const [medicineDeps,      setMedicineDeps]      = useState(null);
   const [stockForecast,     setStockForecast]     = useState(null);
   const [adaptiveBufferData,setAdaptiveBufferData]= useState(null);
   const [stockDrugOptions,  setStockDrugOptions]  = useState([]);
   const [stockDrugName,     setStockDrugName]     = useState('');
+  const [csvModal,          setCsvModal]          = useState(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -60,8 +77,8 @@ export default function ReportsPage() {
       'Low Stock Alerts':          () => fetchLowStockAlerts(threshold),
       'Seasonality':               () => fetchSeasonality(days),
       'Doctor Trends':             () => fetchDoctorTrends(days, 30),
-      'Weekly':                    () => fetchWeeklyReport(days),
-      'Monthly':                   () => fetchMonthlyReport(days),
+      'Weekly':                    () => fetchWeeklyReport(days, period),
+      'Monthly':                   () => fetchMonthlyReport(days, period),
       'Medicine Dependencies':     () => fetchMedicineDependency(null, days),
       'Stock Depletion Forecast':  () => stockDrugName
         ? fetchStockDepletionForecast(stockDrugName, days)
@@ -78,7 +95,7 @@ export default function ReportsPage() {
       })
       .catch(() => setError('Failed to load data. Please try again.'))
       .finally(() => setLoading(false));
-  }, [tab, days, threshold, stockDrugName]);
+  }, [tab, days, threshold, stockDrugName, period]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -96,17 +113,47 @@ export default function ReportsPage() {
   }, [tab, stockDrugName, stockDrugOptions.length]);
 
   // ── Tab switch ────────────────────────────────────────────────────────────
-
   const handleTabChange = (newTab) => {
     if (newTab === tab) { fetchData(); return; }
     setData(null); setError(null);
     setMedicineDeps(null); setStockForecast(null); setAdaptiveBufferData(null);
     setDays(DEFAULT_DAYS[newTab] || 30);
+    setPeriod(newTab === 'Weekly' || newTab === 'Monthly' ? 'MTD' : null);
     setTab(newTab);
   };
 
-  // ── Range selector ────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    const exportTypeMap = {
+      'Top Medicines': 'medicine-usage',
+      'Low Stock Alerts': 'restock',
+      'Seasonality': 'disease-trends',
+      'Doctor Trends': 'doctor-trends',
+      'Weekly': 'reports/weekly',
+      'Monthly': 'reports/monthly',
+    };
+    const type = exportTypeMap[tab] || 'disease-trends';
+    
+    try {
+      const url = getExportUrl(type, { days, period });
+      const res = await apiInstance.get(url);
+      const rows = res.data.trim().split('\n').map(r => {
+        const parts = [];
+        let current = ''; let inQuotes = false;
+        for (let char of r) {
+          if (char === '"') inQuotes = !inQuotes;
+          else if (char === ',' && !inQuotes) { parts.push(current); current = ''; }
+          else current += char;
+        }
+        parts.push(current);
+        return parts.map(c => c.replace(/^"|"$/g, '').trim());
+      });
+      setCsvModal({ type, rows, url });
+    } catch (err) {
+      console.error('Export Preview failed:', err);
+    }
+  };
 
+  // ── Range selector ────────────────────────────────────────────────────────
   const btnStyle = (active) => ({
     padding: '6px 14px', borderRadius: 8, border: '1px solid',
     borderColor: active ? '#1e293b' : '#e2e8f0',
@@ -130,9 +177,17 @@ export default function ReportsPage() {
     const rangeButtons = (ranges) => (
       <div style={{ display: 'flex', gap: 6 }}>
         {ranges.map(opt => (
-          <button key={opt.days ?? opt} onClick={() => setDays(opt.days ?? opt)}
-            style={btnStyle(days === (opt.days ?? opt))}>
-            {opt.label ?? `${opt}d`}
+          <button key={opt.label || opt} onClick={() => {
+              if (typeof opt === 'number') {
+                setDays(opt);
+                setPeriod(null);
+              } else {
+                setDays(opt.days);
+                setPeriod(opt.period || null);
+              }
+            }}
+            style={btnStyle((typeof opt === 'number' ? days === opt : (period === opt.period && days === opt.days)))}>
+            {typeof opt === 'number' ? `Last ${opt}d` : opt.label}
           </button>
         ))}
       </div>
@@ -150,8 +205,6 @@ export default function ReportsPage() {
       </select>
     );
   };
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ 
@@ -182,7 +235,17 @@ export default function ReportsPage() {
           <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
           <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Reports & Intelligence</h1>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+          <button 
+            onClick={handleExport}
+            style={{
+              padding: '10px 20px', background: '#0f172a', color: '#fff',
+              borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8, fontSize: 13
+            }}
+          >
+            <span>📥</span> Export CSV
+          </button>
           {renderRangeSelector()}
         </div>
       </header>
@@ -280,6 +343,8 @@ export default function ReportsPage() {
           )}
         </div>
       </main>
+
+      {csvModal && <CsvPreviewModal data={csvModal} onClose={() => setCsvModal(null)} />}
     </div>
   );
 }

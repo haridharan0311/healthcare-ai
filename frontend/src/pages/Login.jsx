@@ -65,7 +65,7 @@ export default function Login() {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="e.g. super_admin"
+              placeholder="Enter username"
               style={{
                 width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #e2e8f0',
                 fontSize: 14, outline: 'none', transition: 'border-color 0.2s',

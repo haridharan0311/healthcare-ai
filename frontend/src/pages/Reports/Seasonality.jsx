@@ -35,7 +35,7 @@ export default function Seasonality({ data }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <div style={{ fontWeight: 700, fontSize: '16px', color }}>{season}</div>
                 <div style={{ background: `${color}15`, color, padding: '2px 8px', borderRadius: '8px', fontWeight: 600, fontSize: '12px' }}>
-                  {(info.total_cases || 0).toLocaleString()} cases
+                   {(info.total_cases || 0).toLocaleString()} cases
                 </div>
               </div>
               <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
@@ -54,6 +54,39 @@ export default function Seasonality({ data }) {
             </div>
           );
         })}
+      </div>
+
+      <div style={{ marginTop: '40px' }}>
+        <h4 className={styles.panelTitle} style={{ fontSize: '16px' }}>Data Table Preview</h4>
+        <div className={styles.tableContainer}>
+          <table className={styles.dataTable}>
+            <thead>
+              <tr>
+                {['#', 'Season', 'Disease Name', 'Case Count', 'Distribution (%)'].map(h => <th key={h}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(data.seasons || {}).flatMap(([season, info]) => 
+                info.diseases.map((d, i) => ({ ...d, season }))
+              ).map((row, idx) => (
+                <tr key={idx}>
+                  <td style={{ color: '#9ca3af', fontWeight: 600 }}>{idx + 1}</td>
+                  <td style={{ fontWeight: 600, color: SEASON_COLORS[row.season] || '#64748b' }}>{row.season}</td>
+                  <td style={{ fontWeight: 500 }}>{row.disease_name}</td>
+                  <td>{(row.case_count || 0).toLocaleString()}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ flex: 1, minWidth: '60px' }}>
+                        <ProgressBar pct={row.percentage} color={SEASON_COLORS[row.season]} />
+                      </div>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b' }}>{row.percentage}%</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
