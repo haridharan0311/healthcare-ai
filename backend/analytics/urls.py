@@ -54,6 +54,5 @@ urlpatterns = [
     path('dashboard/medicines/',         views.dashboard_views.DashboardMedicinesView.as_view(), name='dashboard-medicines'),
     
     path('simulator/toggle/',            views.live_data_views.LiveDataToggleView.as_view(),    name='simulator-toggle'),
-
-    path('simulator/toggle/',            views.live_data_views.LiveDataToggleView.as_view(),    name='simulator-toggle'),
+    path('simulator/notifications/',     views.live_data_views.SimulatorNotificationsView.as_view(), name='simulator-notifications'),
 ]

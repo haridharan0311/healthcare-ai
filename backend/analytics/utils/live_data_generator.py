@@ -41,6 +41,7 @@ from django.db import transaction
 from django.db.utils import OperationalError
 from django.utils import timezone
 from django.db.models import Max
+from django.core.cache import cache
 from django.conf import settings
 
 from analytics.models import Disease, Appointment
@@ -331,6 +332,23 @@ class LiveDataGenerator:
                 except Exception as exc:
                     logger.error('Drug stock bulk update failed', exc_info=exc)
                     break
+
+        # ── Push notifications to cache ──────────────────────────
+        if created_appts:
+            notifications = []
+            for appt in created_appts:
+                notifications.append({
+                    'disease': appt.disease.name,
+                    'doctor': str(appt.doctor),
+                    'clinic': appt.clinic.clinic_name,
+                    'patient': str(appt.patient),
+                    'timestamp': str(timezone.now())
+                })
+            
+            existing = cache.get('simulator_notifications', [])
+            # Keep only last 20 to prevent cache bloat
+            updated = (existing + notifications)[-20:]
+            cache.set('simulator_notifications', updated, timeout=300)
 
         # ── Log summary ──────────────────────────────────────────
         total_lines = len(prescription_lines)

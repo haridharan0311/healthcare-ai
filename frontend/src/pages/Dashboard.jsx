@@ -8,6 +8,7 @@ import {
   fetchSeasonality,
   fetchDoctorTrends,
   fetchSimulatorStatus,
+  fetchSimulatorNotifications,
   toggleSimulator,
   apiInstance
 } from '../api';
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const [doctorTrends, setDoctorTrends]   = useState([]);
   const [doctorSummary, setDoctorSummary] = useState({});
   const [simStatus, setSimStatus]         = useState({ running: false, interval: 30 });
+  const [notifications, setNotifications] = useState([]);
   const [medicinesLoaded, setMedicinesLoaded] = useState(false);
 
   const handleCsvPreview = async (type, params = {}) => {
@@ -126,6 +128,56 @@ export default function Dashboard() {
   }, [loadAllData]);
 
 
+  // ── Poll for simulator notifications ──
+  useEffect(() => {
+    let intervalId;
+    if (simStatus.running) {
+      intervalId = setInterval(() => {
+        fetchSimulatorNotifications().then(res => {
+          if (res.data && res.data.length > 0) {
+            // Aggregation Logic: Group by Doctor + Clinic
+            const grouped = res.data.reduce((acc, current) => {
+              const key = `${current.doctor}-${current.clinic}`;
+              if (!acc[key]) {
+                acc[key] = { ...current, count: 1, diseases: [current.disease], patients: [current.patient] };
+              } else {
+                acc[key].count += 1;
+                if (!acc[key].diseases.includes(current.disease)) acc[key].diseases.push(current.disease);
+                acc[key].patients.push(current.patient);
+              }
+              return acc;
+            }, {});
+
+            const newNotifs = Object.values(grouped).map(n => ({
+              ...n,
+              id: Math.random().toString(36).substr(2, 9)
+            }));
+
+            setNotifications(prev => {
+                // Keep only unique groups, preferring more recent ones
+                const combined = [...prev, ...newNotifs];
+                return combined.slice(-5); // Only show last 5 groups to prevent clutter
+            });
+            
+            loadAllData();
+          }
+        }).catch(err => console.error('Notification fetch failed:', err));
+      }, 3000);
+    }
+    return () => clearInterval(intervalId);
+  }, [simStatus.running, loadAllData]);
+
+  // ── Auto-remove notifications after 3s ──
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const timer = setTimeout(() => {
+        setNotifications(prev => prev.slice(1));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notifications]);
+
+
   const handleToggleSimulator = () => {
     const action = simStatus.running ? 'stop' : 'start';
     toggleSimulator(action, simStatus.interval).then(res => {
@@ -154,8 +206,58 @@ export default function Dashboard() {
       backgroundImage: 'radial-gradient(#e2e8f0 0.5px, transparent 0.5px)',
       backgroundSize: '24px 24px',
       fontFamily: '"Inter", system-ui, -apple-system, sans-serif',
-      color: '#0f172a'
+      color: '#0f172a',
+      position: 'relative'
     }}>
+      {/* ── Notification Popups (Top Left) ── */}
+      <div style={{
+        position: 'fixed', top: 20, left: 20, zIndex: 10000,
+        display: 'flex', flexDirection: 'column', gap: 10,
+        pointerEvents: 'none'
+      }}>
+        {notifications.map(n => (
+          <div key={n.id} style={{
+            background: 'rgba(255, 255, 255, 0.7)',
+            color: '#0f172a',
+            padding: '16px 20px', borderRadius: 16, fontSize: 13, fontWeight: 500,
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+            border: '1px solid rgba(255,255,255,0.4)',
+            backdropFilter: 'blur(16px)', minWidth: 320, maxWidth: 400,
+            animation: 'slideInPremium 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            pointerEvents: 'auto',
+            marginBottom: 8
+          }}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'start' }}>
+              <div style={{ 
+                background: '#2563eb', width: 10, height: 10, borderRadius: '50%', marginTop: 6,
+                boxShadow: '0 0 12px rgba(37, 99, 235, 0.4)'
+              }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ 
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: 8, opacity: 0.8, fontSize: 11, fontWeight: 700, 
+                  textTransform: 'uppercase', letterSpacing: '1px' 
+                }}>
+                  <span>Simulator Broadcast</span>
+                  <span style={{ color: '#64748b' }}>Just Now</span>
+                </div>
+                
+                <div style={{ fontSize: 14, lineHeight: 1.5, color: '#1e293b' }}>
+                  {n.count > 1 ? (
+                    <>
+                      <strong style={{ color: '#2563eb' }}>{n.count} new consultations</strong> processed by <span style={{ fontWeight: 700 }}>Dr. {n.doctor}</span> at <span style={{ color: '#64748b' }}>{n.clinic}</span>.
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontWeight: 700 }}>Dr. {n.doctor}</span> ({n.clinic}) processed a new <strong style={{ color: '#2563eb' }}>{n.disease}</strong> consultation for <span style={{ color: '#475569' }}>{n.patient}</span>.
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
       {/* ── Premium Top Bar ── */}
       <header style={{
         background: 'rgba(255, 255, 255, 0.8)',
@@ -396,6 +498,10 @@ export default function Dashboard() {
         }
         @keyframes spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes slideInPremium {
+          from { transform: perspective(1000px) rotateX(-20deg) translateY(-20px) scale(0.95); opacity: 0; }
+          to { transform: perspective(1000px) rotateX(0) translateY(0) scale(1); opacity: 1; }
         }
       `}</style>
     </div>

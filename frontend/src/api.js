@@ -69,6 +69,7 @@ export const fetchPlatformMedicines = (days = 30) => api('/dashboard/medicines/'
 
 // ── Simulator Control ─────────────────────────────────────────────────
 export const fetchSimulatorStatus = () => api('/simulator/toggle/');
+export const fetchSimulatorNotifications = () => api('/simulator/notifications/');
 export const toggleSimulator = (action, interval = 30) => 
   apiInstance.post(`/simulator/toggle/`, { action, interval });
 

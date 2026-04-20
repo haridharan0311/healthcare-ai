@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.core.cache import cache
 from ..utils.live_data_generator import _generator, start_live_data_generator, stop_live_data_generator
 
 class LiveDataToggleView(APIView):
@@ -50,3 +51,15 @@ class LiveDataToggleView(APIView):
                 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SimulatorNotificationsView(APIView):
+    """
+    GET /api/simulator/notifications/
+    Fetch and clear recent simulator notifications from cache.
+    """
+    def get(self, request):
+        notifications = cache.get('simulator_notifications', [])
+        if notifications:
+            cache.delete('simulator_notifications')
+        return Response(notifications)
