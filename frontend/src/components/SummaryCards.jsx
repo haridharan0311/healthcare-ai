@@ -34,8 +34,8 @@ export default function SummaryCards({ days, summary = {} }) {
 
   const totalWtd = todaySummary?.total_wtd || 0;
   const totalMtd = todaySummary?.total_mtd || 0;
-  const spikeCount = spikes?.length || 0;
-  const topDis = todaySummary?.by_disease?.[0] || { disease: '—', count: 0 };
+  const activeOutbreaks = todaySummary?.active_outbreaks || 0;
+  const topDisease = todaySummary?.top_disease || '—';
 
   const cards = [
     {
@@ -61,14 +61,14 @@ export default function SummaryCards({ days, summary = {} }) {
     },
     {
       label: 'Active Outbreaks',
-      value: spikeCount,
+      value: activeOutbreaks.toLocaleString(),
       sub: 'Security alerts detected',
       color: COLORS.spikes,
       icon: '🚨'
     },
     {
       label: 'Dominant Pathology',
-      value: topDis.disease,
+      value: topDisease,
       sub: 'Highest prevalence currently',
       color: COLORS.disease,
       icon: '🦠'

@@ -68,7 +68,7 @@ export default function DistrictRestock({ days, onExport }) {
           <div style={{ fontSize: 13, color: '#64748b' }}>Strategic Pharmacy Replenishment Suggestions</div>
         </div>
         <button
-          onClick={onExport}
+          onClick={() => onExport({ district: selectedDistrict })}
           style={{
             padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0',
             background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#444'

@@ -125,16 +125,25 @@ export default function ReportsPage() {
   const handleExport = async () => {
     const exportTypeMap = {
       'Top Medicines': 'medicine-usage',
-      'Low Stock Alerts': 'restock',
+      'Low Stock Alerts': 'low-stock-alerts',
       'Seasonality': 'disease-trends',
       'Doctor Trends': 'doctor-trends',
       'Weekly': 'reports/weekly',
       'Monthly': 'reports/monthly',
+      'Medicine Dependencies': 'medicine-dependency',
+      'Stock Depletion Forecast': 'stock-depletion',
     };
     const type = exportTypeMap[tab] || 'disease-trends';
     
+    // Build parameters based on tab
+    const params = { days };
+    if (tab === 'Weekly' || tab === 'Monthly') params.period = period;
+    if (tab === 'Low Stock Alerts') params.threshold = threshold;
+    if (tab === 'Medicine Dependencies' && medicineDeps?.target_disease) params.disease = medicineDeps.target_disease;
+    if (tab === 'Stock Depletion Forecast') params.drug_name = 'all';
+
     try {
-      const url = getExportUrl(type, { days, period });
+      const url = getExportUrl(type, params);
       const res = await apiInstance.get(url);
       const rows = res.data.trim().split('\n').map(r => {
         const parts = [];
@@ -236,16 +245,18 @@ export default function ReportsPage() {
           <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>Reports & Intelligence</h1>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <button 
-            onClick={handleExport}
-            style={{
-              padding: '10px 20px', background: '#0f172a', color: '#fff',
-              borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 8, fontSize: 13
-            }}
-          >
-            <span>📥</span> Export CSV
-          </button>
+          {tab !== 'Adaptive Buffers' && (
+            <button 
+              onClick={handleExport}
+              style={{
+                padding: '10px 20px', background: '#0f172a', color: '#fff',
+                borderRadius: 10, border: 'none', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13
+              }}
+            >
+              <span>📥</span> Export CSV
+            </button>
+          )}
           {renderRangeSelector()}
         </div>
       </header>

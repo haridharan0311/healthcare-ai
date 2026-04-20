@@ -38,6 +38,9 @@ urlpatterns = [
     path('export/doctor-trends/',      views.ExportDoctorTrendsView.as_view(),     name='export-doctor-trends'),
     path('export/reports/weekly/',     views.ExportWeeklyReportView.as_view(),     name='export-weekly'),
     path('export/reports/monthly/',    views.ExportMonthlyReportView.as_view(),    name='export-monthly'),
+    path('export/low-stock-alerts/',   views.ExportLowStockAlertView.as_view(),    name='export-low-stock-alerts'),
+    path('export/medicine-dependency/',views.ExportMedicineDependencyView.as_view(),name='export-medicine-dependency'),
+    path('export/stock-depletion/',    views.ExportStockDepletionView.as_view(),   name='export-stock-depletion'),
     path('export-report/',             views.ExportReportView.as_view(),           name='export-report'),
 
     # ── UNIFIED SIMPLE FLOW API ───────────────────────────────────────

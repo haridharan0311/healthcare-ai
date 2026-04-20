@@ -5,7 +5,8 @@ from .spike_views import SpikeAlertView
 from .report_views import WeeklyReportView, MonthlyReportView, TodaySummaryView, WhatChangedTodayView
 from .export_views import (
     ExportDiseaseTrendsView, ExportSpikeAlertsView, ExportRestockView, ExportReportView,
-    ExportMedicineUsageView, ExportDoctorTrendsView, ExportWeeklyReportView, ExportMonthlyReportView
+    ExportMedicineUsageView, ExportDoctorTrendsView, ExportWeeklyReportView, ExportMonthlyReportView,
+    ExportLowStockAlertView, ExportMedicineDependencyView, ExportStockDepletionView
 )
 from . import live_data_views
 from . import dashboard_views

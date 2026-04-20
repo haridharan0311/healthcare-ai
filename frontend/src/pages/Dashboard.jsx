@@ -66,7 +66,8 @@ export default function Dashboard() {
          total_today: health.total_today || 0,
          total_wtd:   health.total_wtd || 0,
          total_mtd:   health.total_mtd || 0,
-         by_disease: [],
+         active_outbreaks: health.active_outbreaks || 0,
+         top_disease: health.top_disease || '—',
          date: 'As of Today'
       });
       setSummaryLoaded(true);
@@ -78,14 +79,6 @@ export default function Dashboard() {
       const diseases = data.top_diseases || [];
       setSummaryTrends(diseases.map(d => ({ ...d, total_cases: d.count })));
       setSummarySpikes(data.forecasts || []);
-      
-      // Update today summary with top disease
-      if (diseases.length > 0) {
-        setSummaryToday(prev => ({
-          ...prev,
-          by_disease: [{ disease: diseases[0].name, count: Math.round(diseases[0].count / 30) }]
-        }));
-      }
     }).catch(err => console.error(err));
 
     // 3. Fetch Heavy Medicines (Non-blocking)
@@ -108,7 +101,7 @@ export default function Dashboard() {
       setMedicinesLoaded(true);
     });
 
-    fetchSeasonality(365).then(res => {
+    fetchSeasonality(30).then(res => {
       setSeasonality({ seasons: res.data?.seasons || res.data?.seasonal_patterns || {} });
     }).catch(err => console.error(err));
 
@@ -366,8 +359,10 @@ export default function Dashboard() {
         {/* Feature Sections */}
         <section style={{ display: 'flex', flexDirection: 'column', gap: 32, minHeight: 800 }}>
           <SpikeAlerts onExport={(range) => handleCsvPreview('spike-alerts', { days: range })} />
-          <TrendChart globalDays={30} onExport={(d) => handleCsvPreview('disease-trends', { days: d })} />
-          <DistrictRestock days={30} onExport={() => handleCsvPreview('restock')} />
+          <div style={{ height: 500, minHeight: 500 }}>
+            <TrendChart globalDays={30} onExport={(d) => handleCsvPreview('disease-trends', { days: d })} />
+          </div>
+          <DistrictRestock days={30} onExport={(p) => handleCsvPreview('restock', p)} />
         </section>
 
       </main>

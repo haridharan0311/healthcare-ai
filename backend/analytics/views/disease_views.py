@@ -223,20 +223,45 @@ class SeasonalityView(APIView):
             'All':     {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
         }
         for season, sdata in data.items():
+            # Standardize season names to match frontend categories
+            target_season = season if season in ['Monsoon', 'Summer', 'Winter'] else 'All'
+            
+            existing = seasons_out[target_season]
             total = sdata['total_cases']
-            seasons_out[season] = {
-                'top_disease':       sdata['top_disease'],
-                'top_disease_count': sdata['top_disease_count'],
-                'total_cases':       total,
-                'diseases': [
-                    {
-                        'disease_name': d['disease_name'],
-                        'case_count':   d['case_count'],
-                        'percentage':   round(d['case_count'] / total * 100, 1) if total > 0 else 0,
-                    }
-                    for d in sdata['diseases']
-                ],
-            }
+            
+            # Combine data for 'All' or other non-standard seasons
+            combined_diseases = existing['diseases'] + [
+                {
+                    'disease_name': d['disease_name'],
+                    'case_count':   d['case_count'],
+                    'percentage':   0, # Will recalculate below
+                }
+                for d in sdata['diseases']
+            ]
+            
+            new_total = existing['total_cases'] + total
+            
+            # Sort and find top disease for combined
+            if combined_diseases:
+                # Merge duplicate diseases if any (e.g. same disease in 'All' and 'Autumn')
+                merged = defaultdict(int)
+                for d in combined_diseases:
+                    merged[d['disease_name']] += d['case_count']
+                
+                final_diseases = sorted(
+                    [{'disease_name': name, 'case_count': count, 'percentage': round(count/new_total*100, 1) if new_total > 0 else 0} 
+                     for name, count in merged.items()],
+                    key=lambda x: -x['case_count']
+                )
+                
+                seasons_out[target_season] = {
+                    'top_disease':       final_diseases[0]['disease_name'],
+                    'top_disease_count': final_diseases[0]['case_count'],
+                    'total_cases':       new_total,
+                    'diseases':          final_diseases,
+                }
+            else:
+                seasons_out[target_season]['total_cases'] = new_total
 
         return Response({
             'period':        f'{start} to {end}',

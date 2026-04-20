@@ -24,6 +24,8 @@ from ..serializers.serializers import (
     SpikeAlertSerializer, RestockSuggestionSerializer
 )
 from ..services.restock_service import RestockService
+from ..services.usage import UsageIntelligence
+from ..services.forecasting import ForecastingService
 from ..utils.validators import validate_positive_int
 
 from ..services.aggregation import (
@@ -81,7 +83,7 @@ class ExportDiseaseTrendsView(APIView):
 
             writer.writerow([
                 d_name, season, cat, sev,
-                r['period1_count'], r['period2_count'], f"{r['growth_rate']}%",
+                r['period1_count'], r['period2_count'], f"{r['pct_change']}%",
                 r['direction'].upper(), sw, p1_start, p1_end
             ])
             
@@ -416,3 +418,149 @@ class ExportMonthlyReportView(APIView):
             diseases = "; ".join([f"{d['disease_name']}: {d['case_count']} ({d['percentage']}%)" for d in m['diseases']])
             writer.writerow([m['month_label'], m['total_cases'], diseases])
         return response
+class ExportLowStockAlertView(APIView):
+    """GET /api/export/low-stock-alerts/?threshold=50"""
+    def get(self, request):
+        try:
+            threshold = int(request.query_params.get('threshold', 50))
+        except ValueError:
+            threshold = 50
+
+        from django.db.models import Avg, Sum, Count
+        stock_qs_base = DrugMaster.objects.all()
+        stock_qs = apply_clinic_filter(stock_qs_base, request) \
+            .values('drug_name', 'generic_name') \
+            .annotate(
+                avg_stock=Avg('current_stock'),
+                total_stock=Sum('current_stock'),
+                clinic_count=Count('clinic', distinct=True),
+            ) \
+            .filter(avg_stock__isnull=False, avg_stock__lte=threshold) \
+            .order_by('avg_stock')
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="low_stock_alerts_{date.today()}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Low Stock Alert Report', f'Threshold: {threshold}', f'Generated: {date.today()}'])
+        writer.writerow(['Drug Name', 'Generic Name', 'Avg Stock/Clinic', 'Total Stock', 'Clinics Count', 'Threshold', 'Alert Level'])
+
+        for row in stock_qs:
+            avg = round(row['avg_stock'] or 0, 1)
+            if avg == 0: alert_level = 'OUT OF STOCK'
+            elif avg <= threshold * 0.25: alert_level = 'CRITICAL'
+            elif avg <= threshold * 0.5: alert_level = 'LOW'
+            else: alert_level = 'WARNING'
+
+            writer.writerow([
+                row['drug_name'], row['generic_name'] or '', avg,
+                row['total_stock'], row['clinic_count'], threshold, alert_level
+            ])
+        return response
+
+
+class ExportMedicineDependencyView(APIView):
+    """GET /api/export/medicine-dependency/?days=30&disease=Flu"""
+    def get(self, request):
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30)
+        disease_name = request.query_params.get('disease')
+        
+        service = UsageIntelligence()
+        rx_qs_base = PrescriptionLine.objects.all()
+        rx_qs = apply_clinic_filter(rx_qs_base, request, clinic_field='prescription__clinic')
+
+        if not disease_name or disease_name.lower() == 'all':
+            data = service.get_all_medicine_dependencies(days=days, rx_queryset=rx_qs)
+            filename = f"medicine_dependencies_all_{date.today()}.csv"
+            title = "All Medicine Dependencies"
+        else:
+            data = service.get_medicine_usage_per_disease(disease_name=disease_name, days=days, rx_queryset=rx_qs)
+            filename = f"medicine_dependency_{disease_name.replace(' ', '_')}_{date.today()}.csv"
+            title = f"Medicine Dependency: {disease_name}"
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        writer = csv.writer(response)
+        writer.writerow([title, f'Period: Last {days} days', f'Generated: {date.today()}'])
+        writer.writerow([])
+        # Structure differs if it's all vs single
+        if not disease_name or disease_name.lower() == 'all':
+            # all_medicine_dependencies returns a list of dictionaries (one per disease)
+            writer.writerow(['Disease Name', 'Total Prescriptions', 'Unique Medicines Count', 'Top Medicine', 'Medicine Prescription Count'])
+            for disease in data:
+                # For "all", we list each disease and its primary dependency
+                top_med = disease['medicines'][0] if disease['medicines'] else {}
+                writer.writerow([
+                    disease['disease_name'], 
+                    disease['total_prescriptions'], 
+                    disease['unique_medicines'],
+                    top_med.get('drug_name', 'N/A'),
+                    top_med.get('prescriptions', 0)
+                ])
+                # Optionally list other medicines in next rows or same row
+        else:
+            # get_medicine_usage_per_disease returns {top_medicines: [...]}
+            writer.writerow(['Drug Name', 'Generic Name', 'Total Quantity', 'Prescription Count'])
+            for item in data.get('top_medicines', []):
+                writer.writerow([
+                    item.get('drug_name'), 
+                    item.get('generic_name'), 
+                    item.get('total_quantity'), 
+                    item.get('prescription_count')
+                ])
+        
+        return response
+
+
+class ExportStockDepletionView(APIView):
+    """GET /api/export/stock-depletion/?drug_name=Flu&days=30"""
+    def get(self, request):
+        selected_drug = request.query_params.get('drug_name')
+        days = validate_positive_int(request.query_params.get('days'), 'days', default=30)
+        
+        service = ForecastingService()
+        rx_qs_base = PrescriptionLine.objects.all()
+        rx_qs = apply_clinic_filter(rx_qs_base, request, clinic_field='prescription__clinic')
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="stock_depletion_report_{date.today()}.csv"'
+        writer = csv.writer(response)
+
+        if selected_drug and selected_drug.lower() != 'all':
+            # Single drug detailed view (original logic)
+            result = service.forecast_stock_depletion(drug_name=selected_drug, days=days, rx_queryset=rx_qs, request=request)
+            writer.writerow(['Stock Depletion Detail', f'Drug: {selected_drug}', f'Period: {days} days'])
+            writer.writerow([])
+            writer.writerow(['Metric', 'Value'])
+            writer.writerow(['Drug Name', result.get('drug_name')])
+            writer.writerow(['Generic Name', result.get('generic_name')])
+            writer.writerow(['Current Stock', result.get('current_stock', 0)])
+            writer.writerow(['Avg Daily Usage', result.get('avg_daily_usage', 0)])
+            writer.writerow(['Days Until Depletion', result.get('days_until_depletion', 'N/A')])
+            writer.writerow(['Estimated Depletion Date', result.get('depletion_date', 'N/A')])
+            writer.writerow(['Status', result.get('status', 'Unknown')])
+        else:
+            # Bulk export view for ALL drugs
+            writer.writerow(['System-wide Stock Depletion Forecast', f'Generated: {date.today()}', f'Period: {days} days'])
+            writer.writerow([])
+            writer.writerow(['Drug Name', 'Generic Name', 'Current Stock', 'Avg Daily Usage', 'Days Left', 'Depletion Date', 'Status'])
+            
+            # Optimization: Get all unique drug names with stock or usage
+            relevant_drugs = DrugMaster.objects.filter(current_stock__gt=0).values_list('drug_name', flat=True).distinct()
+            # Also include drugs used recently
+            usage_drugs = rx_qs.filter(prescription_date__gte=date.today()-timedelta(days=days)).values_list('drug__drug_name', flat=True).distinct()
+            
+            all_drugs = sorted(set(relevant_drugs) | set(usage_drugs))
+            
+            for dname in all_drugs:
+                res = service.forecast_stock_depletion(drug_name=dname, days=days, rx_queryset=rx_qs, request=request)
+                if not res.get('error'):
+                    writer.writerow([
+                        res.get('drug_name'), res.get('generic_name'), 
+                        res.get('current_stock'), res.get('avg_daily_usage'),
+                        res.get('days_until_depletion'), res.get('depletion_date'),
+                        res.get('status')
+                    ])
+                
+        return response
+
+
