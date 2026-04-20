@@ -22,8 +22,17 @@ class LiveDataToggleView(APIView):
                     if interval not in [5, 10, 30, 60, 90, 120]:
                         return Response({'error': 'Invalid interval'}, status=status.HTTP_400_BAD_REQUEST)
                 
+                # Determine target clinic for non-admin users
+                target_clinic_id = None
+                try:
+                    profile = request.user.profile
+                    if profile.role == 'CLINIC_USER' and profile.clinic:
+                        target_clinic_id = profile.clinic.id
+                except Exception:
+                    pass
+
                 # Start or update interval
-                _generator.start(interval=interval)
+                _generator.start(interval=interval, target_clinic_id=target_clinic_id)
                 return Response(_generator.get_status())
             
             elif action == 'stop':

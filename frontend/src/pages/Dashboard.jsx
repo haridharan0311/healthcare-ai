@@ -8,6 +8,7 @@ import {
   fetchSeasonality,
   fetchDoctorTrends,
   fetchSimulatorStatus,
+  toggleSimulator,
   apiInstance
 } from '../api';
 
@@ -125,16 +126,15 @@ export default function Dashboard() {
   }, [loadAllData]);
 
 
-  /*
   const handleToggleSimulator = () => {
     const action = simStatus.running ? 'stop' : 'start';
     toggleSimulator(action, simStatus.interval).then(res => {
       setSimStatus(res.data);
       if (res.data.running) {
-         // Optionally refresh data soon after starting
+         // Refresh data soon after starting to see the first batch
          setTimeout(loadAllData, 2000);
       }
-    });
+    }).catch(err => console.error('Simulator toggle failed:', err));
   };
 
   const handleIntervalChange = (newVal) => {
@@ -145,7 +145,6 @@ export default function Dashboard() {
         setSimStatus(prev => ({ ...prev, interval: val }));
     }
   };
-  */
 
 
   return (
@@ -202,46 +201,53 @@ export default function Dashboard() {
             {/* ── Simulator Control Center ── */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 12, 
-              background: '#f8fafc', padding: '6px 12px', borderRadius: 12,
-              border: '1px solid #e2e8f0'
+              background: simStatus.running ? '#f0fdf4' : '#f8fafc', padding: '6px 12px', borderRadius: 12,
+              border: `1px solid ${simStatus.running ? '#bbf7d0' : '#e2e8f0'}`,
+              transition: 'all 0.3s ease'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{
                   width: 8, height: 8, borderRadius: '50%',
-                  background: '#94a3b8',
-                  boxShadow: 'none',
-                  animation: 'none'
+                  background: simStatus.running ? '#22c55e' : '#94a3b8',
+                  boxShadow: simStatus.running ? '0 0 0 4px rgba(34, 197, 94, 0.2)' : 'none',
+                  animation: simStatus.running ? 'pulse 2s infinite' : 'none'
                 }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Live Gen Disabled
+                <span style={{ 
+                  fontSize: 12, fontWeight: 700, 
+                  color: simStatus.running ? '#15803d' : '#94a3b8', 
+                  textTransform: 'uppercase', letterSpacing: '0.5px' 
+                }}>
+                  {simStatus.running ? 'Live Gen Running' : 'Live Gen Disabled'}
                 </span>
               </div>
 
-              <div style={{ height: 20, width: 1, background: '#e2e8f0' }} />
+              <div style={{ height: 20, width: 1, background: simStatus.running ? '#bbf7d0' : '#e2e8f0' }} />
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <select 
-                  disabled
                   value={simStatus.interval}
+                  onChange={(e) => handleIntervalChange(e.target.value)}
                   style={{
                     background: 'transparent', border: 'none', fontSize: 12, fontWeight: 600,
-                    color: '#94a3b8', outline: 'none', cursor: 'not-allowed'
+                    color: simStatus.running ? '#15803d' : '#475569', outline: 'none', cursor: 'pointer'
                   }}
                 >
+                  <option value={5}>5s</option>
+                  <option value={10}>10s</option>
                   <option value={30}>30s</option>
+                  <option value={60}>1m</option>
                 </select>
                 
                 <button 
-                  disabled
-                  title="Temporarily Disabled"
+                  onClick={handleToggleSimulator}
                   style={{
-                    background: '#e2e8f0',
-                    color: '#94a3b8', border: 'none', padding: '4px 12px', borderRadius: 6,
-                    fontSize: 11, fontWeight: 700, cursor: 'not-allowed', transition: 'all 0.2s',
+                    background: simStatus.running ? '#ef4444' : '#0f172a',
+                    color: '#fff', border: 'none', padding: '4px 12px', borderRadius: 6,
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
                     textTransform: 'uppercase'
                   }}
                 >
-                  Start
+                  {simStatus.running ? 'Stop' : 'Start'}
                 </button>
               </div>
             </div>

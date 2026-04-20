@@ -70,7 +70,7 @@ export const fetchPlatformMedicines = (days = 30) => api('/dashboard/medicines/'
 // ── Simulator Control ─────────────────────────────────────────────────
 export const fetchSimulatorStatus = () => api('/simulator/toggle/');
 export const toggleSimulator = (action, interval = 30) => 
-  axios.post(`${BASE}/simulator/toggle/`, { action, interval });
+  apiInstance.post(`/simulator/toggle/`, { action, interval });
 
 
 // ── CSV exports ───────────────────────────────────────────────────────

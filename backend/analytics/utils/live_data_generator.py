@@ -58,14 +58,20 @@ class LiveDataGenerator:
         self.running = False
         self.interval = getattr(settings, 'LIVE_DATA_INTERVAL', 60)
         self.enabled = getattr(settings, 'ENABLE_LIVE_DATA_GENERATOR', settings.DEBUG)
+        self.target_clinic_id = None
         
-    def start(self, interval=None):
+    def start(self, interval=None, target_clinic_id=None):
         """Start the background data generation thread."""
         if interval:
             self.interval = interval
+        
+        if target_clinic_id:
+            self.target_clinic_id = target_clinic_id
+        else:
+            self.target_clinic_id = None
             
         if self.running:
-            logger.warning('Live data generator already running')
+            logger.info(f'Updating live data generator (interval: {self.interval}s, clinic: {self.target_clinic_id})')
             return
             
         self.running = True
@@ -84,7 +90,8 @@ class LiveDataGenerator:
         return {
             'running': self.running and self.thread and self.thread.is_alive(),
             'interval': self.interval,
-            'enabled': self.enabled
+            'enabled': self.enabled,
+            'target_clinic_id': self.target_clinic_id
         }
 
     def _run_loop(self):
@@ -112,14 +119,46 @@ class LiveDataGenerator:
         """Generate a batch of appointments, prescriptions, and related data."""
         
         # ── Load reference data ──────────────────────────────────
-        clinics = list(Clinic.objects.all())
-        doctors = list(Doctor.objects.all())
-        patients = list(Patient.objects.all())
-        diseases = list(Disease.objects.filter(is_active=True))
-        drugs = list(DrugMaster.objects.all())
+        if self.target_clinic_id:
+            clinics = list(Clinic.objects.filter(id=self.target_clinic_id))
+            doctors = list(Doctor.objects.filter(clinic_id=self.target_clinic_id))
+            patients = list(Patient.objects.filter(clinic_id=self.target_clinic_id))
+            diseases = list(Disease.objects.filter(is_active=True))
+            drugs = list(DrugMaster.objects.filter(clinic_id=self.target_clinic_id))
+        else:
+            clinics = list(Clinic.objects.all())
+            doctors = list(Doctor.objects.all())
+            patients = list(Patient.objects.all())
+            diseases = list(Disease.objects.filter(is_active=True))
+            drugs = list(DrugMaster.objects.all())
         
+        if not clinics:
+             logger.warning('No clinics available for live generation')
+             return
+
+        # ── Auto-Onboarding for empty clinics ────────────────────
+        if self.target_clinic_id and not doctors:
+             doctor = Doctor.objects.create(
+                 first_name="Dr. Default", last_name="(Simulator)",
+                 gender="M", qualification="MD (Internal Medicine)",
+                 clinic=clinics[0]
+             )
+             doctors = [doctor]
+             logger.info(f'Created default doctor for clinic {self.target_clinic_id}')
+
+        if self.target_clinic_id and not patients:
+             patient = Patient.objects.create(
+                 first_name="Test", last_name="Patient",
+                 gender="M", title="Mr", dob="1990-01-01",
+                 mobile_number="0000000000", address_line_1="Virtual St",
+                 clinic=clinics[0]
+             )
+             patients = [patient]
+             logger.info(f'Created default patient for clinic {self.target_clinic_id}')
+
         if not all([clinics, doctors, patients, diseases, drugs]):
-            logger.warning('Missing reference data for live generation')
+            missing = [k for k, v in {'cl':clinics,'dr':doctors,'pa':patients,'ds':diseases,'dg':drugs}.items() if not v]
+            logger.warning(f'Missing reference data for live generation (Missing: {missing})')
             return
         
         # ── Pre-group by clinic for speed ────────────────────────
