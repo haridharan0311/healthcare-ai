@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../AuthContext';
 import {
-  fetchPlatformStats,
-  fetchPlatformTrends,
-  fetchPlatformMedicines,
   getExportUrl,
-  fetchSeasonality,
-  fetchDoctorTrends,
   fetchSimulatorStatus,
   fetchSimulatorNotifications,
   toggleSimulator,
   apiInstance
 } from '../api';
+
+import { 
+  usePlatformStats, 
+  usePlatformTrends, 
+  usePlatformMedicines,
+  useSeasonality,
+  useDoctorTrends 
+} from '../hooks/useDashboardData';
 
 import TrendChart       from '../components/TrendChart';
 import SpikeAlerts      from '../components/SpikeAlerts';
@@ -23,18 +26,14 @@ export default function Dashboard() {
   const { user, logout } = useAuth();
   const [csvModal, setCsvModal]       = useState(null);
 
-  const [summaryTrends, setSummaryTrends] = useState([]);
-  const [summarySpikes, setSummarySpikes] = useState([]);
-  const [summaryToday, setSummaryToday]   = useState(null);
-  const [summaryLoaded, setSummaryLoaded] = useState(false);
-  const [topMedicines, setTopMedicines]   = useState([]);
-  const [lowStock, setLowStock]           = useState({});
-  const [seasonality, setSeasonality]     = useState({});
-  const [doctorTrends, setDoctorTrends]   = useState([]);
-  const [doctorSummary, setDoctorSummary] = useState({});
+  const { data: statsData, isLoading: statsLoading } = usePlatformStats(30);
+  const { data: trendsData } = usePlatformTrends(30, 8);
+  const { data: medicinesData, isLoading: medicinesTotalLoading } = usePlatformMedicines(30);
+  const { data: seasonalityData } = useSeasonality(30);
+  const { data: doctorTrendsData } = useDoctorTrends(0, 5);
+
   const [simStatus, setSimStatus]         = useState({ running: false, interval: 30 });
   const [notifications, setNotifications] = useState([]);
-  const [medicinesLoaded, setMedicinesLoaded] = useState(false);
 
   const handleCsvPreview = async (type, params = {}) => {
     try {
@@ -62,61 +61,6 @@ export default function Dashboard() {
   };
 
   const loadAllData = useCallback(() => {
-    // 1. Fetch Fast Stats
-    fetchPlatformStats(30).then(res => {
-      const health = res.data || {};
-      setSummaryToday({
-         total_today: health.total_today || 0,
-         total_wtd:   health.total_wtd || 0,
-         total_mtd:   health.total_mtd || 0,
-         active_outbreaks: health.active_outbreaks || 0,
-         top_disease: health.top_disease || '—',
-         date: 'As of Today'
-      });
-      setSummaryLoaded(true);
-    }).catch(err => console.error(err));
-
-    // 2. Fetch Charts & Forecasts
-    fetchPlatformTrends(30, 8).then(res => {
-      const data = res.data || {};
-      const diseases = data.top_diseases || [];
-      setSummaryTrends(diseases.map(d => ({ ...d, total_cases: d.count })));
-      setSummarySpikes(data.forecasts || []);
-    }).catch(err => console.error(err));
-
-    // 3. Fetch Heavy Medicines (Non-blocking)
-    setMedicinesLoaded(false);
-    fetchPlatformMedicines(30).then(res => {
-      const allDecisions = res.data || [];
-      const decisions = allDecisions.slice(0, 3);
-      setLowStock({
-         critical: allDecisions.filter(d => d.priority === 'High').length,
-         out_of_stock: allDecisions.filter(d => d.current_stock === 0).length
-      });
-      setTopMedicines(decisions.map(d => ({
-         drug_name: d.drug,
-         generic_name: `Restock: ${d.recommended_restock} (${d.status})`,
-         total_quantity: d.current_stock
-      })));
-      setMedicinesLoaded(true);
-    }).catch(err => {
-      console.error(err);
-      setMedicinesLoaded(true);
-    });
-
-    fetchSeasonality(30).then(res => {
-      setSeasonality({ seasons: res.data?.seasons || res.data?.seasonal_patterns || {} });
-    }).catch(err => console.error(err));
-
-    fetchDoctorTrends(0, 5).then(res => {
-      const data = res.data?.data || res.data || [];
-      setDoctorTrends(data);
-      setDoctorSummary({
-        total_rows: data.length,
-        min_cases: data.length > 0 ? data[data.length - 1].case_count : 0
-      });
-    }).catch(err => console.error(err));
-
     fetchSimulatorStatus().then(res => {
       setSimStatus(res.data);
     }).catch(err => console.error(err));
@@ -376,7 +320,26 @@ export default function Dashboard() {
         </div>
 
         {/* Top 5 metrics */}
-        <SummaryCards days={30} summary={{ loaded: summaryLoaded, trends: summaryTrends, spikes: summarySpikes, todaySummary: summaryToday, stockAlerts: lowStock }} />
+        <SummaryCards 
+          days={30} 
+          summary={{ 
+            loaded: !statsLoading, 
+            trends: trendsData?.top_diseases?.map(d => ({ ...d, total_cases: d.count })) || [], 
+            spikes: trendsData?.forecasts || [], 
+            todaySummary: statsData ? {
+              total_today: statsData.total_today || 0,
+              total_wtd:   statsData.total_wtd || 0,
+              total_mtd:   statsData.total_mtd || 0,
+              active_outbreaks: statsData.active_outbreaks || 0,
+              top_disease: statsData.top_disease || '—',
+              date: 'As of Today'
+            } : null, 
+            stockAlerts: {
+              critical: medicinesData?.filter(d => d.priority === 'High').length || 0,
+              out_of_stock: medicinesData?.filter(d => d.current_stock === 0).length || 0
+            }
+          }} 
+        />
 
         {/* Insight Gid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20, marginBottom: 32 }}>
@@ -387,19 +350,19 @@ export default function Dashboard() {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Pharmacy Inventory & Daily Usage</div>
               <span style={{ fontSize: 20 }}>💊</span>
             </div>
-            {!medicinesLoaded ? (
+            {medicinesTotalLoading ? (
                <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13, flexDirection: 'column', gap: 12 }}>
                  <div className="spinner" />
                  Analyzing 2.8M rows...
                </div>
-            ) : topMedicines.slice(0, 3).map((m, i) => (
+            ) : medicinesData?.slice(0, 3).map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{m.drug_name}</div>
-                  <div style={{ fontSize: 12, color: '#94a3b8' }}>{m.generic_name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>{m.drug}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Restock: {m.recommended_restock} ({m.status})</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontWeight: 800, color: '#2563eb' }}>{(m.total_quantity || 0).toLocaleString()}</div>
+                  <div style={{ fontWeight: 800, color: '#2563eb' }}>{(m.current_stock || 0).toLocaleString()}</div>
                   <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase' }}>Units</div>
                 </div>
               </div>
@@ -410,11 +373,11 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div style={{ background: '#fff1f2', padding: '12px', borderRadius: 10, border: '1px solid #fecaca' }}>
                   <div style={{ fontSize: 11, color: '#dc2626', fontWeight: 600 }}>Critical Stock</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#991b1b' }}>{lowStock.critical || 0}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#991b1b' }}>{medicinesData?.filter(d => d.priority === 'High').length || 0}</div>
                 </div>
                 <div style={{ background: '#fef2f2', padding: '12px', borderRadius: 10, border: '1px solid #fee2e2' }}>
                   <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 600 }}>Out of Stock</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#b91c1c' }}>{lowStock.out_of_stock || 0}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#b91c1c' }}>{medicinesData?.filter(d => d.current_stock === 0).length || 0}</div>
                 </div>
               </div>
             </div>
@@ -426,7 +389,7 @@ export default function Dashboard() {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Top Doctors (Daily Consultations)</div>
               <span style={{ fontSize: 20 }}>👨‍⚕️</span>
             </div>
-            {doctorTrends.slice(0, 3).map((d, i) => (
+            {doctorTrendsData?.slice(0, 3).map((d, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{d.doctor_name}</div>
@@ -438,7 +401,7 @@ export default function Dashboard() {
               </div>
             ))}
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9', fontSize: 11, color: '#64748b' }}>
-              <strong>{doctorSummary.total_rows ?? 0}</strong> active specialists &bull; Min cases: {doctorSummary.min_cases ?? 0}
+              <strong>{doctorTrendsData?.length ?? 0}</strong> active specialists &bull; Min cases: {doctorTrendsData?.length > 0 ? doctorTrendsData[doctorTrendsData.length - 1].case_count : 0}
             </div>
           </div>
 
@@ -449,7 +412,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 20 }}>🌍</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {Object.entries(seasonality.seasons || {}).slice(0, 4).map(([k, v]) => (
+              {Object.entries(seasonalityData?.seasons || seasonalityData?.seasonal_patterns || {}).slice(0, 4).map(([k, v]) => (
                 <div key={k} style={{ padding: '8px', background: '#f8fafc', borderRadius: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 12 }}>{k}</span>

@@ -40,6 +40,7 @@ from inventory.models import PrescriptionLine, DrugMaster
 from ..services.aggregation import get_disease_type
 from .ml_engine import (
     moving_average_forecast,
+    exponential_smoothing_forecast,
     weighted_trend_score,
     predict_demand,
     time_decay_weight
@@ -132,8 +133,10 @@ class ForecastingService:
                     'days_available': len(daily_counts)
                 }
             
-            # Apply moving average forecast
-            forecast_value = moving_average_forecast(daily_counts)
+            # Apply blended forecast (MA + ES)
+            ma_val = moving_average_forecast(daily_counts)
+            es_val = exponential_smoothing_forecast(daily_counts)
+            forecast_value = (ma_val + es_val) / 2
             
             # Calculate trend
             recent_avg = sum(daily_counts[-7:]) / 7 if len(daily_counts) >= 7 else sum(daily_counts) / len(daily_counts)
@@ -342,8 +345,10 @@ class ForecastingService:
                     'forecast_demand': 0
                 }
             
-            # Forecast using moving average
-            forecast_daily = moving_average_forecast(daily_quantities)
+            # Forecast using blended model
+            ma_val = moving_average_forecast(daily_quantities)
+            es_val = exponential_smoothing_forecast(daily_quantities)
+            forecast_daily = (ma_val + es_val) / 2
             forecast_total = forecast_daily * days_ahead
             
             # Calculate confidence
@@ -432,8 +437,11 @@ class ForecastingService:
                 # Build time series (limit to 30 days for forecasting)
                 counts = [date_map.get(limit_date + timedelta(days=i), 0) for i in range(31)]
                 
-                # Prediction logic
-                forecast_val = moving_average_forecast(counts)
+                # Blended prediction logic
+                ma_val = moving_average_forecast(counts)
+                es_val = exponential_smoothing_forecast(counts)
+                forecast_val = (ma_val + es_val) / 2
+                
                 trend_score = weighted_trend_score(sum(counts[-7:]), sum(counts[:-7]))
                 
                 results.append({

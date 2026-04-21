@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { fetchTimeSeries } from '../api';
+import { useTimeSeriesTrends } from '../hooks/useDashboardData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
@@ -12,73 +12,32 @@ const COLORS = [
 ];
 
 export default function TrendChart({ onExport }) {
-  const [days,             setDays]             = useState(30);
-  const [chartData,        setChartData]        = useState([]);
-  const [allDiseases,      setAllDiseases]      = useState([]);
-  const [selectedDiseases, setSelectedDiseases] = useState([]);
-  const [loading,          setLoading]          = useState(true);
-  const [isLayoutReady,    setIsLayoutReady]    = useState(false);
+  const [days, setDays] = useState(30);
+  const { data, isLoading } = useTimeSeriesTrends(days);
   
+  const [selectedDiseases, setSelectedDiseases] = useState([]);
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
   const containerRef = useRef(null);
 
-  // Definitive Layout Stabilization: Use ResizeObserver for accurate ready state
+  const { chartData = [], allDiseases = [] } = data || {};
+
+  // Initialize selected diseases when data loads
+  useEffect(() => {
+    if (allDiseases.length > 0 && selectedDiseases.length === 0) {
+      setSelectedDiseases(allDiseases.slice(0, 4));
+    }
+  }, [allDiseases, selectedDiseases.length]);
+
+  // Layout stabilization
   useEffect(() => {
     if (!containerRef.current) return;
-    
     const observer = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
-      if (width > 0 && height > 0) {
-        setIsLayoutReady(true);
-      }
+      if (width > 0 && height > 0) setIsLayoutReady(true);
     });
-
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
-
-  // Fetch data
-  useEffect(() => {
-    setLoading(true);
-    fetchTimeSeries(days).then(res => {
-      const raw = res.data || [];
-      const dateSet = [...new Set(raw.map(r => r.date))].sort();
-      
-      const totals = {};
-      raw.forEach(r => {
-        totals[r.disease_name] = (totals[r.disease_name] || 0) + r.case_count;
-      });
-      
-      const sortedByVolume = Object.keys(totals).sort((a,b) => totals[b] - totals[a]);
-      setAllDiseases(sortedByVolume);
-      
-      setSelectedDiseases(prev => {
-        if (prev.length === 0) {
-          return sortedByVolume.slice(0, 4);
-        }
-        return prev;
-      });
-
-      const lookup = {};
-      raw.forEach(r => {
-        if (!lookup[r.date]) lookup[r.date] = { date: r.date };
-        lookup[r.date][r.disease_name] = r.case_count;
-      });
-      
-      const processedData = dateSet.map(d => {
-        const entry = { date: d };
-        sortedByVolume.forEach(dis => {
-          entry[dis] = (lookup[d] && lookup[d][dis]) ? lookup[d][dis] : 0;
-        });
-        return entry;
-      });
-      
-      setChartData(processedData);
-      setLoading(false);
-    }).catch(err => {
-      console.error("TrendChart fetch error:", err);
-      setLoading(false);
-    });
-  }, [days]);
 
   const toggleDisease = (name) => {
     setSelectedDiseases(prev => 
@@ -154,7 +113,7 @@ export default function TrendChart({ onExport }) {
         </div>
 
         <div ref={containerRef} style={{ height: 400, width: '100%', minHeight: 400, position: 'relative' }}>
-          {loading || !isLayoutReady ? (
+          {isLoading || !isLayoutReady ? (
             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 12 }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 24, height: 24, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />

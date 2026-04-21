@@ -30,8 +30,8 @@ from ..utils.validators import validate_date_range
 logger = get_logger(__name__)
 
 def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
-    """Statistical spike detection helper with confidence scoring."""
-    if len(daily_counts) < 2:
+    """Statistical spike detection using Z-score and historical variability."""
+    if len(daily_counts) < 3:
         return {
             "today_count": daily_counts[-1] if daily_counts else 0,
             "mean_last_7_days": 0.0,
@@ -39,40 +39,46 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
             "threshold": 0.0,
             "is_spike": False,
             "confidence": 0.0,
-            "reason": "not enough data"
+            "reason": "insufficient data window"
         }
 
     today = daily_counts[-1]
     baseline = daily_counts[-(baseline_days + 1):-1] if len(daily_counts) >= baseline_days + 1 else daily_counts[:-1]
 
     mean = statistics.mean(baseline) if baseline else 0.0
-    
-    # Consistency Factor (Lower variability = Higher confidence)
     std_dev = statistics.stdev(baseline) if len(baseline) >= 2 else 0.0
+    
+    # Use a minimum standard deviation to avoid division by zero and false positives in low-volume
+    effective_std_dev = max(std_dev, 0.5) 
+    z_score = (today - mean) / effective_std_dev
+    
+    # Threshold: Z-score > 2.0 is usually considered an anomaly (95% confidence)
+    # But for healthcare, we might want to be more sensitive or specific
+    threshold = mean + (2 * effective_std_dev)
+    is_spike = z_score > 2.0 and today >= 3 # Ignore spikes with very low absolute counts
+    
+    # Confidence Scoring
+    # 1. Consistency: Lower CV (Coefficient of Variation) = higher confidence in the baseline
     cv = (std_dev / mean) if mean > 0 else 1.0
-    consistency = max(0, 1.0 - cv)
+    consistency_score = max(0, 1.0 - cv)
     
-    # Data Volume Factor
-    volume_factor = min(len(baseline) / baseline_days, 1.0)
+    # 2. Volume: More baseline data = higher confidence
+    volume_score = min(len(baseline) / baseline_days, 1.0)
     
-    # Combine factors for Confidence
-    confidence = round((consistency * 0.4 + volume_factor * 0.6), 2)
+    confidence = round((consistency_score * 0.4 + volume_score * 0.6), 2)
     
-    threshold = mean + (2 * std_dev)
-    is_spike = today > threshold
-    
-    # Impact Intelligence: Level thresholds
+    # Severity assessment
     severity = "normal"
     if is_spike:
-        impact_ratio = today / threshold if threshold > 0 else 2.0
-        if impact_ratio > 2.0: severity = "critical"
-        elif impact_ratio > 1.2: severity = "warning"
+        if z_score > 4.0: severity = "critical"
+        elif z_score > 3.0: severity = "warning"
         else: severity = "mild"
 
     return {
         "today_count": today,
         "mean_last_7_days": round(mean, 2),
         "std_dev": round(std_dev, 2),
+        "z_score": round(z_score, 2),
         "threshold": round(threshold, 2),
         "is_spike": is_spike,
         "confidence": confidence,

@@ -1,5 +1,6 @@
 import datetime
-from datetime import date, timedelta, datetime, time
+from datetime import date, timedelta, time
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from analytics.models import Appointment
@@ -14,8 +15,8 @@ class DashboardStatsView(APIView):
         _, end_date = _get_db_date_range(0)
         
         # 1. Today (Latest system date)
-        today_start = datetime.combine(end_date, time.min)
-        today_end   = datetime.combine(end_date, time.max)
+        today_start = timezone.make_aware(datetime.datetime.combine(end_date, time.min))
+        today_end   = timezone.make_aware(datetime.datetime.combine(end_date, time.max))
         
         base_qs = Appointment.objects.filter(disease__isnull=False)
         filtered_qs = apply_clinic_filter(base_qs, request)
@@ -24,12 +25,12 @@ class DashboardStatsView(APIView):
 
         # 2. Week-to-Date (from Monday)
         wtd_start_date = end_date - timedelta(days=end_date.weekday())
-        wtd_start = datetime.combine(wtd_start_date, time.min)
+        wtd_start = timezone.make_aware(datetime.datetime.combine(wtd_start_date, time.min))
         total_wtd = filtered_qs.filter(appointment_datetime__range=(wtd_start, today_end)).count()
 
         # 3. Month-to-Date (from 1st)
         mtd_start_date = end_date.replace(day=1)
-        mtd_start = datetime.combine(mtd_start_date, time.min)
+        mtd_start = timezone.make_aware(datetime.datetime.combine(mtd_start_date, time.min))
         total_mtd = filtered_qs.filter(appointment_datetime__range=(mtd_start, today_end)).count()
 
         # 4. Top Disease (Today)

@@ -15,13 +15,34 @@ def moving_average_forecast(daily_counts: List[int]) -> float:
     if not daily_counts:
         return 0.0
 
-    last_7 = daily_counts[-7:] if len(daily_counts) >= 7 else daily_counts
-    last_3 = daily_counts[-3:] if len(daily_counts) >= 3 else daily_counts
+    count_len = len(daily_counts)
+    last_7 = daily_counts[-7:] if count_len >= 7 else daily_counts
+    last_3 = daily_counts[-3:] if count_len >= 3 else daily_counts
 
     avg_7 = sum(last_7) / len(last_7)
     avg_3 = sum(last_3) / len(last_3)
 
     forecast = (avg_3 * 0.6) + (avg_7 * 0.4)
+    return round(forecast, 2)
+
+
+def exponential_smoothing_forecast(daily_counts: List[int], alpha: float = 0.3) -> float:
+    """
+    Simple Exponential Smoothing (SES) for forecasting.
+    Formula: S_t = α * y_t + (1 - α) * S_{t-1}
+
+    Args:
+        daily_counts: list of daily case counts
+        alpha: smoothing factor (0 < alpha < 1). 
+               Higher alpha gives more weight to recent data.
+    """
+    if not daily_counts:
+        return 0.0
+    
+    forecast = daily_counts[0]
+    for i in range(1, len(daily_counts)):
+        forecast = alpha * daily_counts[i] + (1 - alpha) * forecast
+        
     return round(forecast, 2)
 
 

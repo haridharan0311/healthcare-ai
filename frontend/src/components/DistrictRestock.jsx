@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchDistricts, fetchDistrictRestock } from '../api';
+import { useDistricts, useDistrictRestock } from '../hooks/useDashboardData';
 
 const STATUS_STYLE = {
   critical:   { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' },
@@ -8,44 +8,28 @@ const STATUS_STYLE = {
 };
 
 export default function DistrictRestock({ days, onExport }) {
-  const [districts,        setDistricts]        = useState([]);
+  const { data: districts = [], isLoading: districtsLoading } = useDistricts();
   const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [data,             setData]             = useState(null);
-  const [loading,          setLoading]          = useState(false);
-  const [districtLoading,  setDistrictLoading]  = useState(true);
-  const [search,           setSearch]           = useState('');
-  const [statusFilter,     setStatusFilter]     = useState('all');
-  const [sortField,        setSortField]        = useState('status');
-  const [sortDir,          setSortDir]          = useState('asc');
+  const { data: restockData, isLoading: restockLoading } = useDistrictRestock(selectedDistrict, days);
+  
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortField, setSortField] = useState('status');
+  const [sortDir, setSortDir] = useState('asc');
 
+  // Auto-select first district when list loads
   useEffect(() => {
-    fetchDistricts()
-      .then(res => {
-        const raw = res.data;
-        if (Array.isArray(raw)) setDistricts(raw);
-        else if (Array.isArray(raw?.districts)) setDistricts(raw.districts);
-        setDistrictLoading(false);
-        if (raw?.districts?.length > 0) setSelectedDistrict(raw.districts[0]);
-        else if (Array.isArray(raw) && raw.length > 0) setSelectedDistrict(raw[0]);
-      })
-      .catch(() => setDistrictLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDistrict) return;
-    setLoading(true);
-    fetchDistrictRestock(selectedDistrict, days || 30).then(res => {
-      setData(res.data);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [selectedDistrict, days]);
+    if (districts.length > 0 && !selectedDistrict) {
+      setSelectedDistrict(districts[0]);
+    }
+  }, [districts, selectedDistrict]);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
   };
 
-  const results = data?.results || [];
+  const results = restockData?.results || [];
   const filtered = results
     .filter(r => statusFilter === 'all' || r.status === statusFilter)
     .filter(r => !search || r.drug_name.toLowerCase().includes(search.toLowerCase()))
@@ -87,7 +71,7 @@ export default function DistrictRestock({ days, onExport }) {
             fontSize: 14, fontWeight: 600, background: '#f8fafc', minWidth: 200, outline: 'none'
           }}
         >
-          <option value="">{districtLoading ? 'Loading...' : 'Select Clinic'}</option>
+          <option value="">{districtsLoading ? 'Loading Clinics...' : 'Select Clinic'}</option>
           {districts.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
 
@@ -104,7 +88,7 @@ export default function DistrictRestock({ days, onExport }) {
         </div>
       </div>
 
-      {data?.summary && (
+      {restockData?.summary && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
           {['critical', 'low', 'sufficient'].map(k => (
             <button
@@ -116,13 +100,13 @@ export default function DistrictRestock({ days, onExport }) {
                 opacity: statusFilter === 'all' || statusFilter === k ? 1 : 0.4
               }}
             >
-              {k}: {data.summary[k]}
+              {k}: {restockData.summary[k]}
             </button>
           ))}
         </div>
       )}
 
-      {loading ? (
+      {restockLoading ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>Forecasting demand...</div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8', background: '#f8fafc', borderRadius: 12 }}>
@@ -167,4 +151,3 @@ export default function DistrictRestock({ days, onExport }) {
     </div>
   );
 }
-
