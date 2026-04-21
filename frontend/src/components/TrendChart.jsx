@@ -16,6 +16,7 @@ export default function TrendChart({ onExport }) {
   const { data, isLoading } = useTimeSeriesTrends(days);
   
   const [selectedDiseases, setSelectedDiseases] = useState([]);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const containerRef = useRef(null);
 
@@ -23,10 +24,11 @@ export default function TrendChart({ onExport }) {
 
   // Initialize selected diseases when data loads
   useEffect(() => {
-    if (allDiseases.length > 0 && selectedDiseases.length === 0) {
+    if (!isInitialized && allDiseases.length > 0) {
       setSelectedDiseases(allDiseases.slice(0, 4));
+      setIsInitialized(true);
     }
-  }, [allDiseases, selectedDiseases.length]);
+  }, [allDiseases, isInitialized]);
 
   // Layout stabilization
   useEffect(() => {

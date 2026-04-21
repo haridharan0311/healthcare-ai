@@ -48,9 +48,10 @@ from .restock_calculator import (
     BASE_SAFETY_BUFFER,
     MAX_SAFETY_BUFFER
 )
+from ..utils.chemistry import _get_generic
 from .timeseries import get_seasonal_weight
 from .spike_detection import detect_spike_logic as detect_spike
-from ..views.utils import apply_clinic_filter
+from ..utils.filters import apply_clinic_filter
 from ..utils.logger import get_logger
 from ..utils.validators import validate_date_range
 

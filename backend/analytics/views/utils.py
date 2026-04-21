@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from django.db.models import Max
 from analytics.models import Appointment
 from ..services.aggregation import build_daily_list
+from ..utils.chemistry import GENERIC_MAP, _get_generic
+from ..utils.geo import _extract_district
 
 def _build_daily_list(daily_map_by_type, disease_type, start_date, end_date):
     """
@@ -30,48 +32,6 @@ def cache_api_response(timeout=300):
     return decorator
 
 
-GENERIC_MAP = {
-    'Paracetamol':       'Acetaminophen',
-    'Ibuprofen':         'Ibuprofen',
-    'Amoxicillin':       'Amoxicillin trihydrate',
-    'Metformin':         'Metformin hydrochloride',
-    'Aspirin':           'Acetylsalicylic acid',
-    'Cetirizine':        'Cetirizine hydrochloride',
-    'Azithromycin':      'Azithromycin dihydrate',
-    'Ciprofloxacin':     'Ciprofloxacin hydrochloride',
-    'Doxycycline':       'Doxycycline hyclate',
-    'Diclofenac':        'Diclofenac sodium',
-    'Chlorpheniramine':  'Chlorpheniramine maleate',
-    'Montelukast':       'Montelukast sodium',
-    'Glibenclamide':     'Glibenclamide',
-    'Glimepiride':       'Glimepiride',
-    'Insulin (Regular)': 'Human insulin',
-    'Amlodipine':        'Amlodipine besylate',
-    'Atenolol':          'Atenolol',
-    'Losartan':          'Losartan potassium',
-    'Enalapril':         'Enalapril maleate',
-    'Salbutamol':        'Albuterol sulfate',
-    'Prednisolone':      'Prednisolone',
-    'Theophylline':      'Theophylline anhydrous',
-    'Omeprazole':        'Omeprazole magnesium',
-    'Ranitidine':        'Ranitidine hydrochloride',
-    'Domperidone':       'Domperidone',
-    'Vitamin C':         'Ascorbic acid',
-    'Vitamin D3':        'Cholecalciferol',
-    'Zinc Sulphate':     'Zinc sulfate monohydrate',
-    'ORS':               'Oral Rehydration Salts',
-    'Chloroquine':       'Chloroquine phosphate',
-}
-
-def _get_generic(drug_name: str) -> str:
-    return GENERIC_MAP.get(drug_name, drug_name)
-
-def _extract_district(address: str) -> str:
-    if not address:
-        return 'Unknown'
-    parts = [p.strip() for p in address.split(',')]
-    return parts[4].strip() if len(parts) >= 5 else 'Unknown'
-
 def _get_db_date_range(days: int = 30):
     cache_key = 'latest_appointment_date'
     latest_dt = cache.get(cache_key)
@@ -81,7 +41,7 @@ def _get_db_date_range(days: int = 30):
             latest=Max('appointment_datetime')
         )['latest']
         if latest_dt:
-            cache.set(cache_key, latest_dt, 1800)  # Cache for 30 minutes
+            cache.set(cache_key, latest_dt, 60)  # Cache for 1 minute
             
     end   = latest_dt.date() if latest_dt else date.today()
     start = end - timedelta(days=days)
@@ -109,37 +69,16 @@ def _get_date_range(request):
         
     return start, end
 
-def apply_clinic_filter(queryset, request_or_user, clinic_field='clinic'):
-    """
-    Filters a queryset based on the logged-in user's role and assigned clinic.
-    - Super admins / Role ADMIN: No filter applied.
-    - Clinic users: Filtered by user.profile.clinic.
-    """
-    from django.contrib.auth.models import AnonymousUser
-    
-    if hasattr(request_or_user, 'user'):
-        user = request_or_user.user
-    else:
-        user = request_or_user
+from ..utils.filters import apply_clinic_filter
 
-    if not user or isinstance(user, AnonymousUser) or not user.is_authenticated:
-        return queryset.none()
-    
-    # Try to get UserProfile
-    try:
-        profile = user.profile
-    except Exception:
-        # Fallback if profile doesn't exist (e.g. system admin)
-        if user.is_superuser:
-            return queryset
-        return queryset.none()
-
-    if profile.role == 'ADMIN' or user.is_superuser:
-        return queryset
-    
-    if profile.role == 'CLINIC_USER' and profile.clinic:
-        filter_kwargs = {clinic_field: profile.clinic}
-        return queryset.filter(**filter_kwargs)
-    
-    return queryset.none()
-
+# Re-exporting for compatibility with existing views
+__all__ = [
+    'apply_clinic_filter',
+    '_get_date_range',
+    '_get_db_date_range',
+    '_build_daily_list',
+    'cache_api_response',
+    '_get_generic',
+    'GENERIC_MAP',
+    '_extract_district'
+]

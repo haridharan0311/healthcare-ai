@@ -29,8 +29,12 @@ from ..utils.validators import validate_date_range
 
 logger = get_logger(__name__)
 
-def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
-    """Statistical spike detection using Z-score and historical variability."""
+def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7, z_threshold: float = 2.0, min_volume: int = 3) -> Dict:
+    """
+    Statistical spike detection using Z-score and historical variability.
+    - z_threshold: Z-score threshold for alert (default 2.0 for 95% confidence)
+    - min_volume: Minimum absolute cases required to trigger an alert
+    """
     if len(daily_counts) < 3:
         return {
             "today_count": daily_counts[-1] if daily_counts else 0,
@@ -39,6 +43,8 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
             "threshold": 0.0,
             "is_spike": False,
             "confidence": 0.0,
+            "impact_severity": "normal",
+            "status": "insufficient_data",
             "reason": "insufficient data window"
         }
 
@@ -52,19 +58,14 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
     effective_std_dev = max(std_dev, 0.5) 
     z_score = (today - mean) / effective_std_dev
     
-    # Threshold: Z-score > 2.0 is usually considered an anomaly (95% confidence)
-    # But for healthcare, we might want to be more sensitive or specific
-    threshold = mean + (2 * effective_std_dev)
-    is_spike = z_score > 2.0 and today >= 3 # Ignore spikes with very low absolute counts
+    # Threshold: Z-score > z_threshold is usually considered an anomaly
+    threshold = mean + (z_threshold * effective_std_dev)
+    is_spike = z_score > z_threshold and today >= min_volume
     
     # Confidence Scoring
-    # 1. Consistency: Lower CV (Coefficient of Variation) = higher confidence in the baseline
     cv = (std_dev / mean) if mean > 0 else 1.0
     consistency_score = max(0, 1.0 - cv)
-    
-    # 2. Volume: More baseline data = higher confidence
     volume_score = min(len(baseline) / baseline_days, 1.0)
-    
     confidence = round((consistency_score * 0.4 + volume_score * 0.6), 2)
     
     # Severity assessment
@@ -82,7 +83,8 @@ def detect_spike_logic(daily_counts: List[int], baseline_days: int = 7) -> Dict:
         "threshold": round(threshold, 2),
         "is_spike": is_spike,
         "confidence": confidence,
-        "impact_severity": severity
+        "impact_severity": severity,
+        "status": "success"
     }
 
 

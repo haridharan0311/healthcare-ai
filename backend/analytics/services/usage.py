@@ -21,7 +21,7 @@ from django.db.models import Count, Sum, Q
 from inventory.models import PrescriptionLine, DrugMaster
 from core.models import Doctor
 from .aggregation import get_disease_type
-from ..views.utils import apply_clinic_filter
+from ..utils.filters import apply_clinic_filter
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)

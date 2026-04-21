@@ -1,0 +1,36 @@
+GENERIC_MAP = {
+    'Paracetamol':       'Acetaminophen',
+    'Ibuprofen':         'Ibuprofen',
+    'Amoxicillin':       'Amoxicillin trihydrate',
+    'Metformin':         'Metformin hydrochloride',
+    'Aspirin':           'Acetylsalicylic acid',
+    'Cetirizine':        'Cetirizine hydrochloride',
+    'Azithromycin':      'Azithromycin dihydrate',
+    'Ciprofloxacin':     'Ciprofloxacin hydrochloride',
+    'Doxycycline':       'Doxycycline hyclate',
+    'Diclofenac':        'Diclofenac sodium',
+    'Chlorpheniramine':  'Chlorpheniramine maleate',
+    'Montelukast':       'Montelukast sodium',
+    'Glibenclamide':     'Glibenclamide',
+    'Glimepiride':       'Glimepiride',
+    'Insulin (Regular)': 'Human insulin',
+    'Amlodipine':        'Amlodipine besylate',
+    'Atenolol':          'Atenolol',
+    'Losartan':          'Losartan potassium',
+    'Enalapril':         'Enalapril maleate',
+    'Salbutamol':        'Albuterol sulfate',
+    'Prednisolone':      'Prednisolone',
+    'Theophylline':      'Theophylline anhydrous',
+    'Omeprazole':        'Omeprazole magnesium',
+    'Ranitidine':        'Ranitidine hydrochloride',
+    'Domperidone':       'Domperidone',
+    'Vitamin C':         'Ascorbic acid',
+    'Vitamin D3':        'Cholecalciferol',
+    'Zinc Sulphate':     'Zinc sulfate monohydrate',
+    'ORS':               'Oral Rehydration Salts',
+    'Chloroquine':       'Chloroquine phosphate',
+}
+
+def _get_generic(drug_name: str) -> str:
+    """Returns the generic name for a given drug brand/name."""
+    return GENERIC_MAP.get(drug_name, drug_name)

@@ -36,9 +36,11 @@ from ..services.aggregation import (
 )
 
 from .utils import (
-    cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
+    cache_api_response, _get_db_date_range, _get_date_range, 
+    _build_daily_list, apply_clinic_filter
 )
+from ..utils.chemistry import GENERIC_MAP, _get_generic
+from ..utils.geo import _extract_district
 
 # export_views.py extracted classes
 

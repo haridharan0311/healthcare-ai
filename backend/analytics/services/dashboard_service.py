@@ -8,6 +8,7 @@ from .restock_service import RestockService
 from inventory.models import PrescriptionLine, DrugMaster
 from analytics.models import Appointment
 from django.db.models import Count, Sum
+from django.utils.timezone import make_aware
 from ..utils.logger import get_logger
 from ..services.aggregation import get_disease_type
 from ..views.utils import apply_clinic_filter
@@ -22,8 +23,8 @@ class DashboardService:
         """Shared helper to get isolated appointment data context."""
         end_date = date.today()
         start_date = end_date - timedelta(days=days)
-        start_dt = datetime.combine(start_date, time.min)
-        end_dt = datetime.combine(end_date, time.max)
+        start_dt = make_aware(datetime.combine(start_date, time.min))
+        end_dt = make_aware(datetime.combine(end_date, time.max))
         
         appt_qs_base = Appointment.objects.filter(
             appointment_datetime__range=(start_dt, end_dt), 
