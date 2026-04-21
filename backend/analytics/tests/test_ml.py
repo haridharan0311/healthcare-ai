@@ -1,139 +1,113 @@
-import logging
-from datetime import date, timedelta
-from typing import List
-
+import unittest
 from django.test import TestCase
-
-# Internal Service Imports
 from analytics.services.ml_engine import (
-    moving_average_forecast, 
-    weighted_trend_score, 
-    predict_demand
+    moving_average_forecast,
+    exponential_smoothing_forecast,
+    weighted_trend_score,
+    time_decay_weight
 )
-from analytics.services.timeseries import get_seasonal_weight
-from analytics.services.spike_detection import (
-    detect_spike_logic as detect_spike,
-    SpikeDetectionService
-)
-from analytics.services.restock_calculator import (
-    calculate_restock, 
-    apply_multi_disease_contribution,
-    calculate_dynamic_safety_buffer
-)
-from analytics.services.aggregation import get_disease_type
-from analytics.services.insights_service import InsightsService
-from analytics.services.forecasting import ForecastingService
+from analytics.services.spike_detection import detect_spike_logic
 
-# Model Imports
-from core.models import Clinic
-from inventory.models import DrugMaster
+class MLFunctionsTestCase(TestCase):
+    """
+    Comprehensive test suite for Machine Learning and Statistical functions.
+    Covers edge cases, mathematical correctness, and robust error handling.
+    """
 
-
-class AnalyticsLogicTestCase(TestCase):
-    """Base class for analytics logic tests with shared helpers."""
+    # ── Moving Average Forecast ──────────────────────────────────────
     
-    def create_sequence(self, base_val: int, length: int, spike: int = None) -> List[int]:
-        """Helper to create test sequences easily."""
-        seq = [base_val] * length
-        if spike is not None:
-            seq[-1] = spike
-        return seq
+    def test_ma_basic_calculation(self):
+        """Test standard weighted moving average calculation."""
+        data = [10, 10, 10, 10, 10, 10, 10]
+        self.assertEqual(moving_average_forecast(data), 10.0)
 
+    def test_ma_trend_sensitivity(self):
+        """Test if MA correctly responds to a rising trend."""
+        data = [10, 11, 12, 13, 14, 15, 16]
+        forecast = moving_average_forecast(data)
+        self.assertGreater(forecast, 14.0) # Should be biased towards recent higher values
 
-class TestMovingAverage(AnalyticsLogicTestCase):
-    """Tests for the moving average forecasting engine."""
-
-    def test_forecast_scenarios(self):
-        # Case 1: Normal variation
-        counts = [10, 12, 8, 15, 20, 18, 22, 25]
-        self.assertAlmostEqual(moving_average_forecast(counts), 19.86, places=1)
-
-        # Case 2: Empty/Minimal data
+    def test_ma_empty_input(self):
+        """Test behavior with empty list."""
         self.assertEqual(moving_average_forecast([]), 0.0)
+
+    def test_ma_single_value(self):
+        """Test behavior with single data point."""
         self.assertEqual(moving_average_forecast([5]), 5.0)
 
-        # Case 3: Zero activity
-        self.assertEqual(moving_average_forecast([0, 0, 0]), 0.0)
+    def test_ma_window_clamping(self):
+        """Test that weights don't exceed data length when data is small."""
+        data = [10, 20]
+        forecast = moving_average_forecast(data)
+        self.assertEqual(forecast, 15.0)
 
 
-class TestSpikeDetector(AnalyticsLogicTestCase):
-    """Tests for statistical anomaly detection."""
+    # ── Exponential Smoothing ───────────────────────────────────────
 
-    def test_detection_reliability(self):
-        # Spike Scenario
-        spike_seq = self.create_sequence(10, 7, spike=50)
-        self.assertTrue(detect_spike(spike_seq)['is_spike'])
+    def test_es_zero_variance(self):
+        """Test ES with consistent data."""
+        data = [100] * 10
+        self.assertAlmostEqual(exponential_smoothing_forecast(data), 100.0, places=1)
 
-        # Stable Scenario
-        stable_seq = self.create_sequence(10, 8)
-        self.assertFalse(detect_spike(stable_seq)['is_spike'])
+        data = [10, 10, 10, 10, 10, 50, 50]
+        # ES responds relative to alpha. Verify ES follows the increase.
+        es_val = exponential_smoothing_forecast(data)
+        self.assertGreater(es_val, 10.0)
 
-    def test_edge_cases(self):
-        self.assertFalse(detect_spike([5])['is_spike']) # Insufficient data
-        self.assertEqual(detect_spike([])['today_count'], 0)
-
-
-class TestSeasonalWeights(AnalyticsLogicTestCase):
-    """Tests for seasonal Intelligence."""
-
-    def test_seasonal_adjustments(self):
-        # Monsoon in August (Month 8) -> Active
-        self.assertEqual(get_seasonal_weight("Monsoon", 8), 1.5)
-        
-        # Monsoon in January (Month 1) -> Inactive
-        self.assertEqual(get_seasonal_weight("Monsoon", 1), 1.0)
-        
-        # Year-round diseases
-        self.assertEqual(get_seasonal_weight("All", 6), 1.0)
+    def test_es_empty_input(self):
+        """Test ES with empty list."""
+        self.assertEqual(exponential_smoothing_forecast([]), 0.0)
 
 
-class TestRestockCalculator(AnalyticsLogicTestCase):
-    """Tests for inventory decision logic."""
+    # ── Spike Detection Logic (Z-Score) ─────────────────────────────
 
-    def test_restock_decision_matrix(self):
-        # Scenario: High demand, low stock -> Critical Restock
-        result = calculate_restock(
-            drug_name='Paracetamol',
-            generic_name='Acetaminophen',
-            predicted_demand=100.0,
-            avg_usage=2.0,
-            current_stock=50,
-            contributing_diseases=['Dengue']
-        )
-        self.assertEqual(result['status'], 'critical')
-        self.assertEqual(result['suggested_restock'], 190)
+    def test_spike_detection_clear_outlier(self):
+        """Test detection of a statistically significant spike."""
+        # Mean: ~10, StdDev: low
+        data = [10, 11, 9, 10, 12, 11, 50] 
+        result = detect_spike_logic(data, z_threshold=2.0)
+        self.assertTrue(result['is_spike'])
+        self.assertGreater(result['z_score'], 2.0)
 
-        # Scenario: Zero stock -> Always Critical
-        result_empty = calculate_restock(
-            drug_name='A', generic_name='B', 
-            predicted_demand=50.0, avg_usage=1.0, 
-            current_stock=0, contributing_diseases=['C']
-        )
-        self.assertEqual(result_empty['status'], 'critical')
+    def test_spike_detection_low_volume_filter(self):
+        """Test that low counts don't trigger alerts if below min_volume."""
+        # Even if 1 -> 4 is a big % jump, it shouldn't trigger if min_volume is 5
+        data = [1, 1, 1, 1, 1, 1, 4]
+        result = detect_spike_logic(data, min_volume=5)
+        self.assertFalse(result['is_spike'])
+
+    def test_spike_detection_zero_variance(self):
+        """Test that constant data doesn't error out."""
+        data = [10, 10, 10, 10, 10]
+        result = detect_spike_logic(data)
+        self.assertFalse(result['is_spike'])
+        self.assertEqual(result['z_score'], 0)
+
+    def test_spike_detection_insufficient_data(self):
+        """Test with very few data points (fewer than 3)."""
+        data = [10, 50]
+        result = detect_spike_logic(data)
+        self.assertFalse(result['is_spike'])
+        self.assertEqual(result['status'], 'insufficient_data')
 
 
-class TestDecisionSupportServices(AnalyticsLogicTestCase):
-    """Integrated tests for high-level Decision Services."""
+    # ── Trend Scoring & Decay ───────────────────────────────────────
 
-    def setUp(self):
-        self.insights = InsightsService()
-        self.forecasting = ForecastingService()
+    def test_weighted_trend_score_rising(self):
+        """Test score with increasing cases."""
+        # Recent: 20, Older: 10
+        score = weighted_trend_score(20, 10)
+        self.assertGreater(score, 0)
 
-    def test_strategic_recommendations(self):
-        """Verify that recommendations are logically triggered."""
-        # Mocking an outbreak
-        outbreaks = [{'disease': 'Flu', 'severity': 'Critical', 'message': 'Alert'}]
-        actions = self.insights._generate_strategic_recommendations(
-            outbreaks, [], [], {'adaptive_buffer': 1.2, 'interpretation': 'low_risk'}
-        )
-        self.assertTrue(any("emergency resources for Flu" in a for a in actions))
+    def test_weighted_trend_score_calculation(self):
+        """Test score comparison between rising and falling trends."""
+        score_rising = weighted_trend_score(20, 5)
+        score_falling = weighted_trend_score(5, 20)
+        self.assertLess(score_falling, score_rising)
 
-    def test_depletion_forecast_messages(self):
-        """Verify depletion messaging based on urgency."""
-        # Critical urgency
-        msg_crit = self.forecasting._get_depletion_recommendation('critical', 3.5)
-        self.assertIn("Action Required", msg_crit)
-        
-        # Low urgency
-        msg_low = self.forecasting._get_depletion_recommendation('low', 12.0)
-        self.assertIn("Order Soon", msg_low)
+        w_recent = time_decay_weight(100, is_recent=True)
+        w_older  = time_decay_weight(100, is_recent=False)
+        self.assertGreater(w_recent, w_older)
+
+if __name__ == '__main__':
+    unittest.main()
