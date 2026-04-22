@@ -142,6 +142,8 @@ export default function ReportsPage() {
     if (tab === 'Medicine Dependencies' && medicineDeps?.target_disease) params.disease = medicineDeps.target_disease;
     if (tab === 'Stock Depletion Forecast') params.drug_name = 'all';
 
+
+
     try {
       const url = getExportUrl(type, params);
       const res = await apiInstance.get(url);

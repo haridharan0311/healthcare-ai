@@ -528,7 +528,7 @@ class ExportStockDepletionView(APIView):
         writer = csv.writer(response)
 
         if selected_drug and selected_drug.lower() != 'all':
-            # Single drug detailed view (original logic)
+            # Single drug detailed view
             result = service.forecast_stock_depletion(drug_name=selected_drug, days=days, rx_queryset=rx_qs, request=request)
             writer.writerow(['Stock Depletion Detail', f'Drug: {selected_drug}', f'Period: {days} days'])
             writer.writerow([])
@@ -547,14 +547,21 @@ class ExportStockDepletionView(APIView):
             writer.writerow(['Drug Name', 'Generic Name', 'Current Stock', 'Avg Daily Usage', 'Days Left', 'Depletion Date', 'Status'])
             
             # Optimization: Get all unique drug names with stock or usage
-            relevant_drugs = DrugMaster.objects.filter(current_stock__gt=0).values_list('drug_name', flat=True).distinct()
-            # Also include drugs used recently
+            relevant_drugs = apply_clinic_filter(DrugMaster.objects.filter(current_stock__gt=0), request).values_list('drug_name', flat=True).distinct()
             usage_drugs = rx_qs.filter(prescription_date__gte=date.today()-timedelta(days=days)).values_list('drug__drug_name', flat=True).distinct()
-            
             all_drugs = sorted(set(relevant_drugs) | set(usage_drugs))
+
+            # Pre-calculate growth rates for all active diseases in bulk to avoid N+1 queries
+            from ..services.timeseries import TimeSeriesAnalysis
+            ts = TimeSeriesAnalysis()
+            active_diseases = Disease.objects.filter(is_active=True).values_list('name', flat=True)
+            growth_map = {}
+            for dname in active_diseases:
+                growth = ts.calculate_growth_rate(dname, days=7, appt_queryset=apply_clinic_filter(Appointment.objects.all(), request))
+                growth_map[dname] = growth.get('growth_rate', 0)
             
             for dname in all_drugs:
-                res = service.forecast_stock_depletion(drug_name=dname, days=days, rx_queryset=rx_qs, request=request)
+                res = service.forecast_stock_depletion(drug_name=dname, days=days, rx_queryset=rx_qs, request=request, growth_map=growth_map)
                 if not res.get('error'):
                     writer.writerow([
                         res.get('drug_name'), res.get('generic_name'), 
@@ -562,6 +569,7 @@ class ExportStockDepletionView(APIView):
                         res.get('days_until_depletion'), res.get('depletion_date'),
                         res.get('status')
                     ])
+
                 
         return response
 

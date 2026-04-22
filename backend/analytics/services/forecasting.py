@@ -45,7 +45,7 @@ from .ml_engine import (
     predict_demand,
     time_decay_weight
 )
-from .timeseries import get_seasonal_weight
+from .timeseries import get_seasonal_weight, TimeSeriesAnalysis
 from .spike_detection import detect_spike_logic as detect_spike
 from ..utils.filters import apply_clinic_filter
 from ..utils.chemistry import _get_generic
@@ -466,7 +466,7 @@ class ForecastingService:
             self.logger.error("Bulk disease forecasting failed", exception=e)
             return []
 
-    def forecast_stock_depletion(self, drug_name: str, days: int = 14, rx_queryset=None, request=None) -> Dict:
+    def forecast_stock_depletion(self, drug_name: str, days: int = 14, rx_queryset=None, request=None, growth_map: Optional[Dict] = None) -> Dict:
         """
         FEATURE 4: Stock Depletion Forecast.
         Forecasts when medicine stock will hit 0 based on current usage trends
@@ -498,12 +498,19 @@ class ForecastingService:
             # Find diseases that use this drug
             related_diseases = rx_queryset.filter(drug__drug_name=drug_name).values_list('disease__name', flat=True).distinct()
             max_growth = 0
-            for d in related_diseases:
-                from .timeseries import TimeSeriesAnalysis
+            
+            if growth_map:
+                # Use pre-calculated map if available
+                for d in related_diseases:
+                    g = growth_map.get(d, 0)
+                    if g > max_growth: max_growth = g
+            else:
                 ts = TimeSeriesAnalysis()
-                growth = ts.calculate_growth_rate(d, days=7)
-                if growth.get('growth_rate', 0) > max_growth:
-                    max_growth = growth['growth_rate']
+                for d in related_diseases:
+                    growth = ts.calculate_growth_rate(d, days=7)
+                    g = growth.get('growth_rate', 0)
+                    if g > max_growth:
+                        max_growth = g
             
             # Adjust daily usage by predicted growth (capped at 2x)
             predicted_daily_usage = avg_daily_usage * (1 + min(max_growth / 100, 1.0))
