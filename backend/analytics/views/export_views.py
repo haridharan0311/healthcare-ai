@@ -380,7 +380,7 @@ class ExportDoctorTrendsView(APIView):
         writer.writerow([])
         writer.writerow(['Doctor Name', 'Primary Disease Type', 'Total Consultations'])
         for doc in data:
-            writer.writerow([doc['doctor_name'], doc['disease'], doc['cases']])
+            writer.writerow([doc['doctor_name'], doc['top_specialization'], doc['total_cases']])
         return response
 
 

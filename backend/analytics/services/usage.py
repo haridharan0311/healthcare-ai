@@ -128,7 +128,7 @@ class UsageIntelligence:
             
         return results
 
-    def get_doctor_patterns(self, doctor_id: Optional[int] = None, days: int = 30, appt_queryset=None) -> Dict or List[Dict]:
+    def get_doctor_patterns(self, doctor_id: Optional[int] = None, days: int = 30, appt_queryset=None) -> Union[Dict, List[Dict]]:
         """
         FEATURE 7: Doctor-wise Analytics.
         Tracks disease handling patterns and performance metrics per doctor.

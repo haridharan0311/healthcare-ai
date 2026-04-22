@@ -16,7 +16,7 @@ class Disease(models.Model):
     # active flag for future control
     is_active = models.BooleanField(default=True)
 
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name

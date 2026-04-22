@@ -508,7 +508,10 @@ class ForecastingService:
             # Adjust daily usage by predicted growth (capped at 2x)
             predicted_daily_usage = avg_daily_usage * (1 + min(max_growth / 100, 1.0))
             
-            if predicted_daily_usage <= 0:
+            if current_stock <= 0:
+                days_left = 0
+                status = "critical"
+            elif predicted_daily_usage <= 0:
                 days_left = 999
                 status = "stable"
             else:

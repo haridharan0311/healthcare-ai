@@ -20,7 +20,8 @@ def _build_daily_list(daily_map_by_type, disease_type, start_date, end_date):
 def cache_api_response(timeout=300):
     def decorator(view_func):
         def wrapper(self, request, *args, **kwargs):
-            cache_key = f"{self.__class__.__name__}:{request.GET.urlencode()}"
+            user_id = request.user.id if request.user.is_authenticated else 'anonymous'
+            cache_key = f"{self.__class__.__name__}:{user_id}:{request.GET.urlencode()}"
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
