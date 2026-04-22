@@ -3,18 +3,25 @@ from typing import List, Dict
 BASE_SAFETY_BUFFER = 1.2
 MAX_SAFETY_BUFFER  = 1.8
 
-def calculate_dynamic_safety_buffer(spike_count: int, total_diseases: int) -> float:
+def calculate_dynamic_safety_buffer(spike_count: int, total_diseases: int, volatility: float = 0.0) -> float:
     """
-    New Feature 7: Auto Safety Buffer Adjustment.
-    Higher spike count → higher buffer.
-    Formula: buffer = BASE + (spike_ratio × (MAX - BASE))
-    spike_ratio = spikes / total_diseases (0.0 to 1.0)
+    FEATURE 5: Adaptive Safety Buffer.
+    Adjusts restock buffer based on both spike counts AND usage volatility.
+    Higher volatility or spike ratio → higher buffer.
     """
     if total_diseases == 0:
         return BASE_SAFETY_BUFFER
+        
     spike_ratio = min(spike_count / total_diseases, 1.0)
-    buffer = BASE_SAFETY_BUFFER + (spike_ratio * (MAX_SAFETY_BUFFER - BASE_SAFETY_BUFFER))
-    return round(buffer, 3)
+    
+    # Factor in volatility (0.0 to 1.0+)
+    # We cap the contribution from volatility to keep buffer within reasonable bounds
+    volatility_factor = min(volatility * 0.5, 0.4)
+    
+    base_calc = BASE_SAFETY_BUFFER + (spike_ratio * (MAX_SAFETY_BUFFER - BASE_SAFETY_BUFFER))
+    final_buffer = base_calc + volatility_factor
+    
+    return round(min(final_buffer, MAX_SAFETY_BUFFER), 3)
 
 def calculate_restock(
     drug_name: str,

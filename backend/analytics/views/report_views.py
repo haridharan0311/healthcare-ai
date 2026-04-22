@@ -248,150 +248,36 @@ class TodaySummaryView(APIView):
 class WhatChangedTodayView(APIView):
     """
     GET /api/what-changed-today/
-
-    Summarizes today’s key changes: appointments, spike alerts, stock risks,
-    and fast-moving disease trends.
+    FEATURE 10: Summarizes daily changes like spikes, risks, and trend shifts.
     """
     @cache_api_response(timeout=300)
     def get(self, request):
+        from ..services.insights_service import InsightsService
+        service = InsightsService()
+        
+        # Get actionable insights for the last 30 days
+        insights = service.get_actionable_insights(days=30, request=request)
+        
+        # Add today's specific stats
         latest = Appointment.objects.aggregate(latest=Max('appointment_datetime'))['latest']
         today = latest.date() if latest else date.today()
-
-        # Today counts by disease type
-        today_qs_base = Appointment.objects.filter(
+        
+        today_count = Appointment.objects.filter(
             appointment_datetime__date=today,
-            disease__isnull=False,
-        )
-        # Exclude Variants
-        var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
-        today_qs = apply_clinic_filter(today_qs_base, request).exclude(var_filter) \
-            .select_related('disease') \
-            .values('disease__name') \
-            .annotate(cnt=Count('id'))
-
-        today_by_disease = defaultdict(int)
-        for row in today_qs:
-            today_by_disease[get_disease_type(row['disease__name'])] += row['cnt']
-
-        today_count = sum(today_by_disease.values())
-        history_start = today - timedelta(days=8)
-        spike_qs_base = Appointment.objects.filter(
-            appointment_datetime__date__range=(history_start, today),
-            disease__isnull=False,
-        )
-        spike_qs = apply_clinic_filter(spike_qs_base, request) \
-            .select_related('disease') \
-            .annotate(appt_date=TruncDate('appointment_datetime')) \
-            .values('appt_date', 'disease__name') \
-            .annotate(case_count=Count('id')) \
-            .order_by('disease__name', 'appt_date')
-
-        daily_by_disease = defaultdict(lambda: defaultdict(int))
-        for row in spike_qs:
-            dtype = get_disease_type(row['disease__name'])
-            daily_by_disease[dtype][row['appt_date']] += row['case_count']
-
-        spike_alerts = []
-        for dtype, daily_map in daily_by_disease.items():
-            daily_list = [
-                daily_map.get(history_start + timedelta(days=i), 0)
-                for i in range(9)
-            ]
-            spike_info = detect_spike(daily_list, baseline_days=7)
-            spike_alerts.append({
-                'disease_name':      dtype,
-                'today_count':       spike_info['today_count'],
-                'mean_last_7_days':  spike_info['mean_last_7_days'],
-                'threshold':         spike_info['threshold'],
-                'std_dev':           spike_info['std_dev'],
-                'is_spike':          spike_info['is_spike'],
-            })
-
-        spike_alerts = sorted(
-            spike_alerts,
-            key=lambda x: (not x['is_spike'], -x['today_count'])
-        )[:8]
-
-        critical_stock = apply_clinic_filter(DrugMaster.objects.filter(current_stock__lte=10), request).count()
-        out_of_stock = apply_clinic_filter(DrugMaster.objects.filter(current_stock=0), request).count()
-        low_stock_qs_base = DrugMaster.objects.filter(current_stock__lte=50)
-        low_stock_qs = apply_clinic_filter(low_stock_qs_base, request) \
-            .values('drug_name', 'generic_name') \
-            .annotate(total_stock=Sum('current_stock')) \
-            .order_by('total_stock')[:5]
-        low_stock_top = [
-            {
-                'drug_name':    row['drug_name'],
-                'generic_name': row['generic_name'] or '',
-                'current_stock': row['total_stock'] or 0,
-            }
-            for row in low_stock_qs
-        ]
-
-        recent_start = today - timedelta(days=6)
-        older_start = today - timedelta(days=14)
-        older_end = today - timedelta(days=7)
-
-        recent_qs_base = Appointment.objects.filter(
-            appointment_datetime__date__range=(recent_start, today),
-            disease__isnull=False,
-        )
-        recent_qs = apply_clinic_filter(recent_qs_base, request) \
-            .select_related('disease') \
-            .values('disease__name') \
-            .annotate(cnt=Count('id'))
-
-        older_qs_base = Appointment.objects.filter(
-            appointment_datetime__date__range=(older_start, older_end),
-            disease__isnull=False,
-        )
-        older_qs = apply_clinic_filter(older_qs_base, request) \
-            .select_related('disease') \
-            .values('disease__name') \
-            .annotate(cnt=Count('id'))
-
-        recent_map = defaultdict(int)
-        older_map = defaultdict(int)
-        for row in recent_qs:
-            recent_map[get_disease_type(row['disease__name'])] += row['cnt']
-        for row in older_qs:
-            older_map[get_disease_type(row['disease__name'])] += row['cnt']
-
-        trend_shifts = []
-        for dtype in set(recent_map) | set(older_map):
-            recent_value = recent_map.get(dtype, 0)
-            older_value = older_map.get(dtype, 0)
-            growth_rate = round(
-                ((recent_value - older_value) / max(older_value, 1)) * 100,
-                1
-            )
-            trend_shifts.append({
-                'disease_name': dtype,
-                'recent_count': recent_value,
-                'prior_count': older_value,
-                'growth_rate': growth_rate,
-                'trend': 'up' if recent_value > older_value else 'down' if recent_value < older_value else 'stable',
-            })
-
-        trend_shifts = sorted(trend_shifts, key=lambda x: -x['growth_rate'])
-
+            disease__isnull=False
+        ).count()
+        
         return Response({
-            'date':              str(today),
+            'date': str(today),
             'total_appointments': today_count,
-            'today_by_disease':  [
-                {'disease_name': d, 'count': c}
-                for d, c in sorted(today_by_disease.items(), key=lambda x: -x[1])
-            ],
-            'spike_alerts':      spike_alerts,
-            'stock_risks': {
-                'critical_count': critical_stock,
-                'out_of_stock_count': out_of_stock,
-                'top_low_stock': low_stock_top,
+            'summary': insights['recommendations'],
+            'risks': {
+                'outbreaks': insights['outbreaks'],
+                'critical_stock': insights['critical_stock']
             },
-            'trend_shifts': {
-                'top_gainers': trend_shifts[:5],
-                'top_decliners': list(reversed(trend_shifts[-5:])),
-            },
+            'trends': {
+                'rising_diseases': insights['rising_trends']
+            }
         })
 
 

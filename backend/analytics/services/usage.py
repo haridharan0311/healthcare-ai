@@ -16,6 +16,7 @@ Usage:
 
 from datetime import date, timedelta
 from typing import Dict, List, Optional
+from collections import defaultdict
 from django.db.models import Count, Sum, Q
 
 from inventory.models import PrescriptionLine, DrugMaster
@@ -130,7 +131,7 @@ class UsageIntelligence:
     def get_doctor_patterns(self, doctor_id: Optional[int] = None, days: int = 30, appt_queryset=None) -> Dict or List[Dict]:
         """
         FEATURE 7: Doctor-wise Analytics.
-        Tracks disease handling patterns per doctor.
+        Tracks disease handling patterns and performance metrics per doctor.
         """
         try:
             start_date = date.today() - timedelta(days=days)
@@ -147,23 +148,54 @@ class UsageIntelligence:
                 ).select_related('doctor', 'disease').values('disease__name').annotate(cases=Count('id')).order_by('-cases')
                 
                 doc = Doctor.objects.get(id=doctor_id)
+                total_cases = sum(r['cases'] for r in qs)
+                
+                # Performance metrics
+                days_active = max(days, 1)
+                cases_per_day = round(total_cases / days_active, 2)
+                
+                # Fetch top drug prescribed by this doctor
+                top_drug_qs = PrescriptionLine.objects.filter(
+                    prescription__doctor_id=doctor_id,
+                    prescription_date__gte=start_date
+                ).values('drug__drug_name').annotate(cnt=Count('id')).order_by('-cnt')[:1]
+                
+                top_drug = top_drug_qs[0]['drug__drug_name'] if top_drug_qs else "N/A"
+
                 return {
                     'doctor_name': f"{doc.first_name} {doc.last_name or ''}".strip(),
-                    'total_cases': sum(r['cases'] for r in qs),
+                    'total_cases': total_cases,
+                    'cases_per_day': cases_per_day,
+                    'top_prescribed_drug': top_drug,
                     'specialization_focus': get_disease_type(qs[0]['disease__name']) if qs else "None",
                     'disease_distribution': {get_disease_type(r['disease__name']): r['cases'] for r in qs}
                 }
             else:
+                # Summary view for all doctors
                 qs = appt_queryset.filter(
                     appointment_datetime__date__gte=start_date,
                     disease__isnull=False
-                ).select_related('doctor', 'disease').values('doctor__first_name', 'doctor__last_name', 'disease__name').annotate(cases=Count('id')).order_by('doctor__first_name', '-cases')
+                ).select_related('doctor', 'disease').values('doctor__id', 'doctor__first_name', 'doctor__last_name', 'disease__name').annotate(cases=Count('id')).order_by('doctor__first_name', '-cases')
+                
+                doctor_data = defaultdict(lambda: {'name': '', 'cases': 0, 'top_disease': '', 'max_d_cases': 0})
+                for r in qs:
+                    did = r['doctor__id']
+                    dname = f"{r['doctor__first_name']} {r['doctor__last_name'] or ''}".strip()
+                    dtype = get_disease_type(r['disease__name'])
+                    
+                    doctor_data[did]['name'] = dname
+                    doctor_data[did]['cases'] += r['cases']
+                    if r['cases'] > doctor_data[did]['max_d_cases']:
+                        doctor_data[did]['max_d_cases'] = r['cases']
+                        doctor_data[did]['top_disease'] = dtype
                 
                 return [{
-                    'doctor_name': f"{r['doctor__first_name']} {r['doctor__last_name'] or ''}".strip(),
-                    'disease': get_disease_type(r['disease__name']),
-                    'cases': r['cases']
-                } for r in qs]
+                    'doctor_id': did,
+                    'doctor_name': data['name'],
+                    'total_cases': data['cases'],
+                    'top_specialization': data['top_disease'],
+                    'efficiency_score': round(data['cases'] / days, 2)
+                } for did, data in doctor_data.items()]
         except Exception as e:
             self.logger.error(f"Doctor-wise analytics failed: {str(e)}")
             return {'error': str(e)}

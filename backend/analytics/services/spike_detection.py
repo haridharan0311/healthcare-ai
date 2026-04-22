@@ -126,6 +126,7 @@ class SpikeDetectionService:
         """
         FEATURE 2: Early Outbreak Warning System.
         Detects consistent upward trends in multi-day windows.
+        Uses a sliding window to detect if a disease is consistently rising.
         """
         start_date = date.today() - timedelta(days=14)
         qs = Appointment.objects.filter(
@@ -142,22 +143,33 @@ class SpikeDetectionService:
         for dtype, counts in disease_series.items():
             if len(counts) < min_days: continue
             
-            # Check for consecutive growth in the last N days
+            # Check for consecutive growth in the last N days (Feature 2)
             recent = counts[-min_days:]
-            if all(recent[i] < recent[i+1] for i in range(len(recent)-1)) and recent[-1] >= min_cases:
+            
+            # Robust trend check: Either strictly increasing OR significantly higher than average
+            strictly_increasing = all(recent[i] < recent[i+1] for i in range(len(recent)-1))
+            
+            # Calculate slope (simple)
+            if len(recent) >= 2:
+                slope = (recent[-1] - recent[0]) / (len(recent) - 1)
+            else:
+                slope = 0
+
+            if (strictly_increasing or slope > 1.0) and recent[-1] >= min_cases:
                 # Scoring logic for Feature 2
-                growth_multiplier = recent[-1] / recent[0] if recent[0] > 0 else 1.0
-                score = (growth_multiplier * 50) + (len(recent) * 10)
+                growth_multiplier = recent[-1] / recent[0] if recent[0] > 0 else recent[-1]
+                score = (growth_multiplier * 50) + (len(recent) * 10) + (slope * 5)
                 
                 outbreaks.append({
                     'disease_name': dtype,
-                    'trend_days': min_days,
+                    'trend_days': len(recent),
                     'start_count': recent[0],
                     'end_count': recent[-1],
+                    'slope': round(slope, 2),
                     'growth_multiplier': round(growth_multiplier, 2),
                     'impact_score': round(score, 1),
                     'severity': 'critical' if score > 100 else 'warning',
-                    'message': f"Feature 2 Alert: Consistent growth detected for {dtype} ({round(growth_multiplier*100-100, 1)}% increase)."
+                    'message': f"Early Outbreak Alert: Consistent upward trend detected for {dtype} ({round(growth_multiplier*100-100, 1)}% total growth)."
                 })
         return sorted(outbreaks, key=lambda x: x['impact_score'], reverse=True)
     def generate_spike_alerts(self) -> List[Dict]:

@@ -61,6 +61,7 @@ class TimeSeriesAnalysis:
             if appt_queryset is None:
                 appt_queryset = Appointment.objects.all()
 
+            # Using aggregation for speed instead of .count() if possible
             recent_count = (
                 appt_queryset
                 .filter(
@@ -83,8 +84,10 @@ class TimeSeriesAnalysis:
 
             if previous_count == 0:
                 growth_rate = 100.0 if recent_count > 0 else 0.0
+                status = 'new' if recent_count > 0 else 'stable'
             else:
                 growth_rate = ((recent_count - previous_count) / previous_count) * 100
+                status = 'rising' if growth_rate > 20 else 'increasing' if growth_rate > 5 else 'decreasing' if growth_rate < -5 else 'stable'
 
             return {
                 'disease_name': disease_name,
@@ -92,7 +95,9 @@ class TimeSeriesAnalysis:
                 'recent_cases': recent_count,
                 'previous_cases': previous_count,
                 'period_days': days,
-                'status': 'increasing' if growth_rate > 10 else 'decreasing' if growth_rate < -10 else 'stable'
+                'status': status,
+                'direction': 'up' if growth_rate > 0 else 'down' if growth_rate < 0 else 'none',
+                'change_magnitude': abs(recent_count - previous_count)
             }
         except Exception as e:
             self.logger.error(f"Growth rate calculation failed: {str(e)}")
@@ -101,12 +106,12 @@ class TimeSeriesAnalysis:
     def get_seasonal_patterns(self, disease_name: str, appt_queryset=None) -> Dict:
         """
         FEATURE 6: Seasonal Intelligence Engine.
-        Analyzes disease trends based on seasons automatically.
+        Analyzes disease trends based on seasons and learns shifts in patterns.
         """
         if appt_queryset is None:
             appt_queryset = Appointment.objects.all()
         try:
-            # Query disease records for seasonal mapping
+            # 1. Query current distributions
             qs = (
                 appt_queryset
                 .filter(disease__name__icontains=disease_name, disease__isnull=False)
@@ -118,11 +123,25 @@ class TimeSeriesAnalysis:
             patterns = {row['disease__season'] or 'Unknown': row['cases'] for row in qs}
             total = sum(patterns.values())
             
+            # 2. Identify peak and compare with historical
+            current_peak = max(patterns, key=patterns.get) if patterns else "Unknown"
+            
+            # Fetch historical from first matching record
+            from analytics.models import Disease
+            historical_season = Disease.objects.filter(name__icontains=disease_name).first().season if Disease.objects.filter(name__icontains=disease_name).exists() else "Unknown"
+            
+            # 3. Detect shifts (Learning component)
+            shift_detected = current_peak != historical_season and historical_season != "All"
+            
             return {
                 'disease_name': disease_name,
                 'seasonal_distribution': patterns,
                 'total_recorded_cases': total,
-                'peak_season': max(patterns, key=patterns.get) if patterns else None
+                'current_peak_season': current_peak,
+                'historical_peak_season': historical_season,
+                'pattern_shift_detected': shift_detected,
+                'confidence_score': round(min(total / 100, 1.0), 2) if total > 0 else 0,
+                'status': 'pattern_shifted' if shift_detected else 'consistent_with_history'
             }
         except Exception as e:
             self.logger.error(f"Seasonal analysis failed: {str(e)}")

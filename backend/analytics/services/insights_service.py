@@ -6,7 +6,7 @@ Decision Layer: Consolidated intelligence derived from Analytics and Prediction 
 Implements Feature 1, 2, 4, 8, 9, 10 for the Decision-Support platform.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import date, timedelta
 from collections import defaultdict
 

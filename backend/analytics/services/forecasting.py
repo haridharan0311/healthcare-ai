@@ -469,21 +469,21 @@ class ForecastingService:
     def forecast_stock_depletion(self, drug_name: str, days: int = 14, rx_queryset=None, request=None) -> Dict:
         """
         FEATURE 4: Stock Depletion Forecast.
-        Forecasts when medicine stock will hit 0 based on current usage trends.
-        Aggregates across all clinics for a professional system-wide view.
+        Forecasts when medicine stock will hit 0 based on current usage trends
+        AND predicted future demand spikes.
         """
         try:
             if rx_queryset is None:
                 rx_queryset = PrescriptionLine.objects.all()
             
-            # Aggregate current stock across clinics (Filtered by user access)
+            # 1. Aggregate current stock
             dm_qs_base = DrugMaster.objects.filter(drug_name=drug_name)
             stock_data = apply_clinic_filter(dm_qs_base, request).aggregate(
                 total_stock=Sum('current_stock')
             )
             current_stock = stock_data['total_stock'] or 0
             
-            # Get usage in the specified days window
+            # 2. Get historical average usage
             end_date = date.today()
             start_date = end_date - timedelta(days=days)
             
@@ -494,11 +494,25 @@ class ForecastingService:
             
             avg_daily_usage = usage_sum / max(days, 1)
             
-            if avg_daily_usage <= 0:
+            # 3. Factor in Future Trends (Intelligence Layer)
+            # Find diseases that use this drug
+            related_diseases = rx_queryset.filter(drug__drug_name=drug_name).values_list('disease__name', flat=True).distinct()
+            max_growth = 0
+            for d in related_diseases:
+                from .timeseries import TimeSeriesAnalysis
+                ts = TimeSeriesAnalysis()
+                growth = ts.calculate_growth_rate(d, days=7)
+                if growth.get('growth_rate', 0) > max_growth:
+                    max_growth = growth['growth_rate']
+            
+            # Adjust daily usage by predicted growth (capped at 2x)
+            predicted_daily_usage = avg_daily_usage * (1 + min(max_growth / 100, 1.0))
+            
+            if predicted_daily_usage <= 0:
                 days_left = 999
                 status = "stable"
             else:
-                days_left = current_stock / avg_daily_usage
+                days_left = current_stock / predicted_daily_usage
                 status = "critical" if days_left < 7 else "low" if days_left < 14 else "sufficient"
                 
             return {
@@ -506,13 +520,14 @@ class ForecastingService:
                 'generic_name': _get_generic(drug_name),
                 'current_stock': current_stock,
                 'avg_daily_usage': round(avg_daily_usage, 2),
+                'predicted_daily_usage': round(predicted_daily_usage, 2),
+                'growth_factor_applied': f"{round(max_growth, 1)}%",
                 'days_until_depletion': round(days_left, 1),
                 'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
                 'status': status,
                 'urgency': status,
-                'analysis_period': f"Last {days} days",
-                'analysis_period_days': days,
-                'recommended_reorder': round(avg_daily_usage * 30 * 1.5, 0), # 30 days stock with 50% buffer
+                'analysis_period': f"Last {days} days + Future Trend",
+                'recommended_reorder': round(predicted_daily_usage * 30 * 1.5, 0),
                 'recommendation': self._get_depletion_recommendation(status, days_left)
             }
         except Exception as e:

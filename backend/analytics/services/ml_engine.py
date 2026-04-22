@@ -78,11 +78,23 @@ def weighted_trend_score(recent_count: int, older_count: int) -> float:
 def predict_demand(trend_score: float, forecast: float) -> float:
     """
     Predicted cases = trend score + forecast value.
-
-    Args:
-        trend_score: output of weighted_trend_score()
-        forecast:    output of moving_average_forecast()
-    Returns:
-        predicted total demand
     """
     return round(trend_score + forecast, 2)
+
+
+def calculate_volatility(values: List[float]) -> float:
+    """
+    Calculate Coefficient of Variation (CV) as a measure of volatility.
+    CV = standard_deviation / mean
+    """
+    if not values or len(values) < 2:
+        return 0.0
+    
+    import statistics
+    try:
+        mean = statistics.mean(values)
+        if mean == 0: return 0.0
+        std_dev = statistics.stdev(values)
+        return round(std_dev / mean, 3)
+    except:
+        return 0.0
