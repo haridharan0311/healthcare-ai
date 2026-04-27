@@ -1,93 +1,49 @@
-import csv
-import re
-from datetime import date, timedelta
-from collections import defaultdict
-
-from django.http import HttpResponse
-from django.db.models import Count, Avg, Max, Sum, Min, Q
-from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status as drf_status
-from django.core.cache import cache
 
-from analytics.models import Disease, Appointment
-from inventory.models import DrugMaster, Prescription, PrescriptionLine
-from core.models import Patient, Doctor, Clinic
-
-from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
-from ..services.timeseries import get_seasonal_weight
+from analytics.models import Appointment
 from ..services.spike_detection import detect_spike_logic as detect_spike
-from ..serializers.serializers import (
-    DiseaseTrendSerializer, TimeSeriesPointSerializer,
-    SpikeAlertSerializer, RestockSuggestionSerializer
-)
-from ..services.restock_service import RestockService
-from ..utils.validators import validate_positive_int
+from ..serializers.serializers import SpikeAlertSerializer
+from ..utils.date_utils import get_db_date_range
+from .utils import cache_api_response, apply_clinic_filter, _build_daily_list
+from ..services.aggregation import get_disease_type, aggregate_daily_counts
 
-from ..services.aggregation import (
-    aggregate_disease_counts, aggregate_daily_counts, build_daily_list,
-    aggregate_medicine_usage, compare_disease_trends, aggregate_top_medicines,
-    aggregate_seasonality, aggregate_doctor_wise,
-    aggregate_weekly, aggregate_monthly, get_disease_type,
-)
-
-from .utils import (
-    cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
-)
-
-# spike_views.py extracted classes
+# Configuration Constants
+DASHBOARD_CACHE_TIMEOUT = 300
+DEFAULT_BASELINE_DAYS = 8
 
 class SpikeAlertView(APIView):
     """
     GET /api/spike-alerts/?days=8&all=true
-    GET /api/spike-detection/?days=8&all=true  (alias)
-
+    
     2.3 Spike Detection: today_count > (mean_last_N_days + 2 × std_dev)
-    Configurable baseline window via ?days= param (minimum 8).
-    Returns period_count = total cases across the selected window.
+    Identifies statistical anomalies in disease distribution.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
+    @cache_api_response(timeout=DASHBOARD_CACHE_TIMEOUT)
     def get(self, request):
         show_all = request.query_params.get('all', 'false').lower() == 'true'
+        days = DEFAULT_BASELINE_DAYS
         
-        # Hardcoded to 8 days baseline window (7 days + today) as per fixed formula
-        days = 8
-        latest = Appointment.objects.aggregate(
-            latest=Max('appointment_datetime')
-        )['latest']
-        end   = latest.date() if latest else date.today()
-        start = end - timedelta(days=days)
+        # Consistent system-wide date anchoring
+        start, end = get_db_date_range(days)
 
-        # ORM aggregation — group by date and disease type
-        qs_base = Appointment.objects.filter(
-            appointment_datetime__date__range=(start, end),
-            disease__isnull=False,
-        )
-        qs = apply_clinic_filter(qs_base, request) \
-            .select_related('disease') \
-            .annotate(appt_date=TruncDate('appointment_datetime')) \
-            .values('appt_date', 'disease__name', 'disease__season') \
-            .annotate(day_count=Count('id'))
+        # Optimize data retrieval via service-style aggregation
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
+        daily_map = aggregate_daily_counts(start, end, queryset=appt_qs)
 
-        daily_by_dtype = defaultdict(lambda: defaultdict(int))
-        type_season    = {}
-
-        for row in qs:
-            dtype = get_disease_type(row['disease__name'])
-            type_season[dtype] = row['disease__season']
-            daily_by_dtype[dtype][row['appt_date']] += row['day_count']
-
-        if not type_season:
+        if not daily_map:
             return Response([])
 
         baseline_days = days - 1
         results = []
 
-        for dtype in type_season:
-            daily_counts = _build_daily_list(daily_by_dtype, dtype, start, end)
-            spike_info   = detect_spike(daily_counts, baseline_days=baseline_days)
+        for dtype, disease_data in daily_map.items():
+            # Standardize daily counts into a list for the statistical engine
+            daily_counts = _build_daily_list(daily_map, dtype, start, end)
+            
+            # Apply detection logic
+            spike_info = detect_spike(daily_counts, baseline_days=baseline_days)
             period_count = sum(daily_counts)
 
             if spike_info['is_spike'] or show_all:
@@ -97,6 +53,7 @@ class SpikeAlertView(APIView):
                     **spike_info
                 })
 
+        # Sort by impact (today's count)
         results.sort(key=lambda x: x['today_count'], reverse=True)
         serializer = SpikeAlertSerializer(results, many=True)
         return Response(serializer.data)

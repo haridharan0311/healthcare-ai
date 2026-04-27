@@ -1,108 +1,68 @@
-"""
-Forecasting Service Module
-
-Advanced predictive analytics using machine learning:
-1. Moving average forecasting - weighted 7-day and 3-day averages
-2. Trend scoring - combines historical and recent data
-3. Demand prediction - forecasts future medicine and disease cases
-4. Seasonal adjustment - factors in seasonal patterns
-
-Layer: Services (Business Logic)
-Dependencies: ml_engine, spike_detector, logger
-
-Usage:
-    from analytics.services.forecasting import ForecastingService
-    
-    service = ForecastingService()
-    
-    # Forecast next-day cases
-    forecast = service.forecast_next_period(
-        disease_name="Flu",
-        days_ahead=7
-    )
-    
-    # Get trend score
-    score = service.calculate_trend_score(
-        recent_cases=150,
-        older_cases=120
-    )
-"""
-
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from datetime import date, timedelta
 from collections import defaultdict
 
-from django.db.models import Count, Sum, Avg, Max
+from django.db.models import Count, Sum, Avg, QuerySet
 from django.db.models.functions import TruncDate
 
 from analytics.models import Appointment
 from inventory.models import PrescriptionLine, DrugMaster
-from ..services.aggregation import get_disease_type
+from .aggregation import get_disease_type
 from .ml_engine import (
     moving_average_forecast,
     exponential_smoothing_forecast,
     weighted_trend_score,
-    predict_demand,
-    time_decay_weight
+    predict_demand
 )
-from .timeseries import get_seasonal_weight, TimeSeriesAnalysis
+from .timeseries import get_seasonal_weight
 from .spike_detection import detect_spike_logic as detect_spike
 from ..utils.filters import apply_clinic_filter
 from ..utils.chemistry import _get_generic
 from ..utils.logger import get_logger
-from ..utils.validators import validate_date_range
+from .constants import (
+    DEFAULT_FORECAST_DAYS,
+    DEFAULT_LOOKBACK_DAYS,
+    DEFAULT_CONFIDENCE_LEVEL,
+    TREND_UP_THRESHOLD,
+    TREND_DOWN_THRESHOLD,
+    TREND_STRICT_UP_THRESHOLD,
+    TREND_STRICT_DOWN_THRESHOLD,
+    TREND_SEVERE_THRESHOLD,
+    DEMAND_SAFETY_BUFFER,
+    TOP_DISEASES_BATCH_LIMIT,
+    REORDER_SAFETY_MULTIPLIER,
+    GROWTH_RATE_RISING
+)
 
 logger = get_logger(__name__)
-
 
 class ForecastingService:
     """
     Service for predictive analytics and forecasting.
-    
-    For new users: Uses historical data and machine learning techniques
-    to predict future disease cases and medicine demand.
+    Uses historical data and machine learning techniques to predict 
+    future disease cases and medicine demand.
     """
     
     def __init__(self):
-        """Initialize service."""
         self.logger = logger
     
     def forecast_next_period(
         self,
         disease_name: str,
-        days_ahead: int = 7,
-        confidence: float = 0.95,
-        appt_queryset = None
-    ) -> Dict:
+        days_ahead: int = DEFAULT_FORECAST_DAYS,
+        confidence: float = DEFAULT_CONFIDENCE_LEVEL,
+        appt_queryset: Optional[QuerySet] = None,
+        request=None
+    ) -> Dict[str, Any]:
         """
         Forecast disease cases for next N days.
-        
-        For new users: Predicts future case counts using weighted moving averages
-        and seasonal factors. Confidence level indicates prediction reliability.
-        
-        Args:
-            disease_name: Disease to forecast
-            days_ahead: Forecast horizon (days into future)
-            confidence: Confidence level (0.0-1.0) for uncertainty ranges
-        
-        Returns:
-            Dictionary with forecast data:
-                - forecast_value: Expected cases in next period
-                - confidence_level: Prediction reliability
-                - confidence_range: (min, max) estimates
-                - trend: 'stable', 'increasing', 'decreasing'
-        
-        Example:
-            forecast = service.forecast_next_period("Flu", days_ahead=7)
-            print(f"Expected Flu cases in 7 days: {forecast['forecast_value']}")
         """
         try:
-            # Get historical daily counts (last 30 days)
             end_date = date.today()
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=DEFAULT_LOOKBACK_DAYS)
             
             if appt_queryset is None:
-                appt_queryset = Appointment.objects.all()
+                appt_queryset = apply_clinic_filter(Appointment.objects.all(), request)
 
             qs = (
                 appt_queryset
@@ -111,7 +71,6 @@ class ForecastingService:
                     disease__name__icontains=disease_name,
                     disease__isnull=False
                 )
-                .select_related('disease')
                 .annotate(appt_date=TruncDate('appointment_datetime'))
                 .values('appt_date')
                 .annotate(day_count=Count('id'))
@@ -121,10 +80,6 @@ class ForecastingService:
             daily_counts = [row['day_count'] for row in qs]
             
             if len(daily_counts) < 3:
-                self.logger.warning(
-                    "Insufficient data for forecast: %s disease",
-                    disease_name
-                )
                 return {
                     'disease': disease_name,
                     'forecast_value': 0,
@@ -139,26 +94,25 @@ class ForecastingService:
             es_val = exponential_smoothing_forecast(daily_counts)
             forecast_value = (ma_val + es_val) / 2
             
-            # Calculate trend
+            # Calculate trend based on recent 7-day average
             recent_avg = sum(daily_counts[-7:]) / 7 if len(daily_counts) >= 7 else sum(daily_counts) / len(daily_counts)
-            older_avg = sum(daily_counts[:-7]) / len(daily_counts[:-7]) if len(daily_counts) > 7 else recent_avg
             
-            if forecast_value > recent_avg * 1.1:
+            if forecast_value > recent_avg * TREND_UP_THRESHOLD:
                 trend = 'increasing'
-            elif forecast_value < recent_avg * 0.9:
+            elif forecast_value < recent_avg * TREND_DOWN_THRESHOLD:
                 trend = 'decreasing'
             else:
                 trend = 'stable'
             
-            # Calculate confidence range based on historical variance
+            # Confidence range calculation based on historical variance
             if len(daily_counts) >= 7:
                 variance = sum((x - recent_avg) ** 2 for x in daily_counts[-7:]) / 7
                 std_dev = variance ** 0.5
-                margin = std_dev * (1 - confidence)  # Higher confidence = smaller range
+                margin = std_dev * (1 - confidence)
             else:
                 margin = forecast_value * 0.3
             
-            result = {
+            return {
                 'disease_name': disease_name,
                 'forecast_value': round(forecast_value, 1),
                 'confidence_level': confidence,
@@ -167,58 +121,25 @@ class ForecastingService:
                 'trend': trend,
                 'days_ahead': days_ahead,
                 'historical_avg': round(recent_avg, 2),
-                'data_points_used': len(daily_counts),
                 'forecast_date': (end_date + timedelta(days=days_ahead)).isoformat()
             }
-            
-            self.logger.info(
-                "Forecasted %s cases for %s in %d days",
-                forecast_value, disease_name, days_ahead
-            )
-            
-            return result
-        
         except Exception as e:
-            self.logger.error(
-                "Forecast generation failed for %s",
-                disease_name,
-                exception=e
-            )
-            return {
-                'disease_name': disease_name,
-                'forecast_value': None,
-                'error': str(e)
-            }
-    
+            self.logger.error(f"Forecast failed for {disease_name}: {str(e)}", exc_info=True)
+            return {'disease_name': disease_name, 'forecast_value': None, 'error': str(e)}
+
     def calculate_trend_score(
         self,
         disease_name: Optional[str] = None,
         recent_cases: Optional[int] = None,
         older_cases: Optional[int] = None,
-        days_back: int = 30,
-        appt_queryset = None
-    ) -> Dict:
+        days_back: int = DEFAULT_LOOKBACK_DAYS,
+        appt_queryset: Optional[QuerySet] = None
+    ) -> Dict[str, Any]:
         """
         Calculate weighted trend score for disease.
-        
-        For new users: Combines recent data (70% weight) and older data (30% weight)
-        to identify if disease is improving or worsening.
-        
-        Args:
-            disease_name: Disease to analyze (alternative to providing counts)
-            recent_cases: Optional recent period case count
-            older_cases: Optional older period case count
-            days_back: Total days to analyze
-        
-        Returns:
-            Dictionary with trend analysis:
-                - trend_score: Composite score
-                - direction: 'improving', 'stable', 'worsening'
-                - intensity: 'mild', 'moderate', 'severe'
         """
         try:
             if disease_name and (recent_cases is None or older_cases is None):
-                # Calculate from database
                 end_date = date.today()
                 start_date = end_date - timedelta(days=days_back)
                 mid_date = start_date + (end_date - start_date) // 2
@@ -226,46 +147,29 @@ class ForecastingService:
                 if appt_queryset is None:
                     appt_queryset = Appointment.objects.all()
 
-                recent_qs = (
-                    appt_queryset
-                    .filter(
-                        appointment_datetime__date__range=(mid_date, end_date),
-                        disease__name__icontains=disease_name,
-                        disease__isnull=False
-                    )
-                    .count()
-                )
+                recent_cases = appt_queryset.filter(
+                    appointment_datetime__date__range=(mid_date, end_date),
+                    disease__name__icontains=disease_name,
+                    disease__isnull=False
+                ).count()
                 
-                older_qs = (
-                    appt_queryset
-                    .filter(
-                        appointment_datetime__date__range=(start_date, mid_date),
-                        disease__name__icontains=disease_name,
-                        disease__isnull=False
-                    )
-                    .count()
-                )
-                
-                recent_cases = recent_qs
-                older_cases = older_qs
+                older_cases = appt_queryset.filter(
+                    appointment_datetime__date__range=(start_date, mid_date),
+                    disease__name__icontains=disease_name,
+                    disease__isnull=False
+                ).count()
             
             score = weighted_trend_score(recent_cases or 0, older_cases or 0)
             
-            # Determine direction and intensity
-            if (older_cases or 0) == 0:
-                if (recent_cases or 0) == 0:
-                    direction = 'stable'
-                    intensity = 'none'
-                else:
-                    direction =  'worsening'
-                    intensity = 'moderate'
+            if not older_cases:
+                direction = 'worsening' if recent_cases else 'stable'
+                intensity = 'moderate' if recent_cases else 'none'
             else:
-                ratio = (recent_cases or 0) / (older_cases or 1)
-                
-                if ratio > 1.3:
+                ratio = (recent_cases or 0) / older_cases
+                if ratio > TREND_STRICT_UP_THRESHOLD:
                     direction = 'worsening'
-                    intensity = 'severe' if ratio > 2.0 else 'moderate'
-                elif ratio < 0.7:
+                    intensity = 'severe' if ratio > TREND_SEVERE_THRESHOLD else 'moderate'
+                elif ratio < TREND_STRICT_DOWN_THRESHOLD:
                     direction = 'improving'
                     intensity = 'mild'
                 else:
@@ -277,60 +181,34 @@ class ForecastingService:
                 'direction': direction,
                 'intensity': intensity,
                 'recent_cases': recent_cases or 0,
-                'older_cases': older_cases or 0,
-                'ratio': round((recent_cases or 0) / (older_cases or 1), 2)
+                'older_cases': older_cases or 0
             }
-            
-            if disease_name:
-                result['disease_name'] = disease_name
-            
-            self.logger.info(
-                "Trend score: %.2f (%s, %s)",
-                score, direction, intensity
-            )
-            
+            if disease_name: result['disease_name'] = disease_name
             return result
-        
         except Exception as e:
-            self.logger.error(
-                "Trend score calculation failed",
-                exception=e
-            )
+            self.logger.error(f"Trend score failed: {str(e)}", exc_info=True)
             return {'error': str(e)}
-    
+
     def forecast_medicine_demand(
         self,
         drug_name: str,
-        days_ahead: int = 30,
-        rx_queryset = None
-    ) -> Dict:
+        days_ahead: int = DEFAULT_LOOKBACK_DAYS,
+        rx_queryset: Optional[QuerySet] = None,
+        request=None
+    ) -> Dict[str, Any]:
         """
         Forecast medicine demand for next N days.
-        
-        For new users: Combines disease forecasts with drug-to-disease mappings
-        to predict how much medicine will be needed.
-        
-        Args:
-            drug_name: Medicine to forecast
-            days_ahead: Forecast horizon
-        
-        Returns:
-            Forecast with demand, confidence range, and recommendations
         """
         try:
-            # Get recent usage pattern
             end_date = date.today()
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=DEFAULT_LOOKBACK_DAYS)
             
             if rx_queryset is None:
-                rx_queryset = PrescriptionLine.objects.all()
+                rx_queryset = apply_clinic_filter(PrescriptionLine.objects.all(), request, clinic_field='prescription__clinic')
 
             qs = (
                 rx_queryset
-                .filter(
-                    prescription_date__range=(start_date, end_date),
-                    drug__drug_name=drug_name
-                )
+                .filter(prescription_date__range=(start_date, end_date), drug__drug_name=drug_name)
                 .annotate(rx_date=TruncDate('prescription_date'))
                 .values('rx_date')
                 .annotate(daily_qty=Sum('quantity'))
@@ -340,94 +218,57 @@ class ForecastingService:
             daily_quantities = [row['daily_qty'] or 0 for row in qs]
             
             if not daily_quantities:
-                return {
-                    'drug_name': drug_name,
-                    'status': 'no_recent_usage',
-                    'forecast_demand': 0
-                }
+                return {'drug_name': drug_name, 'status': 'no_recent_usage', 'forecast_demand': 0}
             
-            # Forecast using blended model
             ma_val = moving_average_forecast(daily_quantities)
             es_val = exponential_smoothing_forecast(daily_quantities)
             forecast_daily = (ma_val + es_val) / 2
             forecast_total = forecast_daily * days_ahead
             
-            # Calculate confidence
-            avg_usage = sum(daily_quantities) / len(daily_quantities)
-            recommended_stock = forecast_total * 1.2  # 20% safety buffer
-            
-            result = {
+            return {
                 'drug_name': drug_name,
                 'days_ahead': days_ahead,
                 'forecast_daily_usage': round(forecast_daily, 2),
                 'forecast_total_usage': round(forecast_total, 1),
-                'recommended_stock': round(recommended_stock, 1),
-                'historical_avg_daily': round(avg_usage, 2)
+                'recommended_stock': round(forecast_total * DEMAND_SAFETY_BUFFER, 1)
             }
-            
-            self.logger.info(
-                "Medicine demand forecast for %s: %.1f units over %d days",
-                drug_name, forecast_total, days_ahead
-            )
-            
-            return result
-        
         except Exception as e:
-            self.logger.error(
-                "Medicine demand forecast failed for %s",
-                drug_name,
-                exception=e
-            )
+            self.logger.error(f"Medicine forecast failed for {drug_name}: {str(e)}", exc_info=True)
             return {'error': str(e)}
-    
+
     def forecast_all_diseases(
         self,
-        days_ahead: int = 7,
-        precalculated_context: Optional[Dict] = None
-    ) -> List[Dict]:
+        days_ahead: int = DEFAULT_FORECAST_DAYS,
+        precalculated_context: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Generate forecasts for all active diseases.
-        Optimized: Uses preloaded context to bypass DB hits entirely.
+        Optimized: Uses preloaded context or bulk ORM queries.
         """
         try:
             ctx = precalculated_context or {}
-            
-            # Use pre-aggregated data if available
+            limit_date = ctx.get('start_date') or (date.today() - timedelta(days=DEFAULT_LOOKBACK_DAYS))
+
             if 'daily_by_dtype' in ctx:
                 disease_daily_map = ctx['daily_by_dtype']
-                limit_date = ctx.get('start_date') or (date.today() - timedelta(days=30))
             else:
-                # 1. Identify top 20 diseases by volume in last 30 days
-                limit_date = date.today() - timedelta(days=30)
                 top_names_qs = (
                     Appointment.objects
-                    .filter(
-                        appointment_datetime__date__gte=limit_date,
-                        disease__isnull=False,
-                        disease__is_active=True
-                    )
+                    .filter(appointment_datetime__date__gte=limit_date, disease__isnull=False, disease__is_active=True)
                     .values('disease__name')
                     .annotate(total=Count('id'))
-                    .order_by('-total')[:20]
+                    .order_by('-total')[:TOP_DISEASES_BATCH_LIMIT]
                 )
-                
                 top_names = [row['disease__name'] for row in top_names_qs]
-                if not top_names:
-                    return []
+                if not top_names: return []
 
-                # 2. Bulk fetch historical daily counts for these diseases
                 historical_qs = (
                     Appointment.objects
-                    .filter(
-                        appointment_datetime__date__gte=limit_date,
-                        disease__name__in=top_names
-                    )
+                    .filter(appointment_datetime__date__gte=limit_date, disease__name__in=top_names)
                     .annotate(day=TruncDate('appointment_datetime'))
                     .values('day', 'disease__name')
                     .annotate(count=Count('id'))
                 )
-
-                # 3. Process in memory
                 disease_daily_map = defaultdict(lambda: defaultdict(int))
                 for row in historical_qs:
                     dtype = get_disease_type(row['disease__name'])
@@ -435,58 +276,49 @@ class ForecastingService:
 
             results = []
             for dtype, date_map in disease_daily_map.items():
-                # Build time series (limit to 30 days for forecasting)
-                counts = [date_map.get(limit_date + timedelta(days=i), 0) for i in range(31)]
+                counts = [date_map.get(limit_date + timedelta(days=i), 0) for i in range(DEFAULT_LOOKBACK_DAYS + 1)]
                 
-                # Blended prediction logic
                 ma_val = moving_average_forecast(counts)
                 es_val = exponential_smoothing_forecast(counts)
                 forecast_val = (ma_val + es_val) / 2
-                
                 trend_score = weighted_trend_score(sum(counts[-7:]), sum(counts[:-7]))
                 
                 results.append({
                     'disease_name': dtype,
                     'forecast_value': round(forecast_val, 1),
-                    'trend': 'rising' if trend_score > 20 else 'stable',
+                    'trend': 'rising' if trend_score > GROWTH_RATE_RISING else 'stable',
                     'days_ahead': days_ahead,
                     'historical_avg': round(sum(counts)/max(len(counts), 1), 1),
                     'total': sum(counts),
                     'trend_score': round(trend_score, 2)
                 })
             
-            # Return top 20 by volume
-            return sorted(results, key=lambda x: -x['total'])[:20]
-        
+            return sorted(results, key=lambda x: -x['total'])[:TOP_DISEASES_BATCH_LIMIT]
         except Exception as e:
-            self.logger.error("Bulk disease forecasting failed", exception=e)
-            return []
-        
-        except Exception as e:
-            self.logger.error("Bulk disease forecasting failed", exception=e)
+            self.logger.error(f"Bulk forecasting failed: {str(e)}", exc_info=True)
             return []
 
-    def forecast_stock_depletion(self, drug_name: str, days: int = 14, rx_queryset=None, request=None, growth_map: Optional[Dict] = None) -> Dict:
+    def forecast_stock_depletion(
+        self,
+        drug_name: str,
+        days: int = 14,
+        rx_queryset: Optional[QuerySet] = None,
+        request=None,
+        growth_map: Optional[Dict[str, float]] = None
+    ) -> Dict[str, Any]:
         """
         FEATURE 4: Stock Depletion Forecast.
-        Forecasts when medicine stock will hit 0 based on current usage trends
-        AND predicted future demand spikes.
         """
         try:
-            if rx_queryset is None:
-                rx_queryset = PrescriptionLine.objects.all()
+            if rx_queryset is None: rx_queryset = PrescriptionLine.objects.all()
             
-            # 1. Aggregate current stock
-            dm_qs_base = DrugMaster.objects.filter(drug_name=drug_name)
-            stock_data = apply_clinic_filter(dm_qs_base, request).aggregate(
+            stock_data = apply_clinic_filter(DrugMaster.objects.filter(drug_name=drug_name), request).aggregate(
                 total_stock=Sum('current_stock')
             )
             current_stock = stock_data['total_stock'] or 0
             
-            # 2. Get historical average usage
             end_date = date.today()
             start_date = end_date - timedelta(days=days)
-            
             usage_sum = rx_queryset.filter(
                 prescription_date__range=(start_date, end_date),
                 drug__drug_name=drug_name
@@ -494,33 +326,29 @@ class ForecastingService:
             
             avg_daily_usage = usage_sum / max(days, 1)
             
-            # 3. Factor in Future Trends (Intelligence Layer)
-            # Find diseases that use this drug
+            # Intelligence Layer: Factor in predicted future demand
             related_diseases = rx_queryset.filter(drug__drug_name=drug_name).values_list('disease__name', flat=True).distinct()
             max_growth = 0
             
             if growth_map:
-                # Use pre-calculated map if available
                 for d in related_diseases:
                     g = growth_map.get(d, 0)
                     if g > max_growth: max_growth = g
             else:
+                # Late import to resolve circular dependency
+                from .timeseries import TimeSeriesAnalysis
                 ts = TimeSeriesAnalysis()
                 for d in related_diseases:
-                    growth = ts.calculate_growth_rate(d, days=7)
+                    growth = ts.calculate_growth_rate(d, days=7, request=request)
                     g = growth.get('growth_rate', 0)
-                    if g > max_growth:
-                        max_growth = g
+                    if g > max_growth: max_growth = g
             
-            # Adjust daily usage by predicted growth (capped at 2x)
             predicted_daily_usage = avg_daily_usage * (1 + min(max_growth / 100, 1.0))
             
             if current_stock <= 0:
-                days_left = 0
-                status = "critical"
+                days_left, status = 0, "critical"
             elif predicted_daily_usage <= 0:
-                days_left = 999
-                status = "stable"
+                days_left, status = 999, "stable"
             else:
                 days_left = current_stock / predicted_daily_usage
                 status = "critical" if days_left < 7 else "low" if days_left < 14 else "sufficient"
@@ -531,20 +359,17 @@ class ForecastingService:
                 'current_stock': current_stock,
                 'avg_daily_usage': round(avg_daily_usage, 2),
                 'predicted_daily_usage': round(predicted_daily_usage, 2),
-                'growth_factor_applied': f"{round(max_growth, 1)}%",
                 'days_until_depletion': round(days_left, 1),
                 'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
                 'status': status,
-                'urgency': status,
-                'analysis_period': f"Last {days} days + Future Trend",
-                'recommended_reorder': round(predicted_daily_usage * 30 * 1.5, 0),
+                'recommended_reorder': round(predicted_daily_usage * 30 * REORDER_SAFETY_MULTIPLIER, 0),
                 'recommendation': self._get_depletion_recommendation(status, days_left)
             }
         except Exception as e:
+            self.logger.error(f"Depletion forecast failed for {drug_name}: {str(e)}", exc_info=True)
             return {'error': str(e)}
 
     def _get_depletion_recommendation(self, status: str, days_left: float) -> str:
-        """Helper to generate actions for Feature 4."""
         if status == 'critical':
             return f"Action Required: Stockout expected in {round(days_left, 1)} days. Place emergency order today."
         elif status == 'low':

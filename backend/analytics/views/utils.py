@@ -13,7 +13,9 @@ def _build_daily_list(daily_map_by_type, disease_type, start_date, end_date):
     Adapter for legacy views using the 4-arg signature.
     Fills zeros for missing days in a range.
     """
-    daily_counts = daily_map_by_type.get(disease_type, {})
+    data = daily_map_by_type.get(disease_type, {})
+    # Handle both raw Dict[date, int] and the complex {'daily': Dict[date, int]} structure
+    daily_counts = data.get('daily', data) if isinstance(data, dict) else {}
     return build_daily_list(daily_counts, start_date, end_date)
 
 
@@ -33,20 +35,10 @@ def cache_api_response(timeout=300):
     return decorator
 
 
+from ..utils.date_utils import get_db_date_range, get_latest_activity_date
+
 def _get_db_date_range(days: int = 30):
-    cache_key = 'latest_appointment_date'
-    latest_dt = cache.get(cache_key)
-    
-    if latest_dt is None:
-        latest_dt = Appointment.objects.aggregate(
-            latest=Max('appointment_datetime')
-        )['latest']
-        if latest_dt:
-            cache.set(cache_key, latest_dt, 60)  # Cache for 1 minute
-            
-    end   = latest_dt.date() if latest_dt else date.today()
-    start = end - timedelta(days=days)
-    return start, end
+    return get_db_date_range(days)
 
 def _get_date_range(request):
     """

@@ -1,77 +1,48 @@
-import csv
-import re
 from datetime import date, timedelta
 from collections import defaultdict
+from typing import List, Dict, Any
 
-from django.http import HttpResponse
-from django.db.models import Count, Avg, Max, Sum, Min, Q
-from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+from django.db.models import Count
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status as drf_status
-from django.core.cache import cache
 
-from analytics.models import Disease, Appointment
-from inventory.models import DrugMaster, Prescription, PrescriptionLine
-from core.models import Patient, Doctor, Clinic
-
-from ..services.ml_engine import moving_average_forecast, weighted_trend_score, predict_demand
+from analytics.models import Appointment
+from .utils import cache_api_response, _get_date_range, _get_db_date_range, apply_clinic_filter
+from ..services.constants import ANALYTICS_CACHE_TIMEOUT, ROUNDING_PRECISION_GROWTH
 from ..services.timeseries import get_seasonal_weight
-from ..services.spike_detection import detect_spike_logic as detect_spike
-from ..serializers.serializers import (
-    DiseaseTrendSerializer, TimeSeriesPointSerializer,
-    SpikeAlertSerializer, RestockSuggestionSerializer
-)
-from ..services.restock_service import RestockService
-from ..utils.validators import validate_positive_int
-
+from ..services.ml_engine import weighted_trend_score
 from ..services.aggregation import (
-    aggregate_disease_counts, aggregate_daily_counts, build_daily_list,
-    aggregate_medicine_usage, compare_disease_trends, aggregate_top_medicines,
-    aggregate_seasonality, aggregate_doctor_wise,
-    aggregate_weekly, aggregate_monthly, get_disease_type,
+    aggregate_disease_counts, aggregate_daily_counts, compare_disease_trends, 
+    aggregate_seasonality, get_disease_type
 )
-
-from .utils import (
-    cache_api_response, GENERIC_MAP, _get_generic, _extract_district,
-    _get_db_date_range, _get_date_range, _build_daily_list, apply_clinic_filter
-)
-
-# disease_views.py extracted classes
+from ..services.usage import UsageIntelligence
 
 class DiseaseTrendView(APIView):
     """
     GET /api/disease-trends/?days=30
-
-    1.1 Disease Aggregation — Count cases per disease using ORM Count.
-    No Python loops for aggregation. Uses select_related for performance.
-    Supports date filtering via ?days= param.
+    
+    Returns high-level trends for diseases using weighted scores and seasonal adjustments.
     """
-    @cache_api_response(timeout=300)
-    def get(self, request):
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
         start, end = _get_date_range(request)
         current_month = date.today().month
         mid = end - timedelta(days=7)
 
-        appt_qs_base = Appointment.objects.all()
-        appt_qs = apply_clinic_filter(appt_qs_base, request)
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
 
-        def get_filtered_aggregates(date_start, date_end):
-            return aggregate_disease_counts(date_start, date_end, queryset=appt_qs)
-
-        recent = get_filtered_aggregates(mid, end)
-        older = get_filtered_aggregates(start, mid)
+        # Fetch aggregates for two windows to compare
+        recent = aggregate_disease_counts(mid, end, queryset=appt_qs)
+        older = aggregate_disease_counts(start, mid, queryset=appt_qs)
 
         combined = defaultdict(lambda: {
-            'recent': 0, 'older': 0, 'season': 'All', 'category': '', 'severity': 1
+            'recent': 0, 'older': 0, 'season': 'All'
         })
 
         for dtype, data in recent.items():
             combined[dtype].update({
                 'recent': data['count'],
-                'season': data['season'],
-                'category': data['category'],
-                'severity': data['severity']
+                'season': data['season']
             })
 
         for dtype, data in older.items():
@@ -83,7 +54,7 @@ class DiseaseTrendView(APIView):
         results = []
         for dtype, data in combined.items():
             sw = get_seasonal_weight(data['season'], current_month)
-            score = round(weighted_trend_score(data['recent'], data['older']) * sw, 2)
+            score = round(weighted_trend_score(data['recent'], data['older']) * sw, ROUNDING_PRECISION_GROWTH)
             results.append({
                 'disease_name': dtype,
                 'season': data['season'],
@@ -96,32 +67,23 @@ class DiseaseTrendView(APIView):
         return Response(results)
 
 
-# ─── 1.2 Time-Series Aggregation → Time-Series API ───────────────────────────
-
-
-
 class TimeSeriesView(APIView):
     """
     GET /api/disease-trends/timeseries/?days=7&disease=Flu
-
-    1.2 Time-Series Aggregation — Group by date using TruncDate.
-    Groups by disease. Supports last 7 / 30 days via ?days= param.
-    Uses ORM aggregation — no Python loops.
+    
+    Provides chronological data points for disease tracking.
     """
-    @cache_api_response(timeout=300)
-    def get(self, request):
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
         start, end = _get_date_range(request)
         disease_filter = request.query_params.get('disease')
 
-        appt_qs_base = Appointment.objects.all()
-        appt_qs = apply_clinic_filter(appt_qs_base, request)
-
-        # 1. Daily counts per disease (ORM TruncDate) using aggregated service
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
         daily_map_by_type = aggregate_daily_counts(start, end, disease_filter=disease_filter, queryset=appt_qs)
 
         results = []
         for dtype, data in daily_map_by_type.items():
-            daily = data.get('daily', {})
+            daily = data.get('daily', {}) if isinstance(data, dict) else {}
             for d, count in daily.items():
                 results.append({
                     'date': d.isoformat() if hasattr(d, 'isoformat') else str(d),
@@ -133,208 +95,120 @@ class TimeSeriesView(APIView):
         return Response(results)
 
 
-# ─── 1.3 Medicine Usage Aggregation → Medicine Usage API ─────────────────────
-
-
-
 class TrendComparisonView(APIView):
     """
     GET /api/trend-comparison/?days=7
-
-    Compares this period vs previous period of same length.
-    Returns increase/decrease % per disease.
-    Example: days=7 → this week vs last week.
+    
+    Comparative analysis between two equal time windows.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
-    def get(self, request):
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
         try:
             days = int(request.query_params.get('days', 7))
-        except ValueError:
+        except (ValueError, TypeError):
             days = 7
 
         p1_start, p1_end = _get_db_date_range(days)
-        p2_start, p2_end = _get_db_date_range(days * 2) # Overlap as per logic
-        # Overwriting for precise comparison logic
-        p2_start = p2_end - timedelta(days=days*2)
-        p2_end   = p1_start - timedelta(days=1)
+        p2_start = p1_start - timedelta(days=days)
+        p2_end = p1_start - timedelta(days=1)
 
-        appt_qs_base = Appointment.objects.all()
-        appt_qs = apply_clinic_filter(appt_qs_base, request)
-
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
         results = compare_disease_trends(p2_start, p2_end, p1_start, p1_end, queryset=appt_qs)
 
-        if not results:
-            return Response({
-                'period1': f'{p1_start} to {p1_end}',
-                'period2': f'{p2_start} to {p2_end}',
-                'results': [],
-                'summary': {'increasing': 0, 'decreasing': 0, 'stable': 0, 'new': 0}
-            })
-
         return Response({
-            'period1':  f'{p1_start} to {p1_end}',
-            'period2':  f'{p2_start} to {p2_end}',
-            'results':  results,
+            'period1': f'{p1_start} to {p1_end}',
+            'period2': f'{p2_start} to {p2_end}',
+            'results': results,
             'summary': {
                 'increasing': sum(1 for r in results if r['direction'] == 'up'),
                 'decreasing': sum(1 for r in results if r['direction'] == 'down'),
-                'stable':     sum(1 for r in results if r['direction'] == 'stable'),
-                'new':        sum(1 for r in results if r['direction'] == 'new'),
+                'stable': sum(1 for r in results if r['direction'] == 'stable'),
+                'new': sum(1 for r in results if r['direction'] == 'new'),
             }
         })
-
-
-# ── New Feature 2: Top Medicines Dashboard ────────────────────────────────────
-
 
 
 class SeasonalityView(APIView):
     """
     GET /api/seasonality/?days=365
-
-    Groups disease cases by season (Summer/Monsoon/Winter/All).
-    The "All" section = only diseases whose season field = "All".
-    Monsoon + Summer + Winter cases are separate — they do NOT add up to "All".
-    "All" means diseases active in all seasons (e.g. Hypertension).
-    Total across all seasons will exceed total appointments because one
-    appointment may be counted in its specific season bucket only.
+    
+    Aggregates diseases based on their seasonal categorization.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
-    def get(self, request):
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
         start, end = _get_date_range(request)
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
         
-        appt_qs_base = Appointment.objects.all()
-        appt_qs = apply_clinic_filter(appt_qs_base, request)
-
-        # Use new refactored service for seasonality
+        # Core data from service
         data = aggregate_seasonality(start, end, queryset=appt_qs)
-
-        # Overall total = sum of all appointments in range (already filtered)
         overall_total = appt_qs.filter(
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
         ).count()
 
-        # Adapt service output to legacy view format
         seasons_out = {
             'Monsoon': {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
             'Summer':  {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
             'Winter':  {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
             'All':     {'top_disease': None, 'top_disease_count': 0, 'total_cases': 0, 'diseases': []},
         }
+
         for season, sdata in data.items():
-            # Standardize season names to match frontend categories
-            target_season = season if season in ['Monsoon', 'Summer', 'Winter'] else 'All'
-            
+            target_season = season if season in seasons_out else 'All'
             existing = seasons_out[target_season]
-            total = sdata['total_cases']
             
-            # Combine data for 'All' or other non-standard seasons
-            combined_diseases = existing['diseases'] + [
-                {
-                    'disease_name': d['disease_name'],
-                    'case_count':   d['case_count'],
-                    'percentage':   0, # Will recalculate below
-                }
-                for d in sdata['diseases']
-            ]
+            # Merge and sort
+            merged_diseases = existing['diseases'] + sdata.get('diseases', [])
+            total_cases = existing['total_cases'] + sdata.get('total_cases', 0)
             
-            new_total = existing['total_cases'] + total
-            
-            # Sort and find top disease for combined
-            if combined_diseases:
-                # Merge duplicate diseases if any (e.g. same disease in 'All' and 'Autumn')
-                merged = defaultdict(int)
-                for d in combined_diseases:
-                    merged[d['disease_name']] += d['case_count']
-                
-                final_diseases = sorted(
-                    [{'disease_name': name, 'case_count': count, 'percentage': round(count/new_total*100, 1) if new_total > 0 else 0} 
-                     for name, count in merged.items()],
-                    key=lambda x: -x['case_count']
-                )
-                
+            if merged_diseases:
+                merged_diseases.sort(key=lambda x: x['case_count'], reverse=True)
                 seasons_out[target_season] = {
-                    'top_disease':       final_diseases[0]['disease_name'],
-                    'top_disease_count': final_diseases[0]['case_count'],
-                    'total_cases':       new_total,
-                    'diseases':          final_diseases,
+                    'top_disease': merged_diseases[0]['disease_name'],
+                    'top_disease_count': merged_diseases[0]['case_count'],
+                    'total_cases': total_cases,
+                    'diseases': merged_diseases
                 }
-            else:
-                seasons_out[target_season]['total_cases'] = new_total
 
         return Response({
-            'period':        f'{start} to {end}',
+            'period': f'{start} to {end}',
             'overall_total': overall_total,
-            'note':          'Seasons are independent groups based on Disease.season field. '
-                             '"All" = diseases active year-round. Totals per season do not sum to overall_total.',
-            'seasons':       seasons_out,
+            'seasons': seasons_out
         })
-
-
-# ─── Doctor-wise Trends ───────────────────────────────────────────────────────
-
 
 
 class DoctorWiseTrendsView(APIView):
     """
-    GET /api/doctor-trends/?days=30&min_cases=10
-
-    Groups by doctor + disease type.
-    Only returns rows where case_count >= min_cases (default 10).
-    Respects ?days= date range.
+    GET /api/doctor-trends/?days=30&limit=10
+    
+    Patterns of disease diagnosis grouped by doctor.
     """
-    @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
-    def get(self, request):
-        start, end = _get_date_range(request)
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
         try:
-            min_cases = int(request.query_params.get('min_cases', 1))
-            limit     = int(request.query_params.get('limit', 3))
-        except ValueError:
-            min_cases = 1
-            limit     = 3
+            days = int(request.query_params.get('days', 30))
+            limit = int(request.query_params.get('limit', 10))
+        except (ValueError, TypeError):
+            days, limit = 30, 10
 
-        # Pure ORM aggregation — group by doctor + disease
-        qs_base = Appointment.objects.filter(
-            appointment_datetime__date__range=(start, end),
-            disease__isnull=False,
-        )
-        qs = (
-            apply_clinic_filter(qs_base, request)
-            .select_related('doctor', 'disease')
-            .values(
-                'doctor__id',
-                'doctor__first_name',
-                'doctor__last_name',
-                'disease__name',
-                'disease__season',
-            )
-            .annotate(case_count=Count('id'))
-            .filter(case_count__gte=min_cases)   # Lower threshold
-            .order_by('-case_count')[:limit]      # Limit output items
-        )
-
-        results = [
-            {
-                'doctor_id':    row['doctor__id'],
-                'doctor_name':  f"{row['doctor__first_name']} {row['doctor__last_name'] or ''}".strip(),
-                'disease_name': get_disease_type(row['disease__name']),
-                'season':       row['disease__season'],
-                'case_count':   row['case_count'],
-            }
-            for row in qs
-        ]
+        # Use the service layer to get standardized patterns
+        service = UsageIntelligence()
+        patterns = service.get_doctor_patterns(days=days, request=request)
+        
+        # Format for frontend compatibility
+        # Frontend expects: doctor_name, disease_name (mapped from top_specialization), case_count (mapped from total_cases)
+        results = []
+        if isinstance(patterns, list):
+            for p in patterns[:limit]:
+                results.append({
+                    'doctor_id': p['doctor_id'],
+                    'doctor_name': p['doctor_name'],
+                    'disease_name': p['top_specialization'],
+                    'case_count': p['total_cases'],
+                    'efficiency_score': p['efficiency_score']
+                })
 
         return Response({
-            'period':     f'{start} to {end}',
-            'min_cases':  min_cases,
-            'limit':      limit,
-            'total_rows': len(results),
-            'data':       results,
+            'period_days': days,
+            'data': results
         })
-
-
-# ─── Weekly Report ────────────────────────────────────────────────────────────
-
-
-

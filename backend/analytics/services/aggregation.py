@@ -1,20 +1,25 @@
 """
-analytics/aggregation.py
-
 Layer 1 — Pure ORM aggregation functions.
-NO prediction logic here. NO Python loops for counting.
+NO prediction logic here. NO Python loops for counting where ORM suffices.
 All functions return QuerySets or dicts from DB aggregation only.
 """
 import re
 from collections import defaultdict
 from datetime import date, timedelta
+from typing import Dict, List, Optional, Any
 
-from django.db.models import Count, Sum, Avg, Max, Q
+from django.db.models import Count, Sum, Avg, Q, QuerySet
 from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
 
-from analytics.models import Appointment
-from inventory.models import PrescriptionLine
-
+from analytics.models import Appointment, Disease
+from inventory.models import PrescriptionLine, DrugMaster
+from .constants import (
+    VARIANT_FILTERS, 
+    DEFAULT_TOP_DRUGS_LIMIT, 
+    DEFAULT_TOP_MEDICINES_LIMIT,
+    ROUNDING_PRECISION_USAGE,
+    ROUNDING_PRECISION_DEFAULT
+)
 
 def get_disease_type(name: str) -> str:
     """Strip trailing numbers — no hardcoded disease list."""
@@ -23,17 +28,13 @@ def get_disease_type(name: str) -> str:
 
 # ── 1.1 Disease case counts (ORM Count) ──────────────────────────────────────
 
-def aggregate_disease_counts(start: date, end: date, queryset: Appointment = None) -> dict:
+def aggregate_disease_counts(start: date, end: date, queryset: Optional[QuerySet] = None) -> Dict[str, Any]:
     """
     Count appointments per disease type in date range.
-    Returns {disease_type: count}
-    Uses ORM Count — no Python loops for aggregation.
+    Returns {disease_type: {count, season, category, severity}}
     """
     if queryset is None:
         queryset = Appointment.objects.all()
-
-    # Global filter for variants: 'Vari' or ends with ' V'
-    var_filter = Q(disease__name__icontains='Vari') | Q(disease__name__endswith=' V')
 
     qs = (
         queryset
@@ -41,10 +42,12 @@ def aggregate_disease_counts(start: date, end: date, queryset: Appointment = Non
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
         )
-        .exclude(var_filter)
+        .exclude(VARIANT_FILTERS)
         .select_related('disease')
-        .values('disease__name', 'disease__season',
-                'disease__category', 'disease__severity')
+        .values(
+            'disease__name', 'disease__season',
+            'disease__category', 'disease__severity'
+        )
         .annotate(case_count=Count('id'))
     )
 
@@ -64,13 +67,14 @@ def aggregate_disease_counts(start: date, end: date, queryset: Appointment = Non
 
 # ── 1.2 Time-series: daily counts using TruncDate ────────────────────────────
 
-def aggregate_daily_counts(start: date, end: date,
-                           disease_filter: str = None,
-                           queryset: Appointment = None) -> dict:
+def aggregate_daily_counts(
+    start: date, 
+    end: date,
+    disease_filter: Optional[str] = None,
+    queryset: Optional[QuerySet] = None
+) -> Dict[str, Any]:
     """
     Group appointment counts by date and disease type.
-    Uses TruncDate for date grouping — pure ORM.
-    Returns {disease_type: {date: count}}
     """
     if queryset is None:
         queryset = Appointment.objects.all()
@@ -101,7 +105,7 @@ def aggregate_daily_counts(start: date, end: date,
     return dict(result)
 
 
-def build_daily_list(daily_map: dict, start: date, end: date) -> list:
+def build_daily_list(daily_map: Dict[date, int], start: date, end: date) -> List[int]:
     """Convert date→count map to ordered list. Fills missing dates with 0."""
     counts = []
     cursor = start
@@ -113,23 +117,26 @@ def build_daily_list(daily_map: dict, start: date, end: date) -> list:
 
 # ── 1.3 Medicine usage: Sum(quantity) grouped by disease + medicine ───────────
 
-def aggregate_medicine_usage(start: date, end: date,
-                             rx_queryset: PrescriptionLine = None,
-                             appt_queryset: Appointment = None) -> list:
+def aggregate_medicine_usage(
+    start: date, 
+    end: date,
+    rx_queryset: Optional[QuerySet] = None,
+    appt_queryset: Optional[QuerySet] = None
+) -> List[Dict[str, Any]]:
     """
     Sum(quantity) grouped by drug + disease.
-    Optimized: 2-step process to handle 1.6M+ rows.
+    Optimized: 2-step process for high performance.
     """
     if rx_queryset is None: rx_queryset = PrescriptionLine.objects.all()
     if appt_queryset is None: appt_queryset = Appointment.objects.all()
 
-    # 1. Identify top 50 medicines first (faster grouping)
+    # 1. Identify top medicines first
     top_drugs_qs = (
         rx_queryset
         .filter(prescription_date__range=(start, end))
         .values('drug_id')
         .annotate(total_qty=Sum('quantity'))
-        .order_by('-total_qty')[:50]
+        .order_by('-total_qty')[:DEFAULT_TOP_DRUGS_LIMIT]
     )
     top_drug_ids = [row['drug_id'] for row in top_drugs_qs]
     
@@ -151,7 +158,7 @@ def aggregate_medicine_usage(start: date, end: date,
     for row in case_qs:
         case_map[get_disease_type(row['disease__name'])] += row['total_cases']
 
-    # 3. Group by medicine + disease ONLY for the top drugs
+    # 3. Group by medicine + disease
     usage_qs = (
         rx_queryset
         .filter(
@@ -166,14 +173,10 @@ def aggregate_medicine_usage(start: date, end: date,
         )
     )
 
-    # Pre-fetch metadata
+    # Pre-fetch metadata using in_bulk for O(1) lookups
     disease_ids = {row['disease_id'] for row in usage_qs}
-    
-    from analytics.models import Disease
-    from inventory.models import DrugMaster
-    
-    drug_map = {d.id: d for d in DrugMaster.objects.filter(id__in=top_drug_ids)}
-    disease_map = {d.id: d for d in Disease.objects.filter(id__in=disease_ids)}
+    drug_map = DrugMaster.objects.in_bulk(top_drug_ids)
+    disease_map = Disease.objects.in_bulk(disease_ids)
 
     type_usage = defaultdict(lambda: defaultdict(lambda: {
         'generic': '', 'season': '', 'qty': 0, 'rx': 0, 'strength': '', 'dosage': ''
@@ -210,7 +213,7 @@ def aggregate_medicine_usage(start: date, end: date,
                 'season':             data['season'],
                 'total_quantity':     data['qty'],
                 'total_cases':        total_cases,
-                'avg_usage':          round(data['qty'] / total_cases, 4),
+                'avg_usage':          round(data['qty'] / total_cases, ROUNDING_PRECISION_USAGE),
                 'prescription_count': data['rx'],
             })
 
@@ -219,13 +222,13 @@ def aggregate_medicine_usage(start: date, end: date,
 
 # ── New Feature 1: Trend Comparison ──────────────────────────────────────────
 
-def compare_disease_trends(period1_start: date, period1_end: date,
-                           period2_start: date, period2_end: date,
-                           queryset: Appointment = None) -> list:
+def compare_disease_trends(
+    period1_start: date, period1_end: date,
+    period2_start: date, period2_end: date,
+    queryset: Optional[QuerySet] = None
+) -> List[Dict[str, Any]]:
     """
     Compare disease case counts between two date ranges.
-    Returns increase/decrease percentage per disease.
-    No hardcoding — all diseases from DB.
     """
     p1 = aggregate_disease_counts(period1_start, period1_end, queryset=queryset)
     p2 = aggregate_disease_counts(period2_start, period2_end, queryset=queryset)
@@ -242,7 +245,7 @@ def compare_disease_trends(period1_start: date, period1_end: date,
             pct_change = 100.0 if count2 > 0 else 0.0
             direction  = 'new'
         else:
-            pct_change = round(((count2 - count1) / count1) * 100, 2)
+            pct_change = round(((count2 - count1) / count1) * 100, ROUNDING_PRECISION_DEFAULT)
             direction  = 'up' if pct_change > 0 else 'down' if pct_change < 0 else 'stable'
 
         results.append({
@@ -263,12 +266,14 @@ def compare_disease_trends(period1_start: date, period1_end: date,
 
 # ── New Feature 2: Top Medicines ──────────────────────────────────────────────
 
-def aggregate_top_medicines(start: date, end: date, limit: int = 10,
-                            queryset: PrescriptionLine = None) -> list:
+def aggregate_top_medicines(
+    start: date, 
+    end: date, 
+    limit: int = DEFAULT_TOP_MEDICINES_LIMIT,
+    queryset: Optional[QuerySet] = None
+) -> List[Dict[str, Any]]:
     """
     Top medicines by total usage using ORM Sum.
-    Groups by drug_name, calculates total prescriptions and total quantity.
-    No hardcoding.
     """
     if queryset is None:
         queryset = PrescriptionLine.objects.all()
@@ -293,19 +298,75 @@ def aggregate_top_medicines(start: date, end: date, limit: int = 10,
             'dosage_type':        row['drug__dosage_type'] or '',
             'total_quantity':     row['total_quantity'] or 0,
             'total_prescriptions': row['total_prescriptions'] or 0,
-            'avg_qty_per_rx':     round(row['avg_qty_per_rx'] or 0, 2),
+            'avg_qty_per_rx':     round(row['avg_qty_per_rx'] or 0, ROUNDING_PRECISION_DEFAULT),
         }
         for row in qs[:limit]
     ]
 
 
+def aggregate_top_medicines_with_stock(
+    start: date, 
+    end: date, 
+    limit: int = DEFAULT_TOP_MEDICINES_LIMIT,
+    rx_queryset: Optional[QuerySet] = None,
+    stock_queryset: Optional[QuerySet] = None
+) -> List[Dict[str, Any]]:
+    """
+    Combines top usage data with live stock levels.
+    """
+    if rx_queryset is None: rx_queryset = PrescriptionLine.objects.all()
+    if stock_queryset is None: stock_queryset = DrugMaster.objects.all()
+
+    # 1. Usage stats
+    usage_qs = (
+        rx_queryset
+        .filter(prescription_date__range=(start, end))
+        .values('drug__drug_name')
+        .annotate(
+            total_quantity=Sum('quantity'),
+            prescription_count=Count('id'),
+        )
+        .order_by('-total_quantity', '-prescription_count')[:limit]
+    )
+    
+    usage_data = list(usage_qs)
+    if not usage_data:
+        return []
+
+    top_names = [row['drug__drug_name'] for row in usage_data]
+
+    # 2. Live stock for these specific drugs
+    stock_qs = (
+        stock_queryset
+        .filter(drug_name__in=top_names)
+        .values('drug_name', 'generic_name', 'dosage_type')
+        .annotate(total_stock=Sum('current_stock'))
+    )
+    stock_map = {row['drug_name']: row for row in stock_qs}
+
+    # 3. Join logic
+    results = []
+    for row in usage_data:
+        name = row['drug__drug_name']
+        details = stock_map.get(name, {})
+        
+        results.append({
+            'drug_name':          name,
+            'generic_name':       details.get('generic_name') or '',
+            'dosage_type':        details.get('dosage_type') or '',
+            'current_stock':      details.get('total_stock') or 0,
+            'prescription_count': row['prescription_count'] or 0,
+            'total_quantity':     row['total_quantity'] or 0,
+        })
+    
+    return results
+
+
 # ── New Feature 4: Disease Seasonality Insights ───────────────────────────────
 
-def aggregate_seasonality(start: date, end: date, queryset: Appointment = None) -> dict:
+def aggregate_seasonality(start: date, end: date, queryset: Optional[QuerySet] = None) -> Dict[str, Any]:
     """
     Analyse disease occurrence by season from Disease model.
-    No hardcoded season-disease mapping — all from DB.
-    Returns most common disease per season + full breakdown.
     """
     if queryset is None:
         queryset = Appointment.objects.all()
@@ -333,7 +394,6 @@ def aggregate_seasonality(start: date, end: date, queryset: Appointment = None) 
 
     result = {}
     for season, entries in seasons.items():
-        # Aggregate by disease type within season
         type_totals = defaultdict(int)
         for e in entries:
             type_totals[e['disease_name']] += e['case_count']
@@ -354,11 +414,9 @@ def aggregate_seasonality(start: date, end: date, queryset: Appointment = None) 
 
 # ── New Feature 5: Doctor-wise Disease Trends ─────────────────────────────────
 
-def aggregate_doctor_wise(start: date, end: date, queryset: Appointment = None) -> list:
+def aggregate_doctor_wise(start: date, end: date, queryset: Optional[QuerySet] = None) -> List[Dict[str, Any]]:
     """
     Group disease data by doctor.
-    Shows which doctor handles most cases of specific diseases.
-    Pure ORM — no Python loops for aggregation.
     """
     if queryset is None:
         queryset = Appointment.objects.all()
@@ -395,7 +453,7 @@ def aggregate_doctor_wise(start: date, end: date, queryset: Appointment = None) 
 
 # ── New Feature 6: Weekly / Monthly aggregation ───────────────────────────────
 
-def aggregate_weekly(start: date, end: date, queryset: Appointment = None) -> list:
+def aggregate_weekly(start: date, end: date, queryset: Optional[QuerySet] = None) -> List[Dict[str, Any]]:
     """Group appointment counts by week using TruncWeek."""
     if queryset is None:
         queryset = Appointment.objects.all()
@@ -413,17 +471,17 @@ def aggregate_weekly(start: date, end: date, queryset: Appointment = None) -> li
         .order_by('week')
     )
 
-    results = []
-    for row in qs:
-        results.append({
+    return [
+        {
             'week':         str(row['week'])[:10] if row['week'] else '',
             'disease_name': get_disease_type(row['disease__name']),
             'case_count':   row['case_count'],
-        })
-    return results
+        }
+        for row in qs
+    ]
 
 
-def aggregate_monthly(start: date, end: date, queryset: Appointment = None) -> list:
+def aggregate_monthly(start: date, end: date, queryset: Optional[QuerySet] = None) -> List[Dict[str, Any]]:
     """Group appointment counts by month using TruncMonth."""
     if queryset is None:
         queryset = Appointment.objects.all()
@@ -441,11 +499,11 @@ def aggregate_monthly(start: date, end: date, queryset: Appointment = None) -> l
         .order_by('month')
     )
 
-    results = []
-    for row in qs:
-        results.append({
+    return [
+        {
             'month':        str(row['month'])[:7] if row['month'] else '',
             'disease_name': get_disease_type(row['disease__name']),
             'case_count':   row['case_count'],
-        })
-    return results
+        }
+        for row in qs
+    ]

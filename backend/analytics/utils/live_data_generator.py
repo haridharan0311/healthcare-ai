@@ -111,10 +111,25 @@ class LiveDataGenerator:
                 while current_sleep < self.interval and self.running:
                     time.sleep(1)
                     current_sleep += 1
-                    
+                
+                # Proactive Cache Warming: Recalculate insights after data generation
+                if self.running:
+                    self.warm_analytics_cache()
         except Exception as e:
             logger.error(f'Live data generator fatal error: {e}', exc_info=True)
             self.running = False
+
+    def warm_analytics_cache(self):
+        """Proactively warm the analytics cache for faster dashboard response."""
+        try:
+            from ..services.analytics_facade import analytics_service
+            logger.info("Warming analytics cache with fresh insights...")
+            # Trigger heavy computations in background
+            analytics_service.get_structured_analytics(days=30)
+            analytics_service.get_realtime_status()
+            logger.info("✓ Analytics cache warmed successfully.")
+        except Exception as e:
+            logger.error(f"Cache warming failed: {e}")
     
     def generate_data(self):
         """Generate a batch of appointments, prescriptions, and related data."""
