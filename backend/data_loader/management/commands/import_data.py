@@ -74,7 +74,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from django.utils.dateparse import parse_datetime
-from django.utils.timezone import make_aware
+from django.utils.timezone import make_aware, now
 
 from core.models import Clinic, Doctor, Patient
 from inventory.models import DrugMaster, Prescription, PrescriptionLine
@@ -123,7 +123,7 @@ class Command(BaseCommand):
                             username=row["username"],
                             defaults={
                                 "email": row["email"],
-                                "date_joined": make_aware(parse_datetime(row["date_joined"])) if row["date_joined"] else date.today(),
+                                "date_joined": make_aware(parse_datetime(row["date_joined"])) if row["date_joined"] else now(),
                                 "last_login": make_aware(parse_datetime(row["last_login"])) if row["last_login"] else None,
                             }
                         )

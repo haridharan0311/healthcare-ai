@@ -73,6 +73,10 @@ class Command(BaseCommand):
                 writer = csv.DictWriter(f, fieldnames=["id", "clinic_name", "clinic_address_1"])
                 writer.writeheader()
                 for clinic in Clinic.objects.all():
+                    writer.writerow({
+                        "id": clinic.id,
+                        "clinic_name": clinic.clinic_name,
+                        "clinic_address_1": clinic.clinic_address_1
                     })
 
             # ================== USERS ==================
@@ -149,7 +153,7 @@ class Command(BaseCommand):
             # ================== DRUG MASTER ==================
             self.stdout.write("Exporting DrugMaster...")
             with open(os.path.join(base_path, "DrugMaster.csv"), "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=["id", "drug_name", "generic_name", "drug_strength", "dosage_type", "clinic_id"])
+                writer = csv.DictWriter(f, fieldnames=["id", "drug_name", "generic_name", "drug_strength", "dosage_type", "current_stock", "clinic_id"])
                 writer.writeheader()
                 for drug in DrugMaster.objects.all():
                     writer.writerow({
@@ -158,6 +162,7 @@ class Command(BaseCommand):
                         "generic_name": drug.generic_name,
                         "drug_strength": drug.drug_strength,
                         "dosage_type": drug.dosage_type,
+                        "current_stock": drug.current_stock,
                         "clinic_id": drug.clinic_id
                     })
 
