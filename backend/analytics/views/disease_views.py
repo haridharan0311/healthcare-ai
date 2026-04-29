@@ -72,6 +72,39 @@ class DiseaseTrendView(APIView):
         results.sort(key=lambda x: x['trend_score'], reverse=True)
         return Response(results)
 
+class DiseaseTypeDistributionView(APIView):
+    """
+    GET /api/disease-trends/distribution/?days=30
+    
+    Distribution of diseases by type (e.g., Viral, Bacterial).
+    """
+    @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
+    def get(self, request) -> Response:
+        start, end = _get_date_range(request)
+        appt_qs = apply_clinic_filter(Appointment.objects.all(), request)
+
+        # Get raw counts grouped by disease type
+        raw_counts = appt_qs.filter(
+            appointment_datetime__date__range=(start, end),
+            disease__isnull=False,
+        ).values('disease').annotate(count=Count('id'))
+
+        type_counts = defaultdict(int)
+        for entry in raw_counts:
+            dtype = get_disease_type(entry['disease'])
+            type_counts[dtype] += entry['count']
+
+        total_cases = sum(type_counts.values())
+        distribution = []
+        for dtype, count in type_counts.items():
+            distribution.append({
+                'disease_type': dtype,
+                'case_count': count,
+                'percentage': round((count / total_cases) * 100, 2) if total_cases > 0 else 0
+            })
+
+        distribution.sort(key=lambda x: x['case_count'], reverse=True)
+        return Response(distribution)
 
 class TimeSeriesView(APIView):
     """
@@ -210,11 +243,14 @@ class DoctorWiseTrendsView(APIView):
                     'doctor_id': p['doctor_id'],
                     'doctor_name': p['doctor_name'],
                     'disease_name': p['top_specialization'],
+                    'season': p.get('season', 'All'),
                     'case_count': p['total_cases'],
                     'efficiency_score': p['efficiency_score']
                 })
 
         return Response({
             'period_days': days,
+            'total_rows': len(results),
+            'min_cases': 10, # Standard threshold for this report
             'data': results
         })

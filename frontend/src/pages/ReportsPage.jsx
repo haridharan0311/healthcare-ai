@@ -323,7 +323,15 @@ export default function ReportsPage() {
                 <TopMedicines data={data} days={days} />
               )}
               {data && tab === 'Low Stock Alerts' && (
-                <LowStockAlerts data={data} threshold={threshold} />
+                <LowStockAlerts 
+                  data={data} 
+                  threshold={threshold} 
+                  onRestock={(drug) => {
+                    setTab('Stock Depletion Forecast');
+                    setStockDrugName(drug);
+                    setDays(90); // Default window for forecast
+                  }}
+                />
               )}
               {data && tab === 'Seasonality' && (
                 <Seasonality data={data} />

@@ -1,7 +1,7 @@
 import React from 'react';
 import styles from './Reports.module.css';
 
-export default function LowStockAlerts({ data, threshold }) {
+export default function LowStockAlerts({ data, threshold, onRestock }) {
   if (!data) return null;
 
   return (
@@ -83,12 +83,18 @@ export default function LowStockAlerts({ data, threshold }) {
                         background: `${c}20`, color: c,
                         padding: '2px 9px', borderRadius: '4px', fontSize: '11px', fontWeight: 700,
                       }}>
-                        {row.alert_level.replace('_', ' ')}
+                        {row.alert_level?.replace('_', ' ') || 'N/A'}
                       </span>
                     </td>
                     <td>
                       {row.restock_now && (
-                        <span className={`${styles.badge} ${styles.badgeCritical}`}>RESTOCK NOW</span>
+                        <button 
+                          className={`${styles.badge} ${styles.badgeCritical}`}
+                          style={{ border: 'none', cursor: 'pointer', outline: 'none' }}
+                          onClick={() => onRestock && onRestock(row.drug_name)}
+                        >
+                          RESTOCK NOW
+                        </button>
                       )}
                     </td>
                   </tr>

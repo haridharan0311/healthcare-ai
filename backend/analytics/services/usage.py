@@ -228,23 +228,26 @@ class UsageIntelligence:
                         'doctor__id', 
                         'doctor__first_name', 
                         'doctor__last_name', 
-                        'disease__name'
+                        'disease__name',
+                        'disease__season' # Include season
                     )
                     .annotate(cases=Count('id'))
-                    .order_by('doctor__first_name', '-cases')
+                    .order_by('doctor__id', '-cases')
                 )
                 
-                doctor_data = defaultdict(lambda: {'name': '', 'cases': 0, 'top_disease': '', 'max_d_cases': 0})
+                doctor_data = defaultdict(lambda: {'name': '', 'cases': 0, 'top_disease': '', 'max_d_cases': 0, 'season': 'All'})
                 for r in qs:
                     did = r['doctor__id']
                     dname = f"{r['doctor__first_name']} {r['doctor__last_name'] or ''}".strip()
                     dtype = get_disease_type(r['disease__name'])
+                    season = r['disease__season'] or 'All'
                     
                     doctor_data[did]['name'] = dname
                     doctor_data[did]['cases'] += r['cases']
                     if r['cases'] > doctor_data[did]['max_d_cases']:
                         doctor_data[did]['max_d_cases'] = r['cases']
                         doctor_data[did]['top_disease'] = dtype
+                        doctor_data[did]['season'] = season
                 
                 results = [
                     {
@@ -252,6 +255,7 @@ class UsageIntelligence:
                         'doctor_name': data['name'],
                         'total_cases': data['cases'],
                         'top_specialization': data['top_disease'],
+                        'season': data['season'],
                         'efficiency_score': round(data['cases'] / max(days, 1), 2)
                     } 
                     for did, data in doctor_data.items()
@@ -299,29 +303,60 @@ class UsageIntelligence:
 
     def get_stock_alerts(
         self, 
-        critical_threshold: int = DEFAULT_CRITICAL_STOCK_THRESHOLD, 
         low_threshold: int = DEFAULT_LOW_STOCK_THRESHOLD, 
         request=None
     ) -> List[Dict]:
         """
         FEATURE 5: Low Stock Alerts.
-        Identifies medicines in critical or low stock situations.
+        Identifies medicines in critical or low stock situations across all clinics.
+        Returns aggregated data for the dashboard.
         """
         try:
-            drugs_qs_base = DrugMaster.objects.filter(current_stock__lte=low_threshold).select_related('clinic')
-            drugs = apply_clinic_filter(drugs_qs_base, request)
+            from django.db.models import Avg, Sum, Count, Min
+            
+            # Aggregate stock by drug across all clinics
+            stock_qs_base = DrugMaster.objects.all()
+            stock_qs = apply_clinic_filter(stock_qs_base, request) \
+                .values('drug_name', 'generic_name') \
+                .annotate(
+                    avg_stock=Avg('current_stock'),
+                    min_stock=Min('current_stock'), # Use Min to detect local stockouts
+                    total_stock=Sum('current_stock'),
+                    clinic_count=Count('clinic', distinct=True),
+                ) \
+                .filter(min_stock__isnull=False, min_stock__lte=low_threshold) \
+                .order_by('min_stock', 'avg_stock')
             
             results = []
-            for drug in drugs:
-                status = 'critical' if drug.current_stock <= critical_threshold else 'low'
+            for row in stock_qs:
+                avg = round(row['avg_stock'] or 0, 1)
+                min_s = row['min_stock'] or 0
+                
+                # Determine alert level based on WORST CASE (min_stock)
+                # This ensures if any clinic is out of stock, the Admin sees 'out_of_stock'
+                if min_s == 0:
+                    alert_level = 'out_of_stock'
+                elif min_s <= low_threshold * 0.25:
+                    alert_level = 'critical'
+                elif min_s <= low_threshold * 0.5:
+                    alert_level = 'low'
+                else:
+                    alert_level = 'warning'
+
                 results.append({
-                    'drug_id': drug.id,
-                    'drug_name': drug.drug_name,
-                    'current_stock': drug.current_stock,
-                    'status': status,
-                    'clinic': drug.clinic.clinic_name if drug.clinic else "Unknown"
+                    'drug_name': row['drug_name'],
+                    'generic_name': row['generic_name'] or '',
+                    'avg_stock_per_clinic': avg,
+                    'min_stock': min_s,
+                    'total_stock': row['total_stock'] or 0,
+                    'clinic_count': row['clinic_count'],
+                    'threshold': low_threshold,
+                    'alert_level': alert_level,
+                    'status': alert_level,
+                    'restock_now': alert_level in ['out_of_stock', 'critical']
                 })
-            return sorted(results, key=lambda x: (x['status'] == 'low', x['current_stock']))
+                
+            return results
         except Exception as e:
             self.logger.error(f"Stock alerts failed: {str(e)}", exc_info=True)
             return []

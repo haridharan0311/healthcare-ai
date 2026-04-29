@@ -117,8 +117,10 @@ class LowStockAlertView(APIView):
         summary = {
             'threshold': threshold,
             'total_alerts': len(alerts),
+            'out_of_stock': sum(1 for a in alerts if a['status'] == 'out_of_stock'),
             'critical': sum(1 for a in alerts if a['status'] == 'critical'),
             'low': sum(1 for a in alerts if a['status'] == 'low'),
+            'warning': sum(1 for a in alerts if a['status'] == 'warning'),
             'alerts': alerts
         }
         

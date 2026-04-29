@@ -22,8 +22,12 @@ from .constants import (
 )
 
 def get_disease_type(name: str) -> str:
-    """Strip trailing numbers — no hardcoded disease list."""
-    return re.sub(r'\s+\d+$', '', name or '').strip()
+    """Strip trailing numbers and 'Variant' suffix to merge data categories."""
+    if not name: return "Unknown"
+    # Remove 'Variant' (case-insensitive)
+    name = re.sub(r'\s+Variant\s*$', '', name, flags=re.IGNORECASE)
+    # Remove trailing numbers
+    return re.sub(r'\s+\d+\s*$', '', name).strip()
 
 
 # ── 1.1 Disease case counts (ORM Count) ──────────────────────────────────────
@@ -42,7 +46,6 @@ def aggregate_disease_counts(start: date, end: date, queryset: Optional[QuerySet
             appointment_datetime__date__range=(start, end),
             disease__isnull=False,
         )
-        .exclude(VARIANT_FILTERS)
         .select_related('disease')
         .values(
             'disease__name', 'disease__season',
@@ -398,14 +401,20 @@ def aggregate_seasonality(start: date, end: date, queryset: Optional[QuerySet] =
         for e in entries:
             type_totals[e['disease_name']] += e['case_count']
 
+        total_season_cases = sum(type_totals.values())
         sorted_diseases = sorted(type_totals.items(), key=lambda x: -x[1])
+        
         result[season] = {
             'top_disease':      sorted_diseases[0][0] if sorted_diseases else None,
             'top_disease_count': sorted_diseases[0][1] if sorted_diseases else 0,
-            'total_cases':      sum(type_totals.values()),
+            'total_cases':      total_season_cases,
             'diseases':         [
-                {'disease_name': d, 'case_count': c}
-                for d, c in sorted_diseases
+                {
+                    'disease_name': d, 
+                    'case_count': c,
+                    'percentage': round((c / total_season_cases) * 100, 1) if total_season_cases > 0 else 0
+                }
+                for d, c in sorted_diseases[:10] # Limit to top 10 per season for readability
             ],
         }
 

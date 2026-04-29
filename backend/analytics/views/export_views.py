@@ -561,14 +561,18 @@ class ExportStockDepletionView(APIView):
                 growth_map[dname] = growth.get('growth_rate', 0)
             
             for dname in all_drugs:
-                res = service.forecast_stock_depletion(drug_name=dname, days=days, rx_queryset=rx_qs, request=request, growth_map=growth_map)
-                if not res.get('error'):
-                    writer.writerow([
-                        res.get('drug_name'), res.get('generic_name'), 
-                        res.get('current_stock'), res.get('avg_daily_usage'),
-                        res.get('days_until_depletion'), res.get('depletion_date'),
-                        res.get('status')
-                    ])
+                try:
+                    res = service.forecast_stock_depletion(drug_name=dname, days=days, rx_queryset=rx_qs, request=request, growth_map=growth_map)
+                    if res and not res.get('error'):
+                        writer.writerow([
+                            res.get('drug_name'), res.get('generic_name'), 
+                            res.get('current_stock'), res.get('avg_daily_usage'),
+                            res.get('days_until_depletion'), res.get('depletion_date'),
+                            res.get('status')
+                        ])
+                except Exception:
+                    # Log error but don't stop the whole export
+                    continue
 
                 
         return response

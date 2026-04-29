@@ -379,6 +379,8 @@ class ForecastingService:
                 'days_until_depletion': round(days_left, 1),
                 'depletion_date': (date.today() + timedelta(days=int(days_left))).isoformat() if days_left < 365 else "N/A",
                 'status': status,
+                'urgency': status, # Frontend expects 'urgency'
+                'analysis_period': f"Last {days} days", # Frontend expects 'analysis_period'
                 'recommended_reorder': round(predicted_daily_usage * 30 * REORDER_SAFETY_MULTIPLIER, 0),
                 'recommendation': self._get_depletion_recommendation(status, days_left)
             }

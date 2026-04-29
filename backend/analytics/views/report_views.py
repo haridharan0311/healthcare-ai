@@ -75,7 +75,10 @@ class WeeklyReportView(APIView):
 
         # Build boxes
         weeks = []
-        for i, (week_start, type_counts) in enumerate(sorted(week_map.items())):
+        # Filter out 'Unknown' weeks before processing to avoid crash
+        valid_weeks = sorted([(ws, tc) for ws, tc in week_map.items() if ws != 'Unknown'])
+        
+        for i, (week_start, type_counts) in enumerate(valid_weeks):
             total = sum(type_counts.values())
             # Calculate week end
             from datetime import datetime
@@ -84,7 +87,7 @@ class WeeklyReportView(APIView):
                 we_date  = ws_date + timedelta(days=6)
                 week_end = str(we_date)
                 week_label = f'Week {i + 1} ({ws_date.strftime("%d %b")} – {we_date.strftime("%d %b %Y")})'
-            except Exception:
+            except (ValueError, TypeError, Exception):
                 week_end   = week_start
                 week_label = f'Week {i + 1}'
 
@@ -147,13 +150,16 @@ class MonthlyReportView(APIView):
             month_map[ms][dtype] += row['case_count']
 
         months = []
-        for i, (month_key, type_counts) in enumerate(sorted(month_map.items())):
+        # Filter out 'Unknown' months
+        valid_months = sorted([(mk, tc) for mk, tc in month_map.items() if mk != 'Unknown'])
+        
+        for i, (month_key, type_counts) in enumerate(valid_months):
             total = sum(type_counts.values())
             try:
                 from datetime import datetime
                 m_date     = datetime.strptime(month_key, '%Y-%m')
                 month_label = m_date.strftime('%B %Y')
-            except Exception:
+            except (ValueError, TypeError, Exception):
                 month_label = month_key
 
             sorted_diseases = sorted(type_counts.items(), key=lambda x: -x[1])
@@ -206,10 +212,20 @@ class TodaySummaryView(APIView):
     @cache_api_response(timeout=300)  # Cache for 30 seconds to match frontend refresh
     def get(self, request):
         # Latest date in DB
-        latest = Appointment.objects.aggregate(
+        latest_data = Appointment.objects.aggregate(
             latest=Max('appointment_datetime')
-        )['latest']
-        today = latest.date() if latest else date.today()
+        )
+        latest = latest_data['latest']
+        
+        if not latest:
+            return Response({
+                'date': str(date.today()),
+                'total_today': 0,
+                'by_disease': [],
+                'message': 'No appointment data found in database.'
+            })
+
+        today = latest.date()
 
         # Per disease today — ORM Count, no loops
         # Only count appointments with a disease assigned for consistency with other views
