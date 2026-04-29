@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import ErrorBoundary from './atoms/ErrorBoundary';
 
 const COLORS = [
   '#4f46e5', '#0d9488', '#64748b', '#7c3aed', 
@@ -115,27 +116,29 @@ export default function TrendChart({ onExport }) {
         </div>
 
         <div ref={containerRef} style={{ height: 400, width: '100%', minHeight: 400, position: 'relative' }}>
-          {isLoading || !isLayoutReady ? (
-            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 24, height: 24, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                  Analyzing patterns...
+          <ErrorBoundary>
+            {isLoading || !isLayoutReady ? (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', background: '#f8fafc', borderRadius: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 24, height: 24, border: '3px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    Analyzing patterns...
+                </div>
               </div>
-            </div>
-          ) : (
-            <ResponsiveContainer width="99%" height="99%" minWidth={0} minHeight={0}>
-              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 700 }} />
-                {selectedDiseases.map((d, i) => (
-                  <Line key={d} type="monotone" dataKey={d} stroke={COLORS[allDiseases.indexOf(d) % COLORS.length]} strokeWidth={2.5} dot={false} activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          )}
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 700 }} />
+                  {selectedDiseases.map((d, i) => (
+                    <Line key={d} type="monotone" dataKey={d} stroke={COLORS[allDiseases.indexOf(d) % COLORS.length]} strokeWidth={2.5} dot={false} activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff' }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ErrorBoundary>
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
