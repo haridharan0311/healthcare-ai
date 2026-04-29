@@ -87,3 +87,23 @@ class Patient(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
+
+class AuditLog(models.Model):
+    """
+    HIPAA-compliant audit log for tracking access to sensitive patient data.
+    """
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
+    action = models.CharField(max_length=255) # e.g., 'VIEW_DASHBOARD', 'EXPORT_REPORT'
+    resource = models.CharField(max_length=255) # e.g., '/api/restock/'
+    metadata = models.JSONField(default=dict) # Store params, IP, etc.
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = "System Audit Log"
+        verbose_name_plural = "System Audit Logs"
+
+    def __str__(self):
+        return f"{self.user} - {self.action} - {self.timestamp}"
+

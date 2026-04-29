@@ -379,12 +379,10 @@ class DistrictRestockView(APIView):
 
         if not district_filter:
             # If all districts are "Unknown", fallback to clinic names
-            if all_districts == {'Unknown'} or len(all_districts) == 0:
-                clinics = Clinic.objects.values_list('clinic_name', flat=True).distinct()
-                all_districts = set(clinics)
+            all_districts = set(Clinic.objects.values_list('clinic_name', flat=True).distinct())
             
             return Response({
-                'districts': sorted(all_districts),
+                'districts': sorted(list(all_districts)),
                 'total':     len(all_districts),
             })
 

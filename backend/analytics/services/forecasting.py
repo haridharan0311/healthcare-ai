@@ -89,38 +89,55 @@ class ForecastingService:
                     'days_available': len(daily_counts)
                 }
             
-            # Apply blended forecast (MA + ES)
-            ma_val = moving_average_forecast(daily_counts)
-            es_val = exponential_smoothing_forecast(daily_counts)
-            forecast_value = (ma_val + es_val) / 2
+            # Advanced: Seasonal-Trend Decomposition (Simulated via NumPy)
+            import numpy as np
+            import pandas as pd
+
+            series = pd.Series(daily_counts)
             
-            # Calculate trend based on recent 7-day average
-            recent_avg = sum(daily_counts[-7:]) / 7 if len(daily_counts) >= 7 else sum(daily_counts) / len(daily_counts)
+            # 1. Trend component (Moving Average)
+            trend = series.rolling(window=min(7, len(series)), min_periods=1).mean()
             
-            if forecast_value > recent_avg * TREND_UP_THRESHOLD:
-                trend = 'increasing'
-            elif forecast_value < recent_avg * TREND_DOWN_THRESHOLD:
-                trend = 'decreasing'
+            # 2. Seasonal component (Day-of-week logic)
+            # We assume a 7-day cycle for healthcare data
+            if len(series) >= 14:
+                seasonal_deltas = []
+                for i in range(7):
+                    day_indices = range(i, len(series), 7)
+                    day_values = series.iloc[day_indices]
+                    seasonal_deltas.append(day_values.mean() - series.mean())
+                
+                # Project seasonality forward
+                future_seasonality = [seasonal_deltas[(len(series) + i) % 7] for i in range(days_ahead)]
             else:
-                trend = 'stable'
+                future_seasonality = [0] * days_ahead
+
+            # 3. Forecast calculation (Trend + Seasonality)
+            last_trend = trend.iloc[-1]
+            slope = (trend.iloc[-1] - trend.iloc[0]) / len(trend) if len(trend) > 1 else 0
             
-            # Confidence range calculation based on historical variance
-            if len(daily_counts) >= 7:
-                variance = sum((x - recent_avg) ** 2 for x in daily_counts[-7:]) / 7
-                std_dev = variance ** 0.5
-                margin = std_dev * (1 - confidence)
-            else:
-                margin = forecast_value * 0.3
+            forecast_points = []
+            for i in range(1, days_ahead + 1):
+                p = last_trend + (slope * i) + future_seasonality[i-1]
+                forecast_points.append(max(0, p))
+
+            forecast_value = sum(forecast_points) / days_ahead
+            
+            # Confidence intervals based on residual variance
+            residuals = series - trend
+            std_dev = residuals.std() if len(residuals) > 1 else (forecast_value * 0.2)
+            margin = std_dev * 1.96 * (1 - (confidence - 0.9)) # Z-score for confidence
             
             return {
                 'disease_name': disease_name,
                 'forecast_value': round(forecast_value, 1),
+                'forecast_points': [round(p, 1) for p in forecast_points],
                 'confidence_level': confidence,
                 'confidence_lower': round(max(0, forecast_value - margin), 1),
                 'confidence_upper': round(forecast_value + margin, 1),
-                'trend': trend,
+                'trend': 'increasing' if slope > 0.1 else 'decreasing' if slope < -0.1 else 'stable',
                 'days_ahead': days_ahead,
-                'historical_avg': round(recent_avg, 2),
+                'historical_avg': round(series.mean(), 2),
                 'forecast_date': (end_date + timedelta(days=days_ahead)).isoformat()
             }
         except Exception as e:

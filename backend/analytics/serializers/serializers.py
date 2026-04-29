@@ -5,6 +5,12 @@ from inventory.models import DrugMaster, Prescription, PrescriptionLine
 from core.models import Patient, Doctor, Clinic
 
 
+class CommonQuerySerializer(serializers.Serializer):
+    days = serializers.IntegerField(required=False, default=30, min_value=1, max_value=365)
+    period = serializers.ChoiceField(choices=['MTD', 'WTD', ''], required=False, default='')
+    disease = serializers.CharField(required=False, allow_blank=True)
+    limit = serializers.IntegerField(required=False, default=10, min_value=1, max_value=100)
+
 
 class DiseaseSerializer(serializers.ModelSerializer):
     class Meta:

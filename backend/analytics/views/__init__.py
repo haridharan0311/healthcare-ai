@@ -10,3 +10,4 @@ from .export_views import (
 )
 from . import live_data_views
 from . import dashboard_views
+from .district_views import StateAnalyticsView

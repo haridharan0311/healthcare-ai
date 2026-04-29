@@ -1,5 +1,6 @@
 from pathlib import Path
 from decouple import config, Csv
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -18,6 +19,7 @@ ALLOWED_HOSTS = ['*']  # Allow all hosts for development
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -29,7 +31,8 @@ INSTALLED_APPS = [
     'analytics',
     'core',
     'inventory',
-    'data_loader',   
+    'data_loader',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -42,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.AuditLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -82,12 +86,27 @@ DATABASES = {
 }
 
 # ── Caching ───────────────────────────────────────────────────────────────
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'healthcare-ai-cache',
+IS_TESTING = 'test' in sys.argv
+
+USE_REDIS = config('USE_REDIS', default=False, cast=bool)
+
+if IS_TESTING or not config('REDIS_URL', default=None) or not USE_REDIS:
+    # Use local memory cache for testing or if Redis is not explicitly enabled
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'healthcare-ai-cache',
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': config('REDIS_URL'),
+        }
+    }
+
+
 
 
 
@@ -121,6 +140,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
@@ -150,6 +170,28 @@ USE_I18N = True
 
 USE_TZ = True
 
+# ── Celery ───────────────────────────────────────────────────────────────
+_REDIS_URL = config('REDIS_URL', default=None)
+_ACTUAL_REDIS = _REDIS_URL if USE_REDIS else None
+
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default=_ACTUAL_REDIS or 'memory://')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default=_ACTUAL_REDIS or 'cache+memory://')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_ALWAYS_EAGER = IS_TESTING or not _ACTUAL_REDIS
+
+# ── Celery Beat Schedule ───────────────────────────────────────────────
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'archive-old-data-weekly': {
+        'task': 'cleanup_old_appointments',
+        'schedule': crontab(hour=2, minute=0, day_of_week='sun'), # Sunday at 2 AM
+        'args': (3,), # 3 years
+    },
+}
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
@@ -171,3 +213,14 @@ LIVE_DATA_INTERVAL = 30  # Generate new data every 30 seconds
 
 
 
+# ── Channels (WebSockets) ──────────────────────────────────────────────
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer' if _ACTUAL_REDIS else 'channels.layers.InMemoryChannelLayer',
+        'CONFIG': {
+            "hosts": [(_REDIS_URL or "redis://localhost:6379/0")],
+        } if _ACTUAL_REDIS else {},
+    },
+}

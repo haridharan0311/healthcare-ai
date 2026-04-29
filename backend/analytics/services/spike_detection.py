@@ -38,7 +38,13 @@ def detect_spike_logic(
     if len(daily_counts) < 3:
         return {
             "today_count": daily_counts[-1] if daily_counts else 0,
+            "mean_last_7_days": 0.0,
+            "std_dev": 0.0,
+            "z_score": 0.0,
+            "threshold": 0.0,
             "is_spike": False,
+            "confidence": 0.0,
+            "impact_severity": "normal",
             "status": "insufficient_data",
             "reason": "insufficient data window"
         }

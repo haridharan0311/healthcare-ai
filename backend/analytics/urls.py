@@ -15,6 +15,7 @@ urlpatterns = [
     # ── Restock ───────────────────────────────────────────────────────
     path('restock-suggestions/',       views.RestockSuggestionView.as_view(), name='restock-suggestions'),
     path('district-restock/',          views.DistrictRestockView.as_view(),   name='district-restock'),
+    path('districts/state-summary/',   views.StateAnalyticsView.as_view(),    name='state-summary'),
 
     # ── Features ──────────────────────────────────────────────────────
     path('trend-comparison/',          views.TrendComparisonView.as_view(),   name='trend-comparison'),

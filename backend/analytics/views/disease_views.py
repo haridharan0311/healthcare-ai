@@ -11,6 +11,7 @@ from .utils import cache_api_response, _get_date_range, _get_db_date_range, appl
 from ..services.constants import ANALYTICS_CACHE_TIMEOUT, ROUNDING_PRECISION_GROWTH
 from ..services.timeseries import get_seasonal_weight
 from ..services.ml_engine import weighted_trend_score
+from ..serializers.serializers import DiseaseTrendSerializer, CommonQuerySerializer
 from ..services.aggregation import (
     aggregate_disease_counts, aggregate_daily_counts, compare_disease_trends, 
     aggregate_seasonality, get_disease_type
@@ -25,6 +26,11 @@ class DiseaseTrendView(APIView):
     """
     @cache_api_response(timeout=ANALYTICS_CACHE_TIMEOUT)
     def get(self, request) -> Response:
+        # Strict input validation
+        query_serializer = CommonQuerySerializer(data=request.query_params)
+        query_serializer.is_valid(raise_exception=True)
+        validated_data = query_serializer.validated_data
+
         start, end = _get_date_range(request)
         current_month = date.today().month
         mid = end - timedelta(days=7)
